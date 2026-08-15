@@ -6,6 +6,7 @@ const estruturaSql = [
     `
   CREATE TABLE IF NOT EXISTS visita_domiciliar (
     id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID,
     beneficiario_id BIGINT NOT NULL,
     beneficiario_nome TEXT NOT NULL,
     unidade TEXT NOT NULL,
@@ -26,6 +27,7 @@ const estruturaSql = [
     atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
   )
   `,
+    "ALTER TABLE IF EXISTS visita_domiciliar ADD COLUMN IF NOT EXISTS tenant_id UUID",
     "ALTER TABLE IF EXISTS visita_domiciliar ADD COLUMN IF NOT EXISTS beneficiario_nome TEXT",
     "ALTER TABLE IF EXISTS visita_domiciliar ADD COLUMN IF NOT EXISTS horario_final TEXT",
     "ALTER TABLE IF EXISTS visita_domiciliar ADD COLUMN IF NOT EXISTS tipo_visita TEXT",
@@ -40,16 +42,20 @@ const estruturaSql = [
     "ALTER TABLE IF EXISTS visita_domiciliar ADD COLUMN IF NOT EXISTS atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()",
     "CREATE INDEX IF NOT EXISTS visita_domiciliar_data_idx ON visita_domiciliar(data_visita)",
     "CREATE INDEX IF NOT EXISTS visita_domiciliar_beneficiario_idx ON visita_domiciliar(beneficiario_id)",
+    "CREATE INDEX IF NOT EXISTS visita_domiciliar_tenant_idx ON visita_domiciliar(tenant_id, data_visita DESC)",
     `
   CREATE TABLE IF NOT EXISTS visita_domiciliar_anexo (
     id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID,
     visita_id BIGINT NOT NULL REFERENCES visita_domiciliar(id) ON DELETE CASCADE,
     nome VARCHAR(200) NOT NULL,
     tipo VARCHAR(60) NOT NULL,
     tamanho VARCHAR(40),
     criado_em TIMESTAMP NOT NULL DEFAULT NOW()
   )
-  `
+  `,
+    "ALTER TABLE IF EXISTS visita_domiciliar_anexo ADD COLUMN IF NOT EXISTS tenant_id UUID",
+    "CREATE INDEX IF NOT EXISTS visita_domiciliar_anexo_tenant_idx ON visita_domiciliar_anexo(tenant_id, visita_id)"
 ];
 let estruturaPromise = null;
 export async function ensureVisitasDomiciliaresEstrutura() {
@@ -58,6 +64,22 @@ export async function ensureVisitasDomiciliaresEstrutura() {
             for (const comando of estruturaSql) {
                 await prisma.$executeRawUnsafe(comando);
             }
+            await prisma.$executeRawUnsafe(`
+        UPDATE visita_domiciliar AS visita
+        SET tenant_id = beneficiario.tenant_id
+        FROM cadastro_beneficiario AS beneficiario
+        WHERE visita.tenant_id IS NULL
+          AND beneficiario.id = visita.beneficiario_id
+          AND beneficiario.tenant_id IS NOT NULL
+      `);
+            await prisma.$executeRawUnsafe(`
+        UPDATE visita_domiciliar_anexo AS anexo
+        SET tenant_id = visita.tenant_id
+        FROM visita_domiciliar AS visita
+        WHERE anexo.tenant_id IS NULL
+          AND visita.id = anexo.visita_id
+          AND visita.tenant_id IS NOT NULL
+      `);
         })();
     }
     await estruturaPromise;
@@ -85,11 +107,12 @@ export class VisitasDomiciliaresRepository {
     async garantirEstrutura() {
         await ensureVisitasDomiciliaresEstrutura();
     }
-    async obterNomeBeneficiario(beneficiarioId) {
+    async obterNomeBeneficiario(beneficiarioId, tenantId) {
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT nome_completo, nome_social
       FROM cadastro_beneficiario
       WHERE id = ${BigInt(beneficiarioId)}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
         const registro = rows[0];
@@ -138,7 +161,7 @@ export class VisitasDomiciliaresRepository {
         }
         return this.schemaInfoPromise;
     }
-    async consultarVisitas(id) {
+    async consultarVisitas(tenantId, id) {
         const schema = await this.obterSchemaInfo();
         const colunaBeneficiarioNome = schema.possuiBeneficiarioNome
             ? "v.beneficiario_nome"
@@ -146,7 +169,7 @@ export class VisitasDomiciliaresRepository {
         const colunaAnexos = schema.possuiAnexos
             ? "v.anexos"
             : schema.possuiTabelaAnexos
-                ? "COALESCE((SELECT jsonb_agg(jsonb_build_object('id', a.id, 'nome', a.nome, 'tipo', a.tipo, 'tamanho', a.tamanho, 'criadoEm', a.criado_em) ORDER BY a.id ASC) FROM visita_domiciliar_anexo a WHERE a.visita_id = v.id), '[]'::jsonb) AS anexos"
+                ? "COALESCE((SELECT jsonb_agg(jsonb_build_object('id', a.id, 'nome', a.nome, 'tipo', a.tipo, 'tamanho', a.tamanho, 'criadoEm', a.criado_em) ORDER BY a.id ASC) FROM visita_domiciliar_anexo a WHERE a.visita_id = v.id AND a.tenant_id::text = $2), '[]'::jsonb) AS anexos"
                 : "'[]'::jsonb AS anexos";
         const colunaHorarioFinal = schema.possuiHorarioFinal ? "v.horario_final" : "NULL::text AS horario_final";
         const colunaTipoVisita = schema.possuiTipoVisita ? "v.tipo_visita" : "NULL::text AS tipo_visita";
@@ -190,41 +213,42 @@ export class VisitasDomiciliaresRepository {
           SELECT
             ${colunas}
           FROM visita_domiciliar v
-          LEFT JOIN cadastro_beneficiario b ON b.id = v.beneficiario_id
+          LEFT JOIN cadastro_beneficiario b ON b.id = v.beneficiario_id AND b.tenant_id::text = $2
           WHERE v.id = $1
+            AND v.tenant_id::text = $2
           LIMIT 1
-        `, id);
+        `, id, tenantId);
         }
         return prisma.$queryRawUnsafe(`
       SELECT
         ${colunas}
       FROM visita_domiciliar v
-      LEFT JOIN cadastro_beneficiario b ON b.id = v.beneficiario_id
+      LEFT JOIN cadastro_beneficiario b ON b.id = v.beneficiario_id AND b.tenant_id::text = $1
+      WHERE v.tenant_id::text = $1
       ORDER BY v.data_visita DESC, v.id DESC
-    `);
+    `, tenantId);
     }
-    async listar() {
+    async listar(tenantId) {
         await this.garantirEstrutura();
-        return this.consultarVisitas();
+        return this.consultarVisitas(tenantId);
     }
-    async obter(id) {
+    async obter(id, tenantId) {
         await this.garantirEstrutura();
-        const rows = await this.consultarVisitas(id);
+        const rows = await this.consultarVisitas(tenantId, id);
         return rows[0] ?? null;
     }
-    async obterOuFalhar(id) {
-        const visita = await this.obter(id);
+    async obterOuFalhar(id, tenantId) {
+        const visita = await this.obter(id, tenantId);
         if (!visita)
             throw new AppError("Visita domiciliar nao encontrada.", 404);
         return visita;
     }
-    async criar(input) {
+    async criar(input, tenantId) {
         await this.garantirEstrutura();
         const schema = await this.obterSchemaInfo();
-        const beneficiarioNome = schema.possuiBeneficiarioNome
-            ? await this.obterNomeBeneficiario(input.beneficiarioId)
-            : null;
+        const beneficiarioNome = await this.obterNomeBeneficiario(input.beneficiarioId, tenantId);
         const campos = [
+            Prisma.raw("tenant_id"),
             Prisma.raw("beneficiario_id"),
             ...(schema.possuiBeneficiarioNome ? [Prisma.raw("beneficiario_nome")] : []),
             Prisma.raw("unidade"),
@@ -245,10 +269,9 @@ export class VisitasDomiciliaresRepository {
             ...(schema.possuiAtualizadoEm ? [Prisma.raw("atualizado_em")] : [])
         ];
         const valores = [
+            Prisma.sql `${tenantId}::uuid`,
             Prisma.sql `${BigInt(input.beneficiarioId)}`,
-            ...(schema.possuiBeneficiarioNome && beneficiarioNome
-                ? [Prisma.sql `${beneficiarioNome}`]
-                : []),
+            ...(schema.possuiBeneficiarioNome ? [Prisma.sql `${beneficiarioNome}`] : []),
             Prisma.sql `${input.unidade}`,
             Prisma.sql `${input.responsavel}`,
             Prisma.sql `${toOptionalDate(input.dataVisita)}`,
@@ -259,12 +282,8 @@ export class VisitasDomiciliaresRepository {
             ...(schema.possuiUsarEnderecoBeneficiario ? [Prisma.sql `${input.usarEnderecoBeneficiario}`] : []),
             ...(schema.possuiEndereco ? [sqlJsonb(input.endereco ?? {})] : []),
             ...(schema.possuiObservacoesIniciais ? [Prisma.sql `${input.observacoesIniciais ?? null}`] : []),
-            ...(schema.possuiCondicoes
-                ? [sqlJsonb(input.condicoes ?? {})]
-                : []),
-            ...(schema.possuiSituacaoSocial
-                ? [sqlJsonb(input.situacaoSocial ?? {})]
-                : []),
+            ...(schema.possuiCondicoes ? [sqlJsonb(input.condicoes ?? {})] : []),
+            ...(schema.possuiSituacaoSocial ? [sqlJsonb(input.situacaoSocial ?? {})] : []),
             ...(schema.possuiRegistro ? [sqlJsonb(input.registro ?? {})] : []),
             ...(schema.possuiAnexos ? [sqlJsonb(input.anexos ?? [])] : []),
             ...(schema.possuiCriadoEm ? [Prisma.sql `NOW()`] : []),
@@ -278,20 +297,16 @@ export class VisitasDomiciliaresRepository {
         const id = inserted[0]?.id;
         if (!id)
             throw new AppError("Nao foi possivel registrar visita domiciliar.", 500);
-        return this.obterOuFalhar(id);
+        return this.obterOuFalhar(id, tenantId);
     }
-    async atualizar(id, input) {
+    async atualizar(id, input, tenantId) {
         await this.garantirEstrutura();
-        await this.obterOuFalhar(id);
+        await this.obterOuFalhar(id, tenantId);
         const schema = await this.obterSchemaInfo();
-        const beneficiarioNome = schema.possuiBeneficiarioNome
-            ? await this.obterNomeBeneficiario(input.beneficiarioId)
-            : null;
+        const beneficiarioNome = await this.obterNomeBeneficiario(input.beneficiarioId, tenantId);
         const atribuicoes = [
             Prisma.sql `beneficiario_id = ${BigInt(input.beneficiarioId)}`,
-            ...(schema.possuiBeneficiarioNome && beneficiarioNome
-                ? [Prisma.sql `beneficiario_nome = ${beneficiarioNome}`]
-                : []),
+            ...(schema.possuiBeneficiarioNome ? [Prisma.sql `beneficiario_nome = ${beneficiarioNome}`] : []),
             Prisma.sql `unidade = ${input.unidade}`,
             Prisma.sql `responsavel = ${input.responsavel}`,
             Prisma.sql `data_visita = ${toOptionalDate(input.dataVisita)}`,
@@ -304,21 +319,15 @@ export class VisitasDomiciliaresRepository {
             ...(schema.possuiUsarEnderecoBeneficiario
                 ? [Prisma.sql `usar_endereco_beneficiario = ${input.usarEnderecoBeneficiario}`]
                 : []),
-            ...(schema.possuiEndereco
-                ? [Prisma.sql `endereco = ${sqlJsonb(input.endereco ?? {})}`]
-                : []),
+            ...(schema.possuiEndereco ? [Prisma.sql `endereco = ${sqlJsonb(input.endereco ?? {})}`] : []),
             ...(schema.possuiObservacoesIniciais
                 ? [Prisma.sql `observacoes_iniciais = ${input.observacoesIniciais ?? null}`]
                 : []),
-            ...(schema.possuiCondicoes
-                ? [Prisma.sql `condicoes = ${sqlJsonb(input.condicoes ?? {})}`]
-                : []),
+            ...(schema.possuiCondicoes ? [Prisma.sql `condicoes = ${sqlJsonb(input.condicoes ?? {})}`] : []),
             ...(schema.possuiSituacaoSocial
                 ? [Prisma.sql `situacao_social = ${sqlJsonb(input.situacaoSocial ?? {})}`]
                 : []),
-            ...(schema.possuiRegistro
-                ? [Prisma.sql `registro = ${sqlJsonb(input.registro ?? {})}`]
-                : []),
+            ...(schema.possuiRegistro ? [Prisma.sql `registro = ${sqlJsonb(input.registro ?? {})}`] : []),
             ...(schema.possuiAnexos ? [Prisma.sql `anexos = ${sqlJsonb(input.anexos ?? [])}`] : []),
             ...(schema.possuiAtualizadoEm ? [Prisma.sql `atualizado_em = NOW()`] : [])
         ];
@@ -326,15 +335,17 @@ export class VisitasDomiciliaresRepository {
       UPDATE visita_domiciliar
       SET ${Prisma.join(atribuicoes, ", ")}
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
-        return this.obterOuFalhar(id);
+        return this.obterOuFalhar(id, tenantId);
     }
-    async remover(id) {
+    async remover(id, tenantId) {
         await this.garantirEstrutura();
-        await this.obterOuFalhar(id);
+        await this.obterOuFalhar(id, tenantId);
         await prisma.$executeRaw(Prisma.sql `
       DELETE FROM visita_domiciliar
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
     }
 }

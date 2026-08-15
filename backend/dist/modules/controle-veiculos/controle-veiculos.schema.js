@@ -36,6 +36,12 @@ const optionalHour = z.preprocess((value) => {
     const trimmed = value.trim();
     return trimmed.length ? trimmed : undefined;
 }, z.string().regex(/^\d{2}:\d{2}$/).optional());
+const optionalDateTime = z.preprocess((value) => {
+    if (typeof value !== "string")
+        return value;
+    const trimmed = value.trim();
+    return trimmed.length ? trimmed : undefined;
+}, z.string().datetime({ offset: true }).optional());
 const tipoOrigemMotorista = z.preprocess((value) => {
     if (typeof value !== "string")
         return value;
@@ -50,6 +56,14 @@ const tipoOrigemMotorista = z.preprocess((value) => {
         return "VOLUNTARIO";
     return normalized;
 }, z.enum(["PROFISSIONAL", "VOLUNTARIO"]));
+const disponibilidadeTipoSituacao = z.enum(["RESERVADO", "INDISPONIVEL"]);
+const disponibilidadeStatusRegistro = z.enum([
+    "ATIVO",
+    "CANCELADO",
+    "ENCERRADO",
+    "EXCLUIDO_LOGICAMENTE"
+]);
+const disponibilidadeMotivoDetalhado = optionalTrimmedString.nullable().optional();
 export const veiculoInputSchema = z.object({
     placa: optionalTrimmedString.nullable().optional(),
     modelo: optionalTrimmedString.nullable().optional(),
@@ -100,4 +114,93 @@ export const localDestinoInputSchema = z.object({
         .refine((value) => !value || isValidPhone(value), "Informe um telefone valido."),
     observacoes: optionalTrimmedString.nullable().optional(),
     ativo: z.boolean().nullable().optional()
+});
+export const disponibilidadeVeiculoInputSchema = z
+    .object({
+    veiculoId: z.coerce.number().int().positive(),
+    dataHoraInicio: optionalDateTime,
+    dataHoraFim: optionalDateTime,
+    tipoSituacao: disponibilidadeTipoSituacao,
+    motivo: optionalTrimmedString.nullable().optional(),
+    motivoDetalhado: disponibilidadeMotivoDetalhado,
+    destino: optionalTrimmedString.nullable().optional(),
+    responsavelNome: optionalTrimmedString.nullable().optional(),
+    observacoes: optionalTrimmedString.nullable().optional(),
+    statusRegistro: disponibilidadeStatusRegistro.optional()
+})
+    .superRefine((value, ctx) => {
+    if (!value.dataHoraInicio) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["dataHoraInicio"],
+            message: "Informe a data e hora inicial."
+        });
+    }
+    if (!value.dataHoraFim) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["dataHoraFim"],
+            message: "Informe a data e hora final."
+        });
+    }
+    if (value.dataHoraInicio && value.dataHoraFim) {
+        const inicio = new Date(value.dataHoraInicio);
+        const fim = new Date(value.dataHoraFim);
+        if (!(inicio < fim)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["dataHoraFim"],
+                message: "A data e hora final deve ser maior que a inicial."
+            });
+        }
+    }
+    if (value.tipoSituacao === "INDISPONIVEL" && !value.motivo?.trim() && !value.motivoDetalhado?.trim()) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["motivo"],
+            message: "Informe o motivo da indisponibilidade."
+        });
+    }
+    if (value.motivo?.trim() === "Outro" && !value.motivoDetalhado?.trim()) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["motivoDetalhado"],
+            message: "Descreva o motivo detalhado."
+        });
+    }
+});
+export const disponibilidadeVeiculoConsultaSchema = z.object({
+    dataHoraInicio: optionalDateTime,
+    dataHoraFim: optionalDateTime,
+    veiculoId: z.coerce.number().int().positive().optional().nullable(),
+    situacao: z.enum(["RESERVADO", "INDISPONIVEL", "DISPONIVEL"]).optional().nullable(),
+    unidade: optionalTrimmedString.nullable().optional(),
+    responsavel: optionalTrimmedString.nullable().optional(),
+    motivo: optionalTrimmedString.nullable().optional()
+}).superRefine((value, ctx) => {
+    if (!value.dataHoraInicio) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["dataHoraInicio"],
+            message: "Informe a data e hora inicial."
+        });
+    }
+    if (!value.dataHoraFim) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["dataHoraFim"],
+            message: "Informe a data e hora final."
+        });
+    }
+    if (value.dataHoraInicio && value.dataHoraFim) {
+        const inicio = new Date(value.dataHoraInicio);
+        const fim = new Date(value.dataHoraFim);
+        if (!(inicio < fim)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["dataHoraFim"],
+                message: "A data e hora final deve ser maior que a inicial."
+            });
+        }
+    }
 });

@@ -168,7 +168,8 @@ export function mapPlanoTrabalhoToResponse(plano, objetivosEspecificos, metas, e
             ? {
                 id: toStringId(plano.termo_fomento_id),
                 numero: plano.termo_numero ?? "",
-                objeto: plano.termo_objeto ?? undefined
+                objeto: plano.termo_objeto ?? undefined,
+                responsavelIndicacao: plano.termo_responsavel_indicacao ?? undefined
             }
             : undefined
     };

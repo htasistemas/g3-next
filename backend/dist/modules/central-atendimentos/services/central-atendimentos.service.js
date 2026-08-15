@@ -4,70 +4,71 @@ import { centralAtendimentoInputSchema, centralAtendimentosBuscaFiltersSchema, c
 import { CentralAtendimentosRepository } from "../repositories/central-atendimentos.repository.js";
 export class CentralAtendimentosService {
     repository = new CentralAtendimentosRepository();
-    async buscarBeneficiarios(rawFilters) {
+    async buscarBeneficiarios(rawFilters, authUser) {
         const filters = centralAtendimentosBuscaFiltersSchema.parse(rawFilters ?? {});
-        return this.repository.buscarBeneficiarios(filters);
+        return this.repository.buscarBeneficiarios(filters, this.parseTenant(authUser));
     }
-    async obterVisaoGeral(rawBeneficiarioId) {
-        return this.repository.obterVisaoGeral(this.parseId(rawBeneficiarioId, "beneficiário"));
+    async obterVisaoGeral(rawBeneficiarioId, authUser) {
+        return this.repository.obterVisaoGeral(this.parseId(rawBeneficiarioId, "beneficiario"), this.parseTenant(authUser));
     }
-    async listarAtendimentos(rawBeneficiarioId) {
-        return this.repository.listarAtendimentos(this.parseId(rawBeneficiarioId, "beneficiário"));
+    async listarAtendimentos(rawBeneficiarioId, authUser) {
+        return this.repository.listarAtendimentos(this.parseId(rawBeneficiarioId, "beneficiario"), this.parseTenant(authUser));
     }
     async criarAtendimento(rawBeneficiarioId, rawInput, authUser) {
-        return this.repository.criarAtendimento(this.parseId(rawBeneficiarioId, "beneficiário"), centralAtendimentoInputSchema.parse(rawInput), authUser);
+        return this.repository.criarAtendimento(this.parseId(rawBeneficiarioId, "beneficiario"), centralAtendimentoInputSchema.parse(rawInput), authUser, this.parseTenant(authUser));
     }
     async atualizarAtendimento(rawBeneficiarioId, rawAtendimentoId, rawInput, authUser) {
-        return this.repository.atualizarAtendimento(this.parseId(rawAtendimentoId, "atendimento"), this.parseId(rawBeneficiarioId, "beneficiário"), centralAtendimentoInputSchema.parse(rawInput), authUser);
+        return this.repository.atualizarAtendimento(this.parseId(rawAtendimentoId, "atendimento"), this.parseId(rawBeneficiarioId, "beneficiario"), centralAtendimentoInputSchema.parse(rawInput), authUser, this.parseTenant(authUser));
     }
     async removerAtendimento(rawBeneficiarioId, rawAtendimentoId, authUser) {
-        await this.repository.removerAtendimento(this.parseId(rawAtendimentoId, "atendimento"), this.parseId(rawBeneficiarioId, "beneficiário"), authUser);
+        await this.repository.removerAtendimento(this.parseId(rawAtendimentoId, "atendimento"), this.parseId(rawBeneficiarioId, "beneficiario"), authUser, this.parseTenant(authUser));
     }
-    async listarBeneficios(rawBeneficiarioId) {
-        return this.repository.listarBeneficios(this.parseId(rawBeneficiarioId, "beneficiário"));
+    async listarBeneficios(rawBeneficiarioId, authUser) {
+        return this.repository.listarBeneficios(this.parseId(rawBeneficiarioId, "beneficiario"), this.parseTenant(authUser));
     }
     async criarBeneficio(rawBeneficiarioId, rawInput, authUser) {
-        return this.repository.criarBeneficio(this.parseId(rawBeneficiarioId, "beneficiário"), centralBeneficioInputSchema.parse(rawInput), authUser);
+        return this.repository.criarBeneficio(this.parseId(rawBeneficiarioId, "beneficiario"), centralBeneficioInputSchema.parse(rawInput), authUser, this.parseTenant(authUser));
     }
     async atualizarBeneficio(rawBeneficiarioId, rawBeneficioId, rawInput, authUser) {
-        return this.repository.atualizarBeneficio(this.parseId(rawBeneficioId, "benefício"), this.parseId(rawBeneficiarioId, "beneficiário"), centralBeneficioInputSchema.parse(rawInput), authUser);
+        return this.repository.atualizarBeneficio(this.parseId(rawBeneficioId, "beneficio"), this.parseId(rawBeneficiarioId, "beneficiario"), centralBeneficioInputSchema.parse(rawInput), authUser, this.parseTenant(authUser));
     }
     async removerBeneficio(rawBeneficiarioId, rawBeneficioId, authUser) {
-        await this.repository.removerBeneficio(this.parseId(rawBeneficioId, "benefício"), this.parseId(rawBeneficiarioId, "beneficiário"), authUser);
+        await this.repository.removerBeneficio(this.parseId(rawBeneficioId, "beneficio"), this.parseId(rawBeneficiarioId, "beneficiario"), authUser, this.parseTenant(authUser));
     }
-    async listarEncaminhamentos(rawBeneficiarioId) {
-        return this.repository.listarEncaminhamentos(this.parseId(rawBeneficiarioId, "beneficiário"));
+    async listarEncaminhamentos(rawBeneficiarioId, authUser) {
+        return this.repository.listarEncaminhamentos(this.parseId(rawBeneficiarioId, "beneficiario"), this.parseTenant(authUser));
     }
     async criarEncaminhamento(rawBeneficiarioId, rawInput, authUser) {
-        return this.repository.criarEncaminhamento(this.parseId(rawBeneficiarioId, "beneficiário"), centralEncaminhamentoInputSchema.parse(rawInput), authUser);
+        return this.repository.criarEncaminhamento(this.parseId(rawBeneficiarioId, "beneficiario"), centralEncaminhamentoInputSchema.parse(rawInput), authUser, this.parseTenant(authUser));
     }
     async atualizarEncaminhamento(rawBeneficiarioId, rawEncaminhamentoId, rawInput, authUser) {
-        return this.repository.atualizarEncaminhamento(this.parseId(rawEncaminhamentoId, "encaminhamento"), this.parseId(rawBeneficiarioId, "beneficiário"), centralEncaminhamentoInputSchema.parse(rawInput), authUser);
+        return this.repository.atualizarEncaminhamento(this.parseId(rawEncaminhamentoId, "encaminhamento"), this.parseId(rawBeneficiarioId, "beneficiario"), centralEncaminhamentoInputSchema.parse(rawInput), authUser, this.parseTenant(authUser));
     }
     async removerEncaminhamento(rawBeneficiarioId, rawEncaminhamentoId, authUser) {
-        await this.repository.removerEncaminhamento(this.parseId(rawEncaminhamentoId, "encaminhamento"), this.parseId(rawBeneficiarioId, "beneficiário"), authUser);
+        await this.repository.removerEncaminhamento(this.parseId(rawEncaminhamentoId, "encaminhamento"), this.parseId(rawBeneficiarioId, "beneficiario"), authUser, this.parseTenant(authUser));
     }
-    async listarHistorico(rawBeneficiarioId) {
-        return this.repository.listarHistorico(this.parseId(rawBeneficiarioId, "beneficiário"));
+    async listarHistorico(rawBeneficiarioId, authUser) {
+        return this.repository.listarHistorico(this.parseId(rawBeneficiarioId, "beneficiario"), this.parseTenant(authUser));
     }
-    async listarCustos(rawBeneficiarioId) {
-        return this.repository.listarCustos(this.parseId(rawBeneficiarioId, "beneficiário"));
+    async listarCustos(rawBeneficiarioId, authUser) {
+        return this.repository.listarCustos(this.parseId(rawBeneficiarioId, "beneficiario"), this.parseTenant(authUser));
     }
-    async listarGrupoFamiliar(rawBeneficiarioId) {
-        return this.repository.listarGrupoFamiliar(this.parseId(rawBeneficiarioId, "beneficiário"));
+    async listarGrupoFamiliar(rawBeneficiarioId, authUser) {
+        return this.repository.listarGrupoFamiliar(this.parseId(rawBeneficiarioId, "beneficiario"), this.parseTenant(authUser));
     }
-    async listarAlertas(rawBeneficiarioId) {
-        return this.repository.listarAlertas(this.parseId(rawBeneficiarioId, "beneficiário"));
+    async listarAlertas(rawBeneficiarioId, authUser) {
+        return this.repository.listarAlertas(this.parseId(rawBeneficiarioId, "beneficiario"), this.parseTenant(authUser));
     }
-    async gerarRelatorio(rawBeneficiarioId, rawTipo) {
+    async gerarRelatorio(rawBeneficiarioId, rawTipo, authUser) {
         const tipo = this.parseTipoRelatorio(rawTipo);
-        return this.repository.gerarRelatorio(this.parseId(rawBeneficiarioId, "beneficiário"), tipo);
+        return this.repository.gerarRelatorio(this.parseId(rawBeneficiarioId, "beneficiario"), tipo, this.parseTenant(authUser));
     }
-    async gerarRelatorioPdf(rawBeneficiarioId, rawTipo) {
+    async gerarRelatorioPdf(rawBeneficiarioId, rawTipo, authUser) {
         const tipo = this.parseTipoRelatorio(rawTipo);
-        const beneficiarioId = this.parseId(rawBeneficiarioId, "beneficiário");
-        const visao = await this.repository.obterVisaoGeral(beneficiarioId);
-        const relatorio = await this.repository.gerarRelatorio(beneficiarioId, tipo);
+        const beneficiarioId = this.parseId(rawBeneficiarioId, "beneficiario");
+        const tenantId = this.parseTenant(authUser);
+        const visao = await this.repository.obterVisaoGeral(beneficiarioId, tenantId);
+        const relatorio = await this.repository.gerarRelatorio(beneficiarioId, tipo, tenantId);
         return this.renderizarPdf(visao.beneficiario.nomeCompleto, relatorio, tipo);
     }
     renderizarPdf(nomeBeneficiario, relatorio, tipo) {
@@ -82,9 +83,9 @@ export class CentralAtendimentosService {
                 });
             });
             doc.on("error", reject);
-            doc.fontSize(18).text("Central de Atendimentos", { align: "center" });
+            doc.fontSize(18).text("Central de atendimentos", { align: "center" });
             doc.moveDown(0.5);
-            doc.fontSize(11).fillColor("#475569").text(`Relatório: ${this.nomeRelatorio(tipo)}`, { align: "center" });
+            doc.fontSize(11).fillColor("#475569").text(`Relatorio: ${this.nomeRelatorio(tipo)}`, { align: "center" });
             doc.text(`Emitido em: ${new Date().toLocaleString("pt-BR")}`, { align: "center" });
             doc.moveDown(1.5);
             doc.fillColor("#0f172a");
@@ -143,16 +144,24 @@ export class CentralAtendimentosService {
     parseTipoRelatorio(rawTipo) {
         const tipo = rawTipo.trim();
         if (!["individual", "familiar", "financeiro-social", "social"].includes(tipo)) {
-            throw new AppError("Tipo de relatório inválido.", 400);
+            throw new AppError("Tipo de relatorio invalido.", 400);
         }
         return tipo;
     }
     parseId(rawId, label) {
         const id = Number(rawId);
         if (!Number.isInteger(id) || id <= 0) {
-            throw new AppError(`Identificador de ${label} inválido.`, 400);
+            throw new AppError(`Identificador de ${label} invalido.`, 400);
         }
         return BigInt(id);
+    }
+    parseTenant(authUser) {
+        const tenantId = authUser?.tenant_id?.trim();
+        const instituicaoId = authUser?.instituicao_id?.trim();
+        if (!tenantId || !instituicaoId) {
+            throw new AppError("Tenant da sessao nao identificado.", 401);
+        }
+        return tenantId;
     }
     nomeRelatorio(tipo) {
         if (tipo === "financeiro-social")

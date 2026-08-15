@@ -33,7 +33,7 @@ export class RegistroPontoController {
         return response.json(espelho);
     }
     async listarUsuarios(request, response) {
-        const usuarios = await service.listarUsuarios(request.query.termo);
+        const usuarios = await service.listarUsuarios(request.query.termo, request.authUser ?? {});
         return response.json({ usuarios });
     }
     async buscarHorarioUsuario(request, response) {
@@ -48,6 +48,15 @@ export class RegistroPontoController {
     async buscarAlertaPendencia(request, response) {
         const alerta = await service.buscarAlertaPendencia(request.authUser ?? {});
         return response.json(alerta);
+    }
+    async buscarConfiguracaoHoraExtra(request, response) {
+        const configuracao = await service.buscarConfiguracaoHoraExtra(request.authUser ?? {});
+        return response.json(configuracao);
+    }
+    async salvarConfiguracaoHoraExtra(request, response) {
+        const origem = obterOrigem(request);
+        const configuracao = await service.salvarConfiguracaoHoraExtra(request.body, request.authUser ?? {}, origem);
+        return response.json(configuracao);
     }
     async buscarFace(request, response) {
         const face = await service.buscarFaceUsuario(request.authUser ?? {});
@@ -75,6 +84,37 @@ export class RegistroPontoController {
     async buscarHistorico(request, response) {
         const historico = await service.buscarHistorico(request.params.id, request.authUser ?? {});
         return response.json(historico);
+    }
+    async listarHorasExtras(request, response) {
+        const resultado = await service.listarHorasExtras(request.query, request.authUser ?? {});
+        return response.json(resultado);
+    }
+    async registrarCienciaHoraExtra(request, response) {
+        const origem = obterOrigem(request);
+        const resultado = await service.registrarCienciaHoraExtra(request.params.id, request.body, request.authUser ?? {}, origem);
+        return response.json({ registro: resultado });
+    }
+    async decidirHoraExtra(request, response) {
+        const origem = obterOrigem(request);
+        const resultado = await service.decidirHoraExtra(request.params.id, request.body, request.authUser ?? {}, origem);
+        return response.json({ registro: resultado });
+    }
+    async listarRelatorioMensal(request, response) {
+        const relatorio = await service.listarRelatorioMensal(request.query, request.authUser ?? {});
+        return response.json(relatorio);
+    }
+    async exportarRelatorioMensal(request, response) {
+        const formato = request.query.formato === "excel" ? "excel" : "pdf";
+        const payload = {
+            ...request.query,
+            ...request.body
+        };
+        const resultado = await service.exportarRelatorioMensal(payload, formato, request.authUser ?? {});
+        return response
+            .status(200)
+            .type(resultado.contentType)
+            .setHeader("Content-Disposition", `inline; filename="${resultado.filename}"`)
+            .send(resultado.buffer);
     }
     async gerarEspelhoPontoPdf(request, response) {
         const payload = {

@@ -55,6 +55,52 @@ export class AuthService {
     const input = authLoginSchema.parse(rawInput);
     const emailNormalizado = input.email?.trim().toLowerCase();
     const loginNormalizado = input.nomeUsuario?.trim().toLowerCase();
+
+    // Novo fluxo: a identidade global é autenticada primeiro. O CNPJ continua
+    // aceito apenas como compatibilidade para integrações e acessos legados.
+    if (emailNormalizado && !input.cnpj && !input.slug && !input.codigoInstituicao) {
+      const buscarCandidatosGlobais = this.repository.buscarCandidatosGlobaisPorEmail;
+      const candidatos = typeof buscarCandidatosGlobais === "function"
+        ? await buscarCandidatosGlobais.call(this.repository, emailNormalizado)
+        : [];
+      const candidatosValidos = [] as typeof candidatos;
+      for (const candidato of candidatos) {
+        if (await bcrypt.compare(input.senha, candidato.senha_hash)) candidatosValidos.push(candidato);
+      }
+
+      if (candidatos.length > 0 && candidatosValidos.length === 0) {
+        await this.repository.registrarEventoAcesso({ evento: "LOGIN_FALHA", identificador: emailNormalizado });
+        throw new AppError("E-mail ou senha inválidos.", 401);
+      }
+
+      const unicos = Array.from(new Map(candidatosValidos.map((item) => [String(item.acesso_id), item])).values());
+      if (unicos.length > 1) {
+        const identidadeId = String(unicos[0]!.identidade_id);
+        const ticket = this.tokenService.gerarTicketSelecao(identidadeId, unicos.map((item) => String(item.usuario_id)));
+        await this.repository.registrarEventoAcesso({ evento: "LOGIN_AMBIENTES_DISPONIVEIS", identificador: emailNormalizado, detalhes_json: { quantidade: unicos.length } });
+        return {
+          selecaoAmbienteRequired: true,
+          loginTicket: ticket,
+          ambientes: unicos.map((item) => ({
+            acesso_id: String(item.acesso_id),
+            instituicao_id: item.instituicao_id,
+            tenant_id: item.tenant_id,
+            nome_instituicao: item.instituicao_nome,
+            nome_fantasia: item.instituicao_nome,
+            cnpj: item.cnpj ?? undefined,
+            unidade_nome: item.unidade_nome ?? undefined,
+            perfil: item.perfil ?? undefined,
+            status: "ATIVO"
+          }))
+        };
+      }
+
+      if (unicos.length === 1) {
+        const usuario = await this.repository.buscarUsuarioPorId(unicos[0]!.usuario_id);
+        if (!usuario) throw new AppError("Usuário autenticado não encontrado.", 401);
+        return this.finalizarLogin(usuario, emailNormalizado);
+      }
+    }
     let tenantsPorEmail: Awaited<ReturnType<AuthRepository["buscarTenantsPorEmail"]>> | undefined;
     let tenantLookup = {
       cnpj: input.cnpj,
@@ -207,6 +253,63 @@ export class AuthService {
       token,
       usuario: usuarioAutenticado
     };
+  }
+
+  async selecionarAmbiente(rawInput: unknown) {
+    const input = rawInput as { loginTicket?: string; acessoId?: string };
+    if (!input.loginTicket || !input.acessoId) throw new AppError("Selecione um ambiente válido.", 400);
+    let ticket: ReturnType<TokenService["validarTicketSelecao"]>;
+    try { ticket = this.tokenService.validarTicketSelecao(input.loginTicket); } catch { throw new AppError("A seleção de ambiente expirou. Entre novamente.", 401); }
+    const acesso = await this.repository.buscarAcessoGlobal(input.acessoId, ticket.sub);
+    if (!acesso || !ticket.usuario_ids?.includes(String(acesso.usuario_id))) throw new AppError("Ambiente não autorizado.", 403);
+    const usuario = await this.repository.buscarUsuarioPorId(acesso.usuario_id);
+    if (!usuario) throw new AppError("Usuário autenticado não encontrado.", 401);
+    return this.finalizarLogin(usuario, usuario.email ?? usuario.nomeUsuario, "AMBIENTE_SELECIONADO");
+  }
+
+  async listarAmbientes(usuarioId: string) {
+    return this.repository.listarAcessosPorUsuario(usuarioId);
+  }
+
+  async trocarAmbiente(usuarioId: string, rawInput: unknown) {
+    const acessoId = typeof (rawInput as { acessoId?: unknown })?.acessoId === "string" ? (rawInput as { acessoId: string }).acessoId : "";
+    if (!acessoId) throw new AppError("Selecione um ambiente válido.", 400);
+    const acesso = await this.repository.buscarAcessoPorUsuario(acessoId, usuarioId);
+    if (!acesso) throw new AppError("Ambiente não autorizado.", 403);
+    const usuario = await this.repository.buscarUsuarioPorId(BigInt(usuarioId));
+    if (!usuario) throw new AppError("Usuário autenticado não encontrado.", 401);
+    return this.finalizarLogin(usuario, usuario.email ?? usuario.nomeUsuario, "TROCA_AMBIENTE");
+  }
+
+  async listarOpcoesContexto(usuarioId: string, tenantId?: string) {
+    if (!tenantId) throw new AppError("Contexto da instituição não identificado.", 401);
+    return this.repository.listarOpcoesContexto(usuarioId, tenantId);
+  }
+
+  async trocarContexto(usuarioId: string, tenantId: string | undefined, rawInput: unknown) {
+    const input = rawInput as { unidadeId?: string | null; projetoId?: string | null };
+    if (!tenantId) throw new AppError("Contexto da instituição não identificado.", 401);
+    const permitido = await this.repository.contextoPermitido(usuarioId, tenantId, input.unidadeId, input.projetoId);
+    if (!permitido) throw new AppError("Contexto de unidade ou projeto não autorizado.", 403);
+    const usuario = await this.repository.buscarUsuarioPorId(BigInt(usuarioId));
+    if (!usuario) throw new AppError("Usuário autenticado não encontrado.", 401);
+    return this.finalizarLogin(usuario, usuario.email ?? usuario.nomeUsuario, "TROCA_CONTEXTO", {
+      instituicao_id: usuario.instituicaoId ?? undefined,
+      unidade_id: input.unidadeId ?? undefined,
+      projeto_id: input.projetoId ?? undefined
+    });
+  }
+
+  private async finalizarLogin(usuario: NonNullable<Awaited<ReturnType<AuthRepository["buscarUsuarioPorId"]>>>, identificador: string, evento = "LOGIN_SUCESSO", contexto?: { instituicao_id?: string; unidade_id?: string; projeto_id?: string }) {
+    const controle = await this.repository.buscarControleAcessoPorUsuarioId(usuario.id);
+    this.validarAcessoUsuario(controle?.status, usuario.instituicaoStatus, usuario.email, usuario.isSuperadmin);
+    this.validarBloqueioTemporarioLogin(controle);
+    if (this.deveExigirMfa(usuario)) return this.criarMfaChallenge(usuario, identificador);
+    if (this.deveExigirBiometriaFacial(usuario)) return this.criarFaceChallenge(usuario, identificador);
+    await this.repository.registrarLoginSucesso(usuario.id);
+    await this.repository.registrarEventoAcesso({ tenant_id: usuario.tenantId ?? undefined, instituicao_id: usuario.instituicaoId ?? undefined, usuario_id: usuario.id, evento, identificador });
+    const usuarioAutenticado = this.mapUsuarioAutenticado(usuario, contexto);
+    return { token: this.tokenService.gerarToken(usuarioAutenticado), usuario: usuarioAutenticado };
   }
 
   async loginGoogle(rawInput: unknown) {
@@ -656,7 +759,7 @@ export class AuthService {
     }
   }
 
-  private mapUsuarioAutenticado(usuario: Awaited<ReturnType<AuthRepository["buscarUsuarioPorLogin"]>>): UsuarioAutenticado {
+  private mapUsuarioAutenticado(usuario: Awaited<ReturnType<AuthRepository["buscarUsuarioPorLogin"]>>, contexto?: { instituicao_id?: string; unidade_id?: string; projeto_id?: string }): UsuarioAutenticado {
     if (!usuario) {
       throw new AppError("Usuario nao encontrado.", 401);
     }
@@ -675,7 +778,8 @@ export class AuthService {
       plano: usuario.instituicaoPlano ?? undefined,
       perfil: usuario.perfilAcesso ?? (usuario.isSuperadmin ? "MASTER" : undefined),
       is_superadmin: usuario.isSuperadmin,
-      permissoes: usuario.permissoes.map((item) => item.permissao.nome)
+      permissoes: usuario.permissoes.map((item) => item.permissao.nome),
+      contexto: contexto ? { instituicao_id: contexto.instituicao_id, unidade_id: contexto.unidade_id, projeto_id: contexto.projeto_id } : undefined
     };
   }
 

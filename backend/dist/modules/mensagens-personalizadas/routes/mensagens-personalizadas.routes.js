@@ -33,6 +33,7 @@ mensagensPersonalizadasRoutes.post("/taxonomias", ensureAuthenticated, ensurePer
 mensagensPersonalizadasRoutes.put("/taxonomias/:id", ensureAuthenticated, ensurePermissions(permissoesCadastro), asyncHandler(controller.atualizarTaxonomia.bind(controller)));
 mensagensPersonalizadasRoutes.delete("/taxonomias/:id", ensureAuthenticated, ensurePermissions(permissoesExclusao), asyncHandler(controller.excluirTaxonomia.bind(controller)));
 mensagensPersonalizadasRoutes.get("/historico", ensureAuthenticated, ensurePermissions(permissoesVisualizacao), asyncHandler(controller.listarHistorico.bind(controller)));
+mensagensPersonalizadasRoutes.get("/destinatarios/todos", ensureAuthenticated, ensurePermissions(permissoesVisualizacao), asyncHandler(controller.buscarTodosDestinatarios.bind(controller)));
 mensagensPersonalizadasRoutes.get("/destinatarios", ensureAuthenticated, ensurePermissions(permissoesVisualizacao), asyncHandler(controller.buscarDestinatarios.bind(controller)));
 mensagensPersonalizadasRoutes.post("/preview", ensureAuthenticated, ensurePermissions(permissoesEnvio), asyncHandler(controller.gerarPreview.bind(controller)));
 mensagensPersonalizadasRoutes.post("/enviar", ensureAuthenticated, ensurePermissions([...permissoesEnvio, ...permissoesEnvioLote]), asyncHandler(controller.enviarMensagem.bind(controller)));

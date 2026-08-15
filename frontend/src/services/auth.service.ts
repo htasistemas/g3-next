@@ -1,5 +1,5 @@
 import { httpClient } from "./http-client";
-import type { LoginAuthResult, TenantContextoLogin, UsuarioAutenticado } from "@/types/auth";
+import type { AmbienteAutorizado, LoginAuthResult, OpcoesContexto, TenantContextoLogin, UsuarioAutenticado } from "@/types/auth";
 
 type LoginResponse = {
   token: string;
@@ -63,6 +63,37 @@ export const authService = {
     });
     if ("token" in data) persistirSessao(data.token, data.usuario);
     return data;
+  },
+
+  async selecionarAmbiente(input: { loginTicket: string; acessoId: string }): Promise<LoginAuthResult> {
+    const { data } = await httpClient.post<LoginAuthResult>("/api/auth/selecionar-ambiente", {
+      loginTicket: input.loginTicket,
+      acessoId: input.acessoId
+    });
+    if ("token" in data) persistirSessao(data.token, data.usuario);
+    return data;
+  },
+
+  async listarAmbientes(): Promise<AmbienteAutorizado[]> {
+    const { data } = await httpClient.get<{ ambientes: AmbienteAutorizado[] }>("/api/auth/ambientes");
+    return data.ambientes ?? [];
+  },
+
+  async trocarAmbiente(acessoId: string): Promise<UsuarioAutenticado> {
+    const { data } = await httpClient.post<LoginResponse>("/api/auth/trocar-ambiente", { acessoId });
+    persistirSessao(data.token, data.usuario);
+    return data.usuario;
+  },
+
+  async obterOpcoesContexto(): Promise<OpcoesContexto> {
+    const { data } = await httpClient.get<OpcoesContexto>("/api/auth/contexto-opcoes");
+    return data;
+  },
+
+  async trocarContexto(input: { unidadeId?: string | null; projetoId?: string | null }): Promise<UsuarioAutenticado> {
+    const { data } = await httpClient.post<LoginResponse>("/api/auth/contexto", input);
+    persistirSessao(data.token, data.usuario);
+    return data.usuario;
   },
 
   async verificarMfa(input: { challengeId: string; codigo: string }): Promise<UsuarioAutenticado> {

@@ -1,9 +1,9 @@
 import bcrypt from "bcryptjs";
-import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { mapaCamposTextoDoacaoRealizada } from "../../../utils/text-format-config.js";
 import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
 import { toStringId } from "../../../utils/string-utils.js";
+import { AuthRepository } from "../../auth/repositories/auth.repository.js";
 import { ParametrosSistemaService } from "../../configuracoes-gerais/services/parametros-sistema.service.js";
 import { doacaoRealizadaFiltersSchema, doacaoRealizadaInputSchema } from "../doacao-realizada.schema.js";
 import { mapDoacaoRealizadaToResponse } from "../doacao-realizada.mapper.js";
@@ -44,11 +44,13 @@ export function entregaEstaDentroDaCarencia(dataAtual, ultimaEntrega, diasCarenc
 export class DoacaoRealizadaService {
     repository;
     parametrosSistemaService;
+    authRepository = new AuthRepository();
     constructor(repository = new DoacaoRealizadaRepository(), parametrosSistemaService = new ParametrosSistemaService()) {
         this.repository = repository;
         this.parametrosSistemaService = parametrosSistemaService;
     }
-    async listar(rawFilters) {
+    async listar(rawFilters, rawTenantId) {
+        const tenantId = this.parseTenantId(rawTenantId);
         const filtersNormalizados = rawFilters && typeof rawFilters === "object"
             ? normalizarObjetoTexto(rawFilters, {
                 beneficiario_nome: "nomePessoa",
@@ -57,12 +59,13 @@ export class DoacaoRealizadaService {
             })
             : rawFilters;
         const filters = doacaoRealizadaFiltersSchema.parse(filtersNormalizados);
-        const registros = await this.repository.listar(filters);
+        const registros = await this.repository.listar(filters, tenantId);
         return registros.map((registro) => mapDoacaoRealizadaToResponse(registro, []));
     }
-    async buscarPorId(rawId) {
+    async buscarPorId(rawId, rawTenantId) {
         const id = this.parseId(rawId);
-        const registro = await this.repository.buscarPorIdOuFalhar(id);
+        const tenantId = this.parseTenantId(rawTenantId);
+        const registro = await this.repository.buscarPorIdOuFalhar(id, tenantId);
         return mapDoacaoRealizadaToResponse(registro.registro, registro.itens);
     }
     async criar(rawInput, atorRaw) {
@@ -70,7 +73,7 @@ export class DoacaoRealizadaService {
         const inputNormalizado = this.normalizarPayload(rawInput);
         const input = doacaoRealizadaInputSchema.parse(inputNormalizado);
         const inputComCarencia = await this.aplicarRegraCarencia(input, ator);
-        const registro = await this.repository.criar(inputComCarencia);
+        const registro = await this.repository.criar(inputComCarencia, ator.tenant_id);
         return mapDoacaoRealizadaToResponse(registro.registro, registro.itens);
     }
     async atualizar(rawId, rawInput, atorRaw) {
@@ -79,16 +82,16 @@ export class DoacaoRealizadaService {
         const inputNormalizado = this.normalizarPayload(rawInput);
         const input = doacaoRealizadaInputSchema.parse(inputNormalizado);
         const inputComCarencia = await this.aplicarRegraCarencia(input, ator, id);
-        const registro = await this.repository.atualizar(id, inputComCarencia);
+        const registro = await this.repository.atualizar(id, inputComCarencia, ator.tenant_id);
         return mapDoacaoRealizadaToResponse(registro.registro, registro.itens);
     }
-    async remover(rawId) {
+    async remover(rawId, rawTenantId) {
         const id = this.parseId(rawId);
-        await this.repository.remover(id);
+        await this.repository.remover(id, this.parseTenantId(rawTenantId));
     }
-    async listarBeneficiarios(rawTermo) {
+    async listarBeneficiarios(rawTermo, rawTenantId) {
         const termo = this.parseTermo(rawTermo);
-        const registros = await this.repository.listarBeneficiarios(termo);
+        const registros = await this.repository.listarBeneficiarios(termo, this.parseTenantId(rawTenantId));
         return registros.map((item) => ({
             id: toStringId(item.id),
             nome_completo: item.nome_completo,
@@ -96,17 +99,17 @@ export class DoacaoRealizadaService {
             cpf: item.cpf ?? undefined
         }));
     }
-    async listarFamilias(rawTermo) {
+    async listarFamilias(rawTermo, rawTenantId) {
         const termo = this.parseTermo(rawTermo);
-        const registros = await this.repository.listarFamilias(termo);
+        const registros = await this.repository.listarFamilias(termo, this.parseTenantId(rawTenantId));
         return registros.map((item) => ({
             id: toStringId(item.id),
             nome_familia: item.nome_familia
         }));
     }
-    async listarItensEstoque(rawTermo) {
+    async listarItensEstoque(rawTermo, rawTenantId) {
         const termo = this.parseTermo(rawTermo);
-        const registros = await this.repository.listarItensEstoque(termo);
+        const registros = await this.repository.listarItensEstoque(termo, this.parseTenantId(rawTenantId));
         return registros.map((item) => ({
             id: toStringId(item.id),
             codigo: item.codigo,
@@ -117,7 +120,8 @@ export class DoacaoRealizadaService {
     }
     parseAtor(atorRaw) {
         const nome_usuario = atorRaw?.nomeUsuario?.trim();
-        if (!nome_usuario) {
+        const tenant_id = atorRaw?.tenant_id?.trim();
+        if (!nome_usuario || !tenant_id) {
             throw new AppError("Usuario autenticado invalido.", 401);
         }
         const idNumerico = Number(atorRaw?.id);
@@ -127,7 +131,8 @@ export class DoacaoRealizadaService {
         return {
             id,
             nome_usuario,
-            permissoes: atorRaw?.permissoes ?? []
+            permissoes: atorRaw?.permissoes ?? [],
+            tenant_id
         };
     }
     parseId(rawId) {
@@ -147,6 +152,13 @@ export class DoacaoRealizadaService {
         }
         return undefined;
     }
+    parseTenantId(rawTenantId) {
+        const tenantId = rawTenantId?.trim();
+        if (!tenantId) {
+            throw new AppError("Tenant nao identificado.", 401);
+        }
+        return tenantId;
+    }
     normalizarPayload(rawInput) {
         if (!rawInput || typeof rawInput !== "object") {
             return rawInput;
@@ -154,7 +166,7 @@ export class DoacaoRealizadaService {
         return normalizarObjetoTexto(rawInput, mapaCamposTextoDoacaoRealizada);
     }
     async aplicarRegraCarencia(input, ator, ignorarDoacaoRealizadaId) {
-        const configuracao = await this.parametrosSistemaService.obterCarenciaDoacaoRealizada();
+        const configuracao = await this.parametrosSistemaService.obterCarenciaDoacaoRealizada(ator.tenant_id);
         const tempoCarenciaDias = Number(configuracao.carencia?.tempo_carencia_dias ?? 0);
         if (!Number.isInteger(tempoCarenciaDias) || tempoCarenciaDias <= 0) {
             return {
@@ -167,6 +179,7 @@ export class DoacaoRealizadaService {
         const itensProcessados = [];
         for (const item of input.itens) {
             const ultimaEntrega = await this.repository.buscarUltimaEntregaMesmoItem({
+                tenantId: ator.tenant_id,
                 beneficiario_id: input.beneficiario_id,
                 vinculo_familiar_id: input.vinculo_familiar_id,
                 item_id: item.item_id,
@@ -234,7 +247,7 @@ export class DoacaoRealizadaService {
         if (!senha) {
             throw new AppError("Informe a senha administrativa para liberar a entrega.", 422);
         }
-        const usuario = await this.buscarUsuarioAutenticadoPorId(ator.id);
+        const usuario = await this.authRepository.buscarUsuarioPorId(ator.id, ator.tenant_id);
         if (!usuario) {
             throw new AppError("Usuario autenticado nao encontrado.", 404);
         }
@@ -247,15 +260,5 @@ export class DoacaoRealizadaService {
             nome_exibicao: usuario.nome?.trim() || usuario.nomeUsuario,
             autorizado_em: new Date().toISOString()
         };
-    }
-    async buscarUsuarioAutenticadoPorId(id) {
-        return prisma.usuario.findUnique({
-            where: { id },
-            select: {
-                nomeUsuario: true,
-                nome: true,
-                senhaHash: true
-            }
-        });
     }
 }

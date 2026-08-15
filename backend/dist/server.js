@@ -21,11 +21,19 @@ import { iniciarDocumentosInstituicaoScheduler } from "./modules/documentos-inst
 import { ensureCaptacaoRecursosEstrutura } from "./modules/captacao-recursos/repositories/captacao-recursos.repository.js";
 import { ensureLicencaUsoEstrutura } from "./modules/licenca-uso/repositories/licenca-uso.repository.js";
 import { iniciarLicencaUsoScheduler } from "./modules/licenca-uso/services/licenca-uso.scheduler.js";
+import { iniciarBackupImagensScheduler } from "./modules/backup-imagens/services/backup-imagens.scheduler.js";
+import { iniciarBackupArquivosScheduler } from "./modules/backup-arquivos/services/backup-arquivos.scheduler.js";
 import { ensureUsuariosGestaoEstrutura } from "./modules/usuarios/repositories/usuario-estrutura.repository.js";
 import { ensureVisitasDomiciliaresEstrutura } from "./modules/visitas-domiciliares/repositories/visitas-domiciliares.repository.js";
 import { ensureAgendamentosEstrutura } from "./modules/agendamentos/repositories/agendamentos.repository.js";
+import { ensureMultiTenantStructure } from "./modules/multi-tenant/tenant-estrutura.service.js";
 async function aquecerEstruturasDeTela() {
     const commemorativeImportService = new CommemorativeImportService();
+    const tenantsMensagens = await prisma.$queryRaw `
+    SELECT DISTINCT tenant_id::text AS tenant_id
+    FROM unidade_assistencial
+    WHERE tenant_id IS NOT NULL
+  `;
     const aquecimentos = [
         { nome: "arquivos", promise: ensureArquivosEstrutura(prisma) },
         { nome: "parametros-sistema", promise: ensureParametrosSistemaEstrutura() },
@@ -43,7 +51,13 @@ async function aquecerEstruturasDeTela() {
         { nome: "agendamentos", promise: ensureAgendamentosEstrutura() },
         { nome: "senhas", promise: ensureSenhasEstrutura() },
         { nome: "chamados-tecnicos", promise: ensureChamadoTecnicoParametrosIniciais() },
-        { nome: "mensagens-personalizadas", promise: ensureMensagensPersonalizadasBase() }
+        ...tenantsMensagens
+            .map((item) => String(item.tenant_id ?? "").trim())
+            .filter(Boolean)
+            .map((tenantId) => ({
+            nome: `mensagens-personalizadas:${tenantId}`,
+            promise: ensureMensagensPersonalizadasBase(tenantId)
+        }))
     ];
     const resultados = await Promise.allSettled(aquecimentos.map((item) => item.promise));
     resultados.forEach((resultado, indice) => {
@@ -53,6 +67,7 @@ async function aquecerEstruturasDeTela() {
     });
 }
 async function bootstrap() {
+    await ensureMultiTenantStructure(prisma);
     await Promise.all([
         ensureUsuariosGestaoEstrutura(prisma),
         ensureRegistroPontoEstrutura(prisma)
@@ -72,6 +87,8 @@ async function bootstrap() {
         iniciarDatasComemorativasScheduler();
         iniciarDocumentosInstituicaoScheduler();
         iniciarLicencaUsoScheduler();
+        iniciarBackupImagensScheduler();
+        iniciarBackupArquivosScheduler();
     });
 }
 bootstrap().catch((error) => {

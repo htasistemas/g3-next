@@ -5,60 +5,60 @@ import { participanteCarteiraStatusValues } from "../carteira-evento.types.js";
 import { CarteiraEventoRepository } from "../repositories/carteira-evento.repository.js";
 export class CarteiraEventoService {
     repository = new CarteiraEventoRepository();
-    listarEventos(rawFilters) {
+    listarEventos(rawFilters, rawTenantId) {
         const filters = eventoCarteiraFiltersSchema.parse(rawFilters ?? {});
-        return this.repository.listarEventos(filters);
+        return this.repository.listarEventos(filters, this.parseTenant(rawTenantId));
     }
-    criarEvento(rawInput) {
+    criarEvento(rawInput, rawTenantId) {
         const input = eventoCarteiraInputSchema.parse(rawInput);
-        return this.repository.criarEvento(input);
+        return this.repository.criarEvento(input, this.parseTenant(rawTenantId));
     }
-    atualizarEvento(rawId, rawInput) {
+    atualizarEvento(rawId, rawInput, rawTenantId) {
         const id = this.parseId(rawId, "evento");
         const input = eventoCarteiraInputSchema.parse(rawInput);
-        return this.repository.atualizarEvento(id, input);
+        return this.repository.atualizarEvento(id, input, this.parseTenant(rawTenantId));
     }
-    listarParticipantes(rawFilters) {
+    listarParticipantes(rawFilters, rawTenantId) {
         const filters = participanteCarteiraFiltersSchema.parse(rawFilters ?? {});
-        return this.repository.listarParticipantes(filters);
+        return this.repository.listarParticipantes(filters, this.parseTenant(rawTenantId));
     }
-    buscarParticipante(rawId) {
-        return this.repository.buscarParticipantePorIdOuFalhar(this.parseId(rawId, "participante"));
+    buscarParticipante(rawId, rawTenantId) {
+        return this.repository.buscarParticipantePorIdOuFalhar(this.parseId(rawId, "participante"), this.parseTenant(rawTenantId));
     }
-    criarParticipante(rawInput) {
+    criarParticipante(rawInput, rawTenantId) {
         const input = participanteCarteiraInputSchema.parse(rawInput);
-        return this.repository.criarParticipante(input);
+        return this.repository.criarParticipante(input, this.parseTenant(rawTenantId));
     }
-    atualizarParticipante(rawId, rawInput) {
+    atualizarParticipante(rawId, rawInput, rawTenantId) {
         const id = this.parseId(rawId, "participante");
         const input = participanteCarteiraInputSchema.parse(rawInput);
-        return this.repository.atualizarParticipante(id, input);
+        return this.repository.atualizarParticipante(id, input, this.parseTenant(rawTenantId));
     }
-    listarBarracas(rawFilters) {
+    listarBarracas(rawFilters, rawTenantId) {
         const filters = barracaEventoFiltersSchema.parse(rawFilters ?? {});
-        return this.repository.listarBarracas(filters);
+        return this.repository.listarBarracas(filters, this.parseTenant(rawTenantId));
     }
-    criarBarraca(rawInput) {
+    criarBarraca(rawInput, rawTenantId) {
         const input = barracaEventoInputSchema.parse(rawInput);
-        return this.repository.criarBarraca(input);
+        return this.repository.criarBarraca(input, this.parseTenant(rawTenantId));
     }
-    atualizarBarraca(rawId, rawInput) {
+    atualizarBarraca(rawId, rawInput, rawTenantId) {
         const id = this.parseId(rawId, "barraca");
         const input = barracaEventoInputSchema.parse(rawInput);
-        return this.repository.atualizarBarraca(id, input);
+        return this.repository.atualizarBarraca(id, input, this.parseTenant(rawTenantId));
     }
-    listarItens(rawFilters) {
+    listarItens(rawFilters, rawTenantId) {
         const filters = itemEventoFiltersSchema.parse(rawFilters ?? {});
-        return this.repository.listarItens(filters);
+        return this.repository.listarItens(filters, this.parseTenant(rawTenantId));
     }
-    criarItem(rawInput) {
+    criarItem(rawInput, rawTenantId) {
         const input = itemEventoInputSchema.parse(rawInput);
-        return this.repository.criarItem(input);
+        return this.repository.criarItem(input, this.parseTenant(rawTenantId));
     }
-    atualizarItem(rawId, rawInput) {
+    atualizarItem(rawId, rawInput, rawTenantId) {
         const id = this.parseId(rawId, "item");
         const input = itemEventoInputSchema.parse(rawInput);
-        return this.repository.atualizarItem(id, input);
+        return this.repository.atualizarItem(id, input, this.parseTenant(rawTenantId));
     }
     recarregar(rawInput, ator) {
         const input = recargaCarteiraInputSchema.parse(rawInput);
@@ -82,29 +82,29 @@ export class CarteiraEventoService {
         const body = (rawInput ?? {});
         return this.repository.emitirSegundaVia(id, !!body.invalidarAnterior, ator);
     }
-    consultarToken(rawInput) {
+    consultarToken(rawInput, rawTenantId) {
         const input = operacaoConsultaTokenSchema.parse(rawInput);
-        return this.repository.consultarToken(BigInt(input.evento_id), input.token);
+        return this.repository.consultarToken(BigInt(input.evento_id), input.token, this.parseTenant(rawTenantId));
     }
     realizarVenda(rawInput, ator) {
         const input = operacaoVendaInputSchema.parse(rawInput);
         return this.repository.realizarVenda(input, ator);
     }
-    listarExtrato(rawFilters) {
+    listarExtrato(rawFilters, rawTenantId) {
         const filters = extratoCarteiraFiltersSchema.parse(rawFilters ?? {});
-        return this.repository.listarExtrato(filters);
+        return this.repository.listarExtrato(filters, this.parseTenant(rawTenantId));
     }
-    obterDashboard(rawFilters) {
+    obterDashboard(rawFilters, rawTenantId) {
         const filters = dashboardCarteiraFiltersSchema.parse(rawFilters ?? {});
-        return this.repository.obterDashboard(filters);
+        return this.repository.obterDashboard(filters, this.parseTenant(rawTenantId));
     }
-    obterFechamento(rawFilters) {
+    obterFechamento(rawFilters, rawTenantId) {
         const filters = fechamentoCarteiraFiltersSchema.parse(rawFilters ?? {});
-        return this.repository.obterFechamento(filters);
+        return this.repository.obterFechamento(filters, this.parseTenant(rawTenantId));
     }
-    obterRelatorio(rawFilters) {
+    obterRelatorio(rawFilters, rawTenantId) {
         const filters = relatorioCarteiraFiltersSchema.parse(rawFilters ?? {});
-        return this.repository.obterRelatorio(filters);
+        return this.repository.obterRelatorio(filters, this.parseTenant(rawTenantId));
     }
     parseId(rawId, label) {
         const id = Number(rawId);
@@ -112,5 +112,12 @@ export class CarteiraEventoService {
             throw new AppError(`Identificador de ${label} invalido.`, 400);
         }
         return BigInt(id);
+    }
+    parseTenant(rawTenantId) {
+        const tenantId = rawTenantId?.trim();
+        if (!tenantId) {
+            throw new AppError("Tenant da sessao nao identificado.", 401);
+        }
+        return tenantId;
     }
 }

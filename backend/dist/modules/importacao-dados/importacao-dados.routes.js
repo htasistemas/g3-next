@@ -1,0 +1,13 @@
+import { Router } from "express";
+import { asyncHandler } from "../../shared/http/async-handler.js";
+import { ensureAuthenticated, ensurePermissions } from "../auth/middlewares/auth.middleware.js";
+import { ImportacaoDadosController, importacaoDadosUpload } from "./importacao-dados.controller.js";
+const controller = new ImportacaoDadosController();
+export const importacaoDadosRoutes = Router();
+importacaoDadosRoutes.use(ensureAuthenticated, ensurePermissions(["MASTER_ADMIN"]));
+importacaoDadosRoutes.get("/instituicoes", asyncHandler(controller.instituicoes.bind(controller)));
+importacaoDadosRoutes.get("/historico", asyncHandler(controller.historico.bind(controller)));
+importacaoDadosRoutes.get("/:id/relatorio", asyncHandler(controller.relatorio.bind(controller)));
+importacaoDadosRoutes.get("/:id", asyncHandler(controller.obter.bind(controller)));
+importacaoDadosRoutes.post("/validar", importacaoDadosUpload.single("arquivo"), asyncHandler(controller.validar.bind(controller)));
+importacaoDadosRoutes.post("/:id/confirmar", asyncHandler(controller.confirmar.bind(controller)));

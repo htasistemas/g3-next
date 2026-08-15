@@ -37,6 +37,15 @@ const optionalHour = z.preprocess((value) => {
     const trimmed = value.trim();
     return trimmed.length ? trimmed : undefined;
 }, z.string().regex(/^\d{2}:\d{2}$/).optional());
+const optionalIntervalMinutes = z.preprocess((value) => {
+    if (value === null || value === undefined || value === "")
+        return undefined;
+    if (typeof value === "number")
+        return value;
+    if (typeof value === "string")
+        return Number(value);
+    return value;
+}, z.number().int().min(1).max(1440).optional());
 const optionalStringArray = z.preprocess((value) => {
     if (value === null || value === undefined || value === "")
         return undefined;
@@ -51,7 +60,7 @@ const optionalStringArray = z.preprocess((value) => {
     return value;
 }, z.array(z.string().trim().min(1)).optional());
 const matriculaStatusValues = ["ATIVO", "FINALIZADO", "CANCELADO"];
-const presencaStatusValues = ["PRESENTE", "AUSENTE"];
+const presencaStatusValues = ["PRESENTE", "AUSENTE", "JUSTIFICADO", "NAO_INFORMADO"];
 const presencaDataStatusValues = ["GERADA", "PREENCHIDA", "CANCELADA"];
 export const matriculaInscricaoInputSchema = z.object({
     beneficiario_nome: z.string().trim().min(3, "Informe o nome do beneficiario."),
@@ -89,6 +98,9 @@ export const matriculaInputSchema = z.object({
     vagas_disponiveis: optionalInteger,
     carga_horaria: optionalInteger,
     horario_inicial: optionalHour,
+    controle_horario_atendimento: z.boolean().optional(),
+    horario_final_atendimento: optionalHour,
+    intervalo_atendimento_minutos: optionalIntervalMinutes,
     duracao_horas: requiredInteger,
     dias_semana: optionalStringArray,
     faixa_etaria: optionalStringArray,
@@ -107,6 +119,27 @@ export const matriculaInputSchema = z.object({
     data_conclusao: optionalIsoDate,
     matriculas: z.array(matriculaInscricaoInputSchema).optional(),
     fila_espera: z.array(matriculaFilaEsperaInputSchema).optional()
+}).superRefine((value, context) => {
+    if (!value.controle_horario_atendimento)
+        return;
+    if (value.tipo.trim().toUpperCase() !== "ATENDIMENTO") {
+        context.addIssue({ code: z.ZodIssueCode.custom, path: ["controle_horario_atendimento"], message: "O controle por horário está disponível apenas para atendimentos." });
+        return;
+    }
+    if (!value.horario_inicial || !value.horario_final_atendimento || value.duracao_horas <= 0) {
+        context.addIssue({ code: z.ZodIssueCode.custom, path: ["duracao_horas"], message: "Informe os horários inicial e final e a duração do atendimento em minutos." });
+        return;
+    }
+    const [horaInicial, minutoInicial] = value.horario_inicial.split(":").map(Number);
+    const [horaFinal, minutoFinal] = value.horario_final_atendimento.split(":").map(Number);
+    const inicio = horaInicial * 60 + minutoInicial;
+    const fim = horaFinal * 60 + minutoFinal;
+    if (fim <= inicio) {
+        context.addIssue({ code: z.ZodIssueCode.custom, path: ["horario_final_atendimento"], message: "O horário final deve ser posterior ao horário inicial." });
+    }
+    else if ((fim - inicio) % value.duracao_horas !== 0) {
+        context.addIssue({ code: z.ZodIssueCode.custom, path: ["duracao_horas"], message: "A duração em minutos deve dividir exatamente o período informado." });
+    }
 });
 export const matriculaFiltersSchema = z.object({
     nome: optionalTrimmedString,
@@ -125,10 +158,16 @@ export const matriculaPresencaDataUpdateSchema = z.object({
 });
 export const matriculaPresencaSalvarSchema = z.object({
     data_aula: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Informe a data da aula."),
+    observacoes: optionalTrimmedString,
+    senha_confirmacao: optionalTrimmedString,
     presencas: z
         .array(z.object({
         matricula_id: z.string().trim().min(1, "Informe a matricula."),
-        status: z.enum(presencaStatusValues)
+        status: z.enum(presencaStatusValues),
+        observacao: optionalTrimmedString
     }))
         .default([])
+});
+export const matriculaPresencaSenhaSchema = z.object({
+    senha: z.string().trim().min(1, "Informe a senha do usuário logado.")
 });

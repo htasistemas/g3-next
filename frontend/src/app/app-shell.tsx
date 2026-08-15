@@ -5,6 +5,8 @@ import { PopupConfirmacao } from "@/components/admin/admin-popups";
 import { DatasComemorativasPopup } from "@/components/system/datas-comemorativas-popup";
 import { AIChatWidget } from "@/modules/ai/components/AIChatWidget";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { useAuth } from "@/hooks/use-auth";
 import { useAutoRefreshOnVersionChange } from "@/hooks/use-auto-refresh-on-version-change";
 import { useSystemVersion } from "@/hooks/use-system-version";
@@ -432,6 +434,12 @@ const menuSectionsBase: MenuSection[] = [
         to: "/setor-juridico/termo-fomento",
         label: "Termo de fomento",
         icon: FileText
+      },
+      {
+        id: "setor-juridico-termos-parceria",
+        to: "/setor-juridico/termos-parceria",
+        label: "Termos de parceria",
+        icon: HeartHandshake
       }
     ]
   },
@@ -771,6 +779,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/setor-administrativo/checklist-diario")) return "Checklist diário";
   if (pathname.startsWith("/setor-juridico/plano-trabalho")) return "Plano de trabalho";
   if (pathname.startsWith("/setor-juridico/termo-fomento")) return "Termo de fomento";
+  if (pathname.startsWith("/setor-juridico/termos-parceria")) return "Termos de parceria";
   if (pathname.startsWith("/setor-financeiro/autorizacao-compras")) return "Autorização de compras";
   if (pathname.startsWith("/setor-financeiro/contabilidade")) return "Lançamentos contábeis";
   if (pathname.startsWith("/setor-financeiro/prestacao-contas")) return "Prestação de contas";
@@ -798,6 +807,7 @@ function ocultarTituloTopo(pathname: string) {
     pathname.startsWith("/captacao-recursos/") ||
     pathname.startsWith("/setor-juridico/plano-trabalho") ||
     pathname.startsWith("/setor-juridico/termo-fomento") ||
+    pathname.startsWith("/setor-juridico/termos-parceria") ||
     pathname.startsWith("/setor-administrativo/")
   );
 }
@@ -823,7 +833,7 @@ function itemMenuEstaAtivo(pathname: string, search: string, item: MenuItem, nav
 }
 
 export function AppShell() {
-  const { usuario, logout } = useAuth();
+  const { usuario, logout, listarAmbientes, trocarAmbiente, obterOpcoesContexto, trocarContexto } = useAuth();
   const [carregarResumoInicial, setCarregarResumoInicial] = useState(false);
   const [popupPontoPendente, setPopupPontoPendente] = useState<RegistroPontoAlertaPendente | null>(null);
   const [popupDatasComemorativas, setPopupDatasComemorativas] = useState<DataComemorativaPopupPayload | null>(null);
@@ -845,6 +855,12 @@ export function AppShell() {
   const [gruposAbertos, setGruposAbertos] = useState<Record<string, boolean>>({});
   const [lembreteAlertaAtivo, setLembreteAlertaAtivo] = useState(false);
   const [logomarcaTopoUrl, setLogomarcaTopoUrl] = useState("");
+  const [ambientes, setAmbientes] = useState<import("@/types/auth").AmbienteAutorizado[]>([]);
+  const [mostrarAmbientes, setMostrarAmbientes] = useState(false);
+  const [mostrarContexto, setMostrarContexto] = useState(false);
+  const [opcoesContexto, setOpcoesContexto] = useState<import("@/types/auth").OpcoesContexto>({ unidades: [], projetos: [] });
+  const [unidadeContexto, setUnidadeContexto] = useState("");
+  const [projetoContexto, setProjetoContexto] = useState("");
   const baseApresentacao = usuario?.instituicao_slug?.trim().toLowerCase() === "g3n-apresentacao";
   const logomarcaInstituicao = baseApresentacao
     ? usuario?.instituicao_logo_url?.trim()
@@ -855,6 +871,16 @@ export function AppShell() {
     unidadeAtualData?.unidade?.razao_social ??
     "Sistema G3";
   const nomeUsuarioExibicao = usuario?.nome?.trim() || usuario?.nomeUsuario || "";
+
+  useEffect(() => {
+    if (!mostrarAmbientes) return;
+    void listarAmbientes().then(setAmbientes).catch(() => setAmbientes([]));
+  }, [listarAmbientes, mostrarAmbientes]);
+
+  useEffect(() => {
+    if (!mostrarContexto) return;
+    void obterOpcoesContexto().then(setOpcoesContexto).catch(() => setOpcoesContexto({ unidades: [], projetos: [] }));
+  }, [mostrarContexto, obterOpcoesContexto]);
 
   const permissoesUsuario = usuario?.permissoes ?? [];
   const totalPendentes = lembretesResumoData?.totalPendentes ?? 0;
@@ -1424,6 +1450,40 @@ export function AppShell() {
                   <p className="text-[10px] text-[var(--g3-muted)]">
                     {nomeUsuarioExibicao}
                   </p>
+                </div>
+                <div className="relative">
+                  <Button type="button" variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={() => setMostrarAmbientes((atual) => !atual)}>
+                    Trocar ambiente
+                  </Button>
+                  {mostrarAmbientes ? (
+                    <div className="absolute right-0 top-9 z-30 w-72 rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] p-2 shadow-xl">
+                      <p className="px-2 py-1 text-xs font-semibold text-[var(--g3-muted)]">Ambientes autorizados</p>
+                      {ambientes.map((ambiente) => (
+                        <button key={ambiente.acesso_id} type="button" className="block w-full rounded-md px-2 py-2 text-left text-xs hover:bg-[var(--g3-primary-soft)]" onClick={() => { void trocarAmbiente(ambiente.acesso_id); setMostrarAmbientes(false); }}>
+                          <span className="block font-semibold">{ambiente.nome_fantasia || ambiente.nome_instituicao}</span>
+                          <span className="text-[var(--g3-muted)]">{ambiente.perfil || "Usuário"}{ambiente.cnpj ? ` · ${ambiente.cnpj}` : ""}</span>
+                        </button>
+                      ))}
+                      {!ambientes.length ? <p className="px-2 py-2 text-xs text-[var(--g3-muted)]">Nenhum outro ambiente disponível.</p> : null}
+                    </div>
+                  ) : null}
+                </div>
+                <div className="relative">
+                  <Button type="button" variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={() => setMostrarContexto((atual) => !atual)}>
+                    Unidade/projeto
+                  </Button>
+                  {mostrarContexto ? <div className="absolute right-0 top-9 z-30 w-72 rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] p-3 shadow-xl">
+                    <Label className="text-xs">Unidade</Label>
+                    <Select value={unidadeContexto} onChange={(event) => { setUnidadeContexto(event.target.value); setProjetoContexto(""); void trocarContexto({ unidadeId: event.target.value || null, projetoId: null }); }}>
+                      <option value="">Todas as unidades</option>
+                      {opcoesContexto.unidades.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
+                    </Select>
+                    <Label className="mt-2 block text-xs">Projeto</Label>
+                    <Select value={projetoContexto} onChange={(event) => { setProjetoContexto(event.target.value); void trocarContexto({ unidadeId: unidadeContexto || null, projetoId: event.target.value || null }); }}>
+                      <option value="">Todos os projetos</option>
+                      {opcoesContexto.projetos.filter((item) => !unidadeContexto || item.unidade_id === unidadeContexto).map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
+                    </Select>
+                  </div> : null}
                 </div>
                 <Button
                   type="button"

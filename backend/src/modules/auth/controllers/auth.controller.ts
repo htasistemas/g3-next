@@ -35,6 +35,36 @@ export class AuthController {
     return response.json(data);
   }
 
+  async selecionarAmbiente(request: Request, response: Response) {
+    const data = await authService.selecionarAmbiente(request.body);
+    if ("token" in data) response.cookie(AUTH_COOKIE_NAME, data.token, authCookieOptions());
+    return response.json(data);
+  }
+
+  async listarAmbientes(request: AuthenticatedRequest, response: Response) {
+    if (!request.authUser?.id) return response.status(401).json({ ambientes: [] });
+    return response.json({ ambientes: await authService.listarAmbientes(request.authUser.id) });
+  }
+
+  async trocarAmbiente(request: AuthenticatedRequest, response: Response) {
+    if (!request.authUser?.id) return response.status(401).json({ message: "Não autenticado." });
+    const data = await authService.trocarAmbiente(request.authUser.id, request.body);
+    if ("token" in data) response.cookie(AUTH_COOKIE_NAME, data.token, authCookieOptions());
+    return response.json(data);
+  }
+
+  async listarOpcoesContexto(request: AuthenticatedRequest, response: Response) {
+    if (!request.authUser?.id) return response.status(401).json({ unidades: [], projetos: [] });
+    return response.json(await authService.listarOpcoesContexto(request.authUser.id, request.authUser.tenant_id));
+  }
+
+  async trocarContexto(request: AuthenticatedRequest, response: Response) {
+    if (!request.authUser?.id) return response.status(401).json({ message: "Não autenticado." });
+    const data = await authService.trocarContexto(request.authUser.id, request.authUser.tenant_id, request.body);
+    if ("token" in data) response.cookie(AUTH_COOKIE_NAME, data.token, authCookieOptions());
+    return response.json(data);
+  }
+
   async loginGoogle(request: Request, response: Response) {
     const data = await authService.loginGoogle(request.body);
     if ("token" in data) {

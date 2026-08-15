@@ -2,6 +2,7 @@ const sqlEstruturaCarteiraEvento = [
     `
   CREATE TABLE IF NOT EXISTS carteira_evento (
     id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID,
     nome_evento VARCHAR(200) NOT NULL,
     tipo_evento VARCHAR(40) NOT NULL,
     data_inicio DATE NOT NULL,
@@ -118,7 +119,9 @@ const sqlEstruturaCarteiraEvento = [
     criado_em TIMESTAMP NOT NULL DEFAULT NOW()
   )
   `,
+    "ALTER TABLE IF EXISTS carteira_evento ADD COLUMN IF NOT EXISTS tenant_id UUID",
     "CREATE INDEX IF NOT EXISTS carteira_evento_status_idx ON carteira_evento(status)",
+    "CREATE INDEX IF NOT EXISTS carteira_evento_tenant_idx ON carteira_evento(tenant_id, data_inicio DESC, id DESC)",
     "CREATE INDEX IF NOT EXISTS carteira_evento_participante_evento_idx ON carteira_evento_participante(evento_id)",
     "CREATE INDEX IF NOT EXISTS carteira_evento_participante_status_idx ON carteira_evento_participante(status)",
     "CREATE INDEX IF NOT EXISTS carteira_evento_barraca_evento_idx ON carteira_evento_barraca(evento_id)",
@@ -149,6 +152,18 @@ export async function ensureCarteiraEventoEstrutura(db) {
             for (const sql of sqlEstruturaCarteiraEvento) {
                 await db.$executeRawUnsafe(sql);
             }
+            await db.$executeRawUnsafe(`
+        UPDATE carteira_evento
+        SET tenant_id = origem.tenant_id
+        FROM (
+          SELECT tenant_id
+          FROM unidade_assistencial
+          WHERE tenant_id IS NOT NULL
+          ORDER BY unidade_principal DESC, atualizado_em DESC, criado_em ASC
+          LIMIT 1
+        ) origem
+        WHERE carteira_evento.tenant_id IS NULL
+      `);
             estruturaInicializada = true;
         })().catch((error) => {
             estruturaInicializando = null;

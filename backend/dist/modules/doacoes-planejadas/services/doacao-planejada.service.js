@@ -6,37 +6,41 @@ import { mapDoacaoPlanejadaToResponse } from "../doacao-planejada.mapper.js";
 import { DoacaoPlanejadaRepository } from "../repositories/doacao-planejada.repository.js";
 export class DoacaoPlanejadaService {
     repository = new DoacaoPlanejadaRepository();
-    async listar(rawFilters) {
+    async listar(rawFilters, rawTenantId) {
+        const tenantId = this.parseTenantId(rawTenantId);
         const filtersNormalizados = rawFilters && typeof rawFilters === "object"
             ? normalizarObjetoTexto(rawFilters, {
                 status: "textoCurto"
             })
             : rawFilters;
         const filters = doacaoPlanejadaFiltersSchema.parse(filtersNormalizados);
-        const registros = await this.repository.listar(filters);
+        const registros = await this.repository.listar(filters, tenantId);
         return registros.map((registro) => mapDoacaoPlanejadaToResponse(registro));
     }
-    async buscarPorId(rawId) {
+    async buscarPorId(rawId, rawTenantId) {
         const id = this.parseId(rawId);
-        const registro = await this.repository.buscarPorIdOuFalhar(id);
+        const tenantId = this.parseTenantId(rawTenantId);
+        const registro = await this.repository.buscarPorIdOuFalhar(id, tenantId);
         return mapDoacaoPlanejadaToResponse(registro);
     }
-    async criar(rawInput) {
+    async criar(rawInput, rawTenantId) {
         const inputNormalizado = this.normalizarPayload(rawInput);
         const input = doacaoPlanejadaInputSchema.parse(inputNormalizado);
-        const registro = await this.repository.criar(input);
+        const tenantId = this.parseTenantId(rawTenantId);
+        const registro = await this.repository.criar(input, tenantId);
         return mapDoacaoPlanejadaToResponse(registro);
     }
-    async atualizar(rawId, rawInput) {
+    async atualizar(rawId, rawInput, rawTenantId) {
         const id = this.parseId(rawId);
         const inputNormalizado = this.normalizarPayload(rawInput);
         const input = doacaoPlanejadaInputSchema.parse(inputNormalizado);
-        const registro = await this.repository.atualizar(id, input);
+        const tenantId = this.parseTenantId(rawTenantId);
+        const registro = await this.repository.atualizar(id, input, tenantId);
         return mapDoacaoPlanejadaToResponse(registro);
     }
-    async remover(rawId) {
+    async remover(rawId, rawTenantId) {
         const id = this.parseId(rawId);
-        await this.repository.remover(id);
+        await this.repository.remover(id, this.parseTenantId(rawTenantId));
     }
     parseId(rawId) {
         const id = Number(rawId);
@@ -50,5 +54,12 @@ export class DoacaoPlanejadaService {
             return rawInput;
         }
         return normalizarObjetoTexto(rawInput, mapaCamposTextoDoacaoPlanejada);
+    }
+    parseTenantId(rawTenantId) {
+        const tenantId = rawTenantId?.trim();
+        if (!tenantId) {
+            throw new AppError("Tenant nao identificado.", 401);
+        }
+        return tenantId;
     }
 }

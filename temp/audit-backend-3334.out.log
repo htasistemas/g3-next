@@ -1,0 +1,7 @@
+[g3n-backend-node] executando em http://127.0.0.1:3334
+[g3n-backend-node] assistente de IA configurado com provider=gemini model=gemini-2.5-flash
+[0mGET /health [32m200[0m 3.006 ms - 65[0m
+[0mPOST /api/auth/login [32m200[0m 135.919 ms - 4221[0m
+[0mGET /api/juridico/termos-parceria/abc [31m500[0m 6.068 ms - 39[0m
+[0mPOST /api/juridico/termos-parceria/1/itens/despesas [33m422[0m 18.183 ms - 66[0m
+[0mGET /api/juridico/termos-parceria [33m401[0m 0.672 ms - 30[0m

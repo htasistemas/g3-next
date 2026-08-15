@@ -23,10 +23,10 @@ export class RelatorioTemplatePadrao {
         })
             .join("");
     }
-    montarClasseColuna(coluna) {
+    montarClasseColuna(coluna, classesExtras = []) {
         if (!coluna)
             return "";
-        const classes = [coluna.classe, coluna.semQuebra ? "coluna-sem-quebra" : ""].filter(Boolean).join(" ");
+        const classes = [coluna.classe, coluna.semQuebra ? "coluna-sem-quebra" : "", ...classesExtras].filter(Boolean).join(" ");
         return classes ? ` class="${this.escapeHtml(classes)}"` : "";
     }
     montarEstiloColuna(coluna, cabecalho = false) {
@@ -42,9 +42,12 @@ export class RelatorioTemplatePadrao {
             .join("") ?? "";
         const bodyRows = input.tabela?.linhas
             .map((linha) => `<tr>${linha
-            .map((valor, index) => {
+            .map((celula, index) => {
             const coluna = input.tabela?.colunas[index];
-            return `<td${this.montarClasseColuna(coluna)}${this.montarEstiloColuna(coluna)}>${this.escapeHtml(valor)}</td>`;
+            const valor = typeof celula === "string" ? celula : celula.valor;
+            const classeCelula = typeof celula === "string" ? "" : celula.classe ?? "";
+            const conteudo = typeof celula === "string" || !celula.html ? this.escapeHtml(valor) : valor;
+            return `<td${this.montarClasseColuna(coluna, [classeCelula])}${this.montarEstiloColuna(coluna)}>${conteudo}</td>`;
         })
             .join("")}</tr>`)
             .join("") ?? "";
@@ -160,6 +163,10 @@ export class RelatorioTemplatePadrao {
               overflow-wrap: anywhere;
               padding: 0 8px;
             }
+            .cabecalho-centro {
+              min-width: 0;
+              text-align: center;
+            }
             .linha-separadora {
               border: 0;
               border-top: 1px solid #111827;
@@ -169,15 +176,15 @@ export class RelatorioTemplatePadrao {
               text-align: center;
               font-weight: 800;
               font-size: 15px;
-              margin: 0 0 2px 0;
+              margin: 4px 0 2px 0;
             }
             .cabecalho-meta {
               display: flex;
               flex-wrap: wrap;
               justify-content: center;
               gap: 10px 14px;
-              margin-top: 3px;
-              margin-bottom: 4px;
+              margin-top: 4px;
+              margin-bottom: 0;
               color: #334155;
               font-size: 10px;
             }
@@ -314,6 +321,37 @@ export class RelatorioTemplatePadrao {
               word-break: break-word;
               line-height: 1.15;
             }
+            .chip-ocorrencia {
+              display: inline-block;
+              padding: 2px 6px;
+              margin: 1px 4px 1px 0;
+              border-radius: 9999px;
+              font-size: 8.5px;
+              font-weight: 700;
+              line-height: 1.4;
+              border: 1px solid transparent;
+              white-space: nowrap;
+            }
+            .chip-ocorrencia--ok {
+              background: #dcfce7;
+              color: #166534;
+              border-color: #86efac;
+            }
+            .chip-ocorrencia--alerta {
+              background: #ffedd5;
+              color: #9a3412;
+              border-color: #fdba74;
+            }
+            .chip-ocorrencia--info {
+              background: #dbeafe;
+              color: #1d4ed8;
+              border-color: #93c5fd;
+            }
+            .chip-ocorrencia--neutro {
+              background: #e2e8f0;
+              color: #334155;
+              border-color: #cbd5e1;
+            }
             tr {
               page-break-inside: avoid;
               break-inside: avoid;
@@ -368,12 +406,13 @@ export class RelatorioTemplatePadrao {
             <header class="cabecalho">
               <div class="cabecalho-topo">
                 <div class="cabecalho-logo">${logoHtml}</div>
-                <div class="cabecalho-razao-social">${this.escapeHtml(input.cabecalho.razaoSocial)}</div>
+                <div class="cabecalho-centro">
+                  <div class="cabecalho-razao-social">${this.escapeHtml(input.cabecalho.razaoSocial)}</div>
+                  <h1 class="cabecalho-titulo">${this.escapeHtml(input.titulo)}</h1>
+                  ${metadadosTopoHtml ? `<div class="cabecalho-meta">${metadadosTopoHtml}</div>` : ""}
+                </div>
                 <div></div>
               </div>
-              ${metadadosTopoHtml ? `<div class="cabecalho-meta">${metadadosTopoHtml}</div>` : ""}
-              <hr class="linha-separadora" />
-              <h1 class="cabecalho-titulo">${this.escapeHtml(input.titulo)}</h1>
               <hr class="linha-separadora" />
             </header>
 
@@ -381,15 +420,7 @@ export class RelatorioTemplatePadrao {
               ${input.descricao ? `<p class="descricao">${this.escapeHtml(input.descricao)}</p>` : ""}
               ${conteudoCorpoHtml}
 
-              ${input.tabela
-            ? `
-                <table>
-                  <colgroup>${colgroupHtml}</colgroup>
-                  <thead><tr>${headerCols}</tr></thead>
-                  <tbody>${bodyRows}</tbody>
-                </table>
-              `
-            : ""}
+              ${this.renderizarTabelas(input)}
 
               ${secoesHtml}
             </section>
@@ -412,5 +443,20 @@ export class RelatorioTemplatePadrao {
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#039;");
+    }
+    renderizarTabelas(input) {
+        const tabelas = input.tabelas?.length ? input.tabelas : input.tabela ? [input.tabela] : [];
+        return tabelas.map((tabela) => {
+            const colgroup = tabela.colunas.map((coluna) => `<col style="width:${coluna.largura ?? "auto"};" />`).join("");
+            const cabecalho = tabela.colunas.map((coluna) => `<th${this.montarClasseColuna(coluna)}${this.montarEstiloColuna(coluna, true)}>${this.escapeHtml(coluna.titulo)}</th>`).join("");
+            const linhas = tabela.linhas.map((linha) => `<tr>${linha.map((celula, index) => {
+                const coluna = tabela.colunas[index];
+                const valor = typeof celula === "string" ? celula : celula.valor;
+                const classe = typeof celula === "string" ? "" : celula.classe ?? "";
+                const conteudo = typeof celula === "string" || !celula.html ? this.escapeHtml(valor) : valor;
+                return `<td${this.montarClasseColuna(coluna, [classe])}${this.montarEstiloColuna(coluna)}>${conteudo}</td>`;
+            }).join("")}</tr>`).join("");
+            return `<table><colgroup>${colgroup}</colgroup><thead><tr>${cabecalho}</tr></thead><tbody>${linhas}</tbody></table>`;
+        }).join("");
     }
 }

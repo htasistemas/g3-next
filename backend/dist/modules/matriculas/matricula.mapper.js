@@ -66,10 +66,14 @@ export function mapCursoToResponse(curso, matriculas, filaEspera) {
         nome: curso.nome,
         descricao: curso.descricao ?? undefined,
         imagem: curso.imagem ?? undefined,
+        imagem_thumbnail: curso.imagem_thumbnail ?? undefined,
         vagas_totais: curso.vagas_totais,
         vagas_disponiveis: curso.vagas_disponiveis,
         carga_horaria: curso.carga_horaria ?? undefined,
         horario_inicial: formatTime(curso.horario_inicial),
+        controle_horario_atendimento: !!curso.controle_horario_atendimento,
+        horario_final_atendimento: formatTime(curso.horario_final_atendimento),
+        intervalo_atendimento_minutos: curso.intervalo_atendimento_minutos ?? undefined,
         duracao_horas: curso.duracao_horas,
         dias_semana: splitList(curso.dias_semana),
         faixa_etaria: splitList(curso.faixa_etaria),
@@ -80,6 +84,8 @@ export function mapCursoToResponse(curso, matriculas, filaEspera) {
         instituicao_parceira: curso.instituicao_parceira ?? undefined,
         sala_id: curso.sala_id ? toStringId(curso.sala_id) : undefined,
         sala_nome: curso.sala_nome ?? undefined,
+        unidade_id: curso.unidade_id ? toStringId(curso.unidade_id) : undefined,
+        unidade_nome: curso.unidade_nome ?? undefined,
         status: curso.status,
         data_triagem: formatDate(curso.data_triagem),
         data_encaminhamento: formatDate(curso.data_encaminhamento),
@@ -90,6 +96,7 @@ export function mapCursoToResponse(curso, matriculas, filaEspera) {
             id_matricula_item: toStringId(item.id),
             beneficiario_nome: item.beneficiario_nome,
             cpf: item.cpf ?? undefined,
+            data_nascimento: item.data_nascimento ? toIsoDate(item.data_nascimento) ?? undefined : undefined,
             telefone: item.telefone ?? undefined,
             email: item.email ?? undefined,
             status: item.status,
@@ -134,6 +141,7 @@ export function mapSalaCatalogoToResponse(record) {
     return {
         id_sala: toStringId(record.id),
         nome: record.nome,
+        unidade_id: record.unidade_id ? toStringId(record.unidade_id) : undefined,
         unidade_nome: record.unidade_nome ?? undefined
     };
 }

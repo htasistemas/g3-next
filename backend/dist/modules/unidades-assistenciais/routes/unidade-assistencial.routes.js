@@ -9,6 +9,7 @@ const permissoesEscrita = ["ADMINISTRADOR", "OPERADOR"];
 const permissaoExclusao = ["ADMINISTRADOR"];
 unidadeAssistencialRoutes.get("/", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listar.bind(controller)));
 unidadeAssistencialRoutes.get("/atual", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.buscarAtual.bind(controller)));
+unidadeAssistencialRoutes.get("/salas/:salaId/vinculos", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.verificarVinculosSala.bind(controller)));
 unidadeAssistencialRoutes.get("/:id", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.buscarPorId.bind(controller)));
 unidadeAssistencialRoutes.post("/", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.criar.bind(controller)));
 unidadeAssistencialRoutes.put("/:id", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.atualizar.bind(controller)));

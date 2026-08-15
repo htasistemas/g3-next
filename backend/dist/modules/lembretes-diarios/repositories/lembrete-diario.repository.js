@@ -6,8 +6,47 @@ function montarDataHoraProxima(dataInicial, horaAviso) {
     const hora = trimOrUndefined(horaAviso) ?? "09:00";
     return new Date(`${dataInicial}T${hora}:00`);
 }
+const estruturaSql = [
+    "ALTER TABLE lembretes_diarios ADD COLUMN IF NOT EXISTS tenant_id UUID",
+    "CREATE INDEX IF NOT EXISTS lembretes_diarios_tenant_idx ON lembretes_diarios(tenant_id, proxima_execucao_em ASC, id DESC)",
+    `
+    UPDATE lembretes_diarios AS l
+    SET tenant_id = u.tenant_id
+    FROM usuarios u
+    WHERE l.tenant_id IS NULL
+      AND l.usuario_id IS NOT NULL
+      AND u.id = l.usuario_id
+      AND u.tenant_id IS NOT NULL
+  `,
+    `
+    UPDATE lembretes_diarios AS l
+    SET tenant_id = ref.tenant_id
+    FROM (
+      SELECT tenant_id
+      FROM instituicoes
+      ORDER BY criado_em ASC
+      LIMIT 1
+    ) ref
+    WHERE l.tenant_id IS NULL
+  `
+];
+let estruturaPromise = null;
 export class LembreteDiarioRepository {
-    async listar(usuarioId) {
+    async garantirEstrutura() {
+        if (!estruturaPromise) {
+            estruturaPromise = (async () => {
+                for (const sql of estruturaSql) {
+                    await prisma.$executeRawUnsafe(sql);
+                }
+            })().catch((error) => {
+                estruturaPromise = null;
+                throw error;
+            });
+        }
+        await estruturaPromise;
+    }
+    async listar(usuarioId, tenantId) {
+        await this.garantirEstrutura();
         const filtroUsuario = usuarioId
             ? Prisma.sql `AND (usuario_id = ${BigInt(usuarioId)} OR todos_usuarios = TRUE)`
             : Prisma.empty;
@@ -29,11 +68,13 @@ export class LembreteDiarioRepository {
         atualizado_em
       FROM lembretes_diarios
       WHERE deletado_em IS NULL
+        AND tenant_id::text = ${tenantId}
       ${filtroUsuario}
       ORDER BY proxima_execucao_em ASC, id DESC
     `);
     }
-    async obterResumo(usuarioId) {
+    async obterResumo(usuarioId, tenantId) {
+        await this.garantirEstrutura();
         const filtroUsuario = usuarioId
             ? Prisma.sql `AND (usuario_id = ${BigInt(usuarioId)} OR todos_usuarios = TRUE)`
             : Prisma.empty;
@@ -49,6 +90,7 @@ export class LembreteDiarioRepository {
         )::BIGINT AS total_vencidos
       FROM lembretes_diarios
       WHERE deletado_em IS NULL
+        AND tenant_id::text = ${tenantId}
       ${filtroUsuario}
     `);
         const row = rows[0];
@@ -57,7 +99,8 @@ export class LembreteDiarioRepository {
             totalVencidos: Number(row?.total_vencidos ?? 0)
         };
     }
-    async buscarPorId(id) {
+    async buscarPorId(id, tenantId) {
+        await this.garantirEstrutura();
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT
         id,
@@ -76,23 +119,26 @@ export class LembreteDiarioRepository {
         atualizado_em
       FROM lembretes_diarios
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
         AND deletado_em IS NULL
       LIMIT 1
     `);
         return rows[0] ?? null;
     }
-    async buscarPorIdOuFalhar(id) {
-        const registro = await this.buscarPorId(id);
+    async buscarPorIdOuFalhar(id, tenantId) {
+        const registro = await this.buscarPorId(id, tenantId);
         if (!registro) {
-            throw new AppError("Lembrete não encontrado.", 404);
+            throw new AppError("Lembrete nao encontrado.", 404);
         }
         return registro;
     }
-    async criar(input) {
+    async criar(input, tenantId) {
+        await this.garantirEstrutura();
         const recorrencia = "DIARIO";
         const proximaExecucao = montarDataHoraProxima(input.dataInicial, input.horaAviso);
         const inserted = await prisma.$queryRaw(Prisma.sql `
       INSERT INTO lembretes_diarios (
+        tenant_id,
         titulo,
         descricao,
         usuario_id,
@@ -105,6 +151,7 @@ export class LembreteDiarioRepository {
         criado_em,
         atualizado_em
       ) VALUES (
+        CAST(${tenantId} AS UUID),
         ${input.titulo},
         ${trimOrUndefined(input.descricao)},
         ${input.usuarioId ? BigInt(input.usuarioId) : null},
@@ -121,12 +168,13 @@ export class LembreteDiarioRepository {
     `);
         const id = inserted[0]?.id;
         if (!id) {
-            throw new AppError("Não foi possível criar o lembrete.", 500);
+            throw new AppError("Nao foi possivel criar o lembrete.", 500);
         }
-        return this.buscarPorIdOuFalhar(id);
+        return this.buscarPorIdOuFalhar(id, tenantId);
     }
-    async atualizar(id, input) {
-        await this.buscarPorIdOuFalhar(id);
+    async atualizar(id, input, tenantId) {
+        await this.garantirEstrutura();
+        await this.buscarPorIdOuFalhar(id, tenantId);
         const proximaExecucao = montarDataHoraProxima(input.dataInicial, input.horaAviso);
         await prisma.$executeRaw(Prisma.sql `
       UPDATE lembretes_diarios
@@ -141,11 +189,13 @@ export class LembreteDiarioRepository {
         status = CASE WHEN status = 'CONCLUIDO' THEN 'PENDENTE' ELSE status END,
         atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
-        return this.buscarPorIdOuFalhar(id);
+        return this.buscarPorIdOuFalhar(id, tenantId);
     }
-    async concluir(id) {
-        await this.buscarPorIdOuFalhar(id);
+    async concluir(id, tenantId) {
+        await this.garantirEstrutura();
+        await this.buscarPorIdOuFalhar(id, tenantId);
         await prisma.$executeRaw(Prisma.sql `
       UPDATE lembretes_diarios
       SET
@@ -153,14 +203,16 @@ export class LembreteDiarioRepository {
         concluido_em = NOW(),
         atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
-        return this.buscarPorIdOuFalhar(id);
+        return this.buscarPorIdOuFalhar(id, tenantId);
     }
-    async adiar(id, input) {
-        await this.buscarPorIdOuFalhar(id);
+    async adiar(id, input, tenantId) {
+        await this.garantirEstrutura();
+        await this.buscarPorIdOuFalhar(id, tenantId);
         const novaData = new Date(input.novaDataHora);
         if (Number.isNaN(novaData.getTime())) {
-            throw new AppError("Nova data para adiar inválida.", 400);
+            throw new AppError("Nova data para adiar invalida.", 400);
         }
         await prisma.$executeRaw(Prisma.sql `
       UPDATE lembretes_diarios
@@ -170,17 +222,20 @@ export class LembreteDiarioRepository {
         status = 'PENDENTE',
         atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
-        return this.buscarPorIdOuFalhar(id);
+        return this.buscarPorIdOuFalhar(id, tenantId);
     }
-    async excluir(id) {
-        await this.buscarPorIdOuFalhar(id);
+    async excluir(id, tenantId) {
+        await this.garantirEstrutura();
+        await this.buscarPorIdOuFalhar(id, tenantId);
         await prisma.$executeRaw(Prisma.sql `
       UPDATE lembretes_diarios
       SET
         deletado_em = NOW(),
         atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
     }
 }

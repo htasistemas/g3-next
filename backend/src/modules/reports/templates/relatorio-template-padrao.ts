@@ -51,6 +51,7 @@ export type RelatorioHtmlInput = {
   subtitulo?: string;
   descricao?: string;
   tabela?: RelatorioTabela;
+  tabelas?: RelatorioTabela[];
   secoes?: Array<{ titulo: string; conteudo: string }>;
   metadadosTopo?: RelatorioMetaTopo[];
   blocos?: RelatorioBloco[];
@@ -509,17 +510,7 @@ export class RelatorioTemplatePadrao {
               ${input.descricao ? `<p class="descricao">${this.escapeHtml(input.descricao)}</p>` : ""}
               ${conteudoCorpoHtml}
 
-              ${
-                input.tabela
-                  ? `
-                <table>
-                  <colgroup>${colgroupHtml}</colgroup>
-                  <thead><tr>${headerCols}</tr></thead>
-                  <tbody>${bodyRows}</tbody>
-                </table>
-              `
-                  : ""
-              }
+              ${this.renderizarTabelas(input)}
 
               ${secoesHtml}
             </section>
@@ -543,5 +534,21 @@ export class RelatorioTemplatePadrao {
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
+  }
+
+  private renderizarTabelas(input: RelatorioHtmlInput): string {
+    const tabelas = input.tabelas?.length ? input.tabelas : input.tabela ? [input.tabela] : [];
+    return tabelas.map((tabela) => {
+      const colgroup = tabela.colunas.map((coluna) => `<col style="width:${coluna.largura ?? "auto"};" />`).join("");
+      const cabecalho = tabela.colunas.map((coluna) => `<th${this.montarClasseColuna(coluna)}${this.montarEstiloColuna(coluna, true)}>${this.escapeHtml(coluna.titulo)}</th>`).join("");
+      const linhas = tabela.linhas.map((linha) => `<tr>${linha.map((celula, index) => {
+        const coluna = tabela.colunas[index];
+        const valor = typeof celula === "string" ? celula : celula.valor;
+        const classe = typeof celula === "string" ? "" : celula.classe ?? "";
+        const conteudo = typeof celula === "string" || !celula.html ? this.escapeHtml(valor) : valor;
+        return `<td${this.montarClasseColuna(coluna, [classe])}${this.montarEstiloColuna(coluna)}>${conteudo}</td>`;
+      }).join("")}</tr>`).join("");
+      return `<table><colgroup>${colgroup}</colgroup><thead><tr>${cabecalho}</tr></thead><tbody>${linhas}</tbody></table>`;
+    }).join("");
   }
 }

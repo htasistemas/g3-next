@@ -4,24 +4,28 @@ import { visitaDomiciliarInputSchema } from "../visitas-domiciliares.schema.js";
 import { VisitasDomiciliaresRepository } from "../repositories/visitas-domiciliares.repository.js";
 export class VisitasDomiciliaresService {
     repository = new VisitasDomiciliaresRepository();
-    async listar() {
-        const rows = await this.repository.listar();
+    async listar(rawTenantId) {
+        const tenantId = this.parseTenant(rawTenantId);
+        const rows = await this.repository.listar(tenantId);
         return rows.map(mapVisitaRowToResponse);
     }
-    async criar(rawInput) {
+    async criar(rawInput, rawTenantId) {
         const input = visitaDomiciliarInputSchema.parse(rawInput);
-        const row = await this.repository.criar(input);
+        const tenantId = this.parseTenant(rawTenantId);
+        const row = await this.repository.criar(input, tenantId);
         return mapVisitaRowToResponse(row);
     }
-    async atualizar(rawId, rawInput) {
+    async atualizar(rawId, rawInput, rawTenantId) {
         const id = this.parseId(rawId);
         const input = visitaDomiciliarInputSchema.parse(rawInput);
-        const row = await this.repository.atualizar(id, input);
+        const tenantId = this.parseTenant(rawTenantId);
+        const row = await this.repository.atualizar(id, input, tenantId);
         return mapVisitaRowToResponse(row);
     }
-    async remover(rawId) {
+    async remover(rawId, rawTenantId) {
         const id = this.parseId(rawId);
-        await this.repository.remover(id);
+        const tenantId = this.parseTenant(rawTenantId);
+        await this.repository.remover(id, tenantId);
     }
     parseId(rawId) {
         const parsed = Number(rawId);
@@ -29,5 +33,12 @@ export class VisitasDomiciliaresService {
             throw new AppError("Identificador invalido.", 400);
         }
         return BigInt(parsed);
+    }
+    parseTenant(rawTenantId) {
+        const tenantId = rawTenantId?.trim();
+        if (!tenantId) {
+            throw new AppError("Tenant da sessao nao identificado.", 401);
+        }
+        return tenantId;
     }
 }

@@ -8,6 +8,7 @@ const permissoesLeitura = ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"];
 const permissoesEscrita = ["ADMINISTRADOR", "OPERADOR"];
 const permissaoExclusao = ["ADMINISTRADOR"];
 fotosEventosRoutes.get("/", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listar.bind(controller)));
+fotosEventosRoutes.get("/resumo", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.resumo.bind(controller)));
 fotosEventosRoutes.post("/", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.criar.bind(controller)));
 fotosEventosRoutes.get("/:id/principal", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.obterFotoPrincipal.bind(controller)));
 fotosEventosRoutes.post("/:id/fotos", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.adicionarFoto.bind(controller)));

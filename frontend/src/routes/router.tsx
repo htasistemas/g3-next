@@ -202,6 +202,7 @@ const ChecklistDiarioPage = carregarPagina(
 );
 const PlanoTrabalhoPage = carregarPagina("/setor-juridico/plano-trabalho", "PlanoTrabalhoPage");
 const TermoFomentoPage = carregarPagina("/setor-juridico/termo-fomento", "TermoFomentoPage");
+const TermosParceriaPage = carregarPagina("/setor-juridico/termos-parceria", "TermosParceriaPage");
 const AutorizacaoComprasPage = carregarPagina(
   "/setor-financeiro/autorizacao-compras",
   "AutorizacaoComprasPage"
@@ -440,6 +441,7 @@ export const router = createBrowserRouter([
       },
       { path: "/setor-juridico/plano-trabalho", element: PlanoTrabalhoPage },
       { path: "/setor-juridico/termo-fomento", element: TermoFomentoPage },
+      { path: "/setor-juridico/termos-parceria", element: TermosParceriaPage },
       { path: "/setor-financeiro/autorizacao-compras", element: AutorizacaoComprasPage },
       { path: "/setor-financeiro/contabilidade", element: ContabilidadePage },
       { path: "/setor-financeiro/prestacao-contas", element: PrestacaoContasPage },

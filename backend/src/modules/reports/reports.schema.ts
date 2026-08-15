@@ -19,6 +19,18 @@ const optionalBoolean = z.preprocess((value) => {
 
 export const formatoRelatorioSchema = z.enum(["pdf", "html"]).default("pdf");
 
+export const termosParceriaRelacaoRequestSchema = z.object({
+  projetoId: optionalString,
+  status: optionalString,
+  busca: optionalString,
+  usuarioEmissor: optionalString
+});
+
+export const termoParceriaCompletoRequestSchema = z.object({
+  termoId: z.string().trim().regex(/^\d+$/, "termoId deve ser numérico."),
+  usuarioEmissor: optionalString
+});
+
 export const beneficiarioRelacaoRequestSchema = z.object({
   nome: optionalString,
   cpf: optionalString,

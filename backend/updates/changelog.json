@@ -1,6 +1,78 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.834",
+                        "releaseDate": "2026-08-15",
+                        "title": "APIs de relatórios de parcerias",
+                        "description": "Criadas as APIs protegidas para relatório consolidado por projeto e relatório completo do termo.",
+                        "changes": ["Consultas com isolamento por tenant.", "PDF e HTML no motor institucional existente.", "Migration incremental para vínculo opcional com termo_fomento."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.833",
+                        "releaseDate": "2026-08-14",
+                        "title": "Persistência ampliada dos termos de parceria",
+                        "description": "O endpoint de termos passou a aceitar e atualizar os campos profissionais existentes no instrumento.",
+                        "changes": ["Campos de proposta, programa, edital, responsáveis, público, território, prazos, parcelas, conta exclusiva, legislação e regulamento persistidos."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.832",
+                        "releaseDate": "2026-08-14",
+                        "title": "Tela de login restaurada",
+                        "description": "Correcoes de compatibilidade da rota frontend nao exigem alteracao de contrato do backend.",
+                        "changes": ["Versao do backend alinhada ao pacote 1.00.832."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.831",
+                        "releaseDate": "2026-08-14",
+                        "title": "Padronizacao visual juridica",
+                        "description": "A tela de termos de parceria foi alinhada ao layout AdminPageLayout usado pelo Termo de fomento.",
+                        "changes": ["Mantidos os endpoints e a persistencia existentes.", "A entrada do modulo agora exibe somente as quatro abas oficiais."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.830",
+                        "releaseDate": "2026-08-14",
+                        "title": "Correcao do fluxo de autenticacao",
+                        "description": "O fluxo institucional continua aceitando CNPJ e slug junto ao login por e-mail.",
+                        "changes": ["Login por e-mail com CNPJ foi validado via API com resposta 200.", "Login por e-mail sem CNPJ foi validado via identificacao global."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.829",
+                        "releaseDate": "2026-08-14",
+                        "title": "CRUD operacional dos termos de parceria",
+                        "description": "Adicionada edição segura de registros filhos e reforçada a operação completa do módulo.",
+                        "changes": ["Endpoint PATCH para registros filhos com allowlist de campos.", "Validação de tenant, termo e histórico mantida na atualização."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.828",
+                        "releaseDate": "2026-08-14",
+                        "title": "Auditoria e endurecimento dos termos de parceria",
+                        "description": "Validações, persistência, exclusão lógica, segurança multi-tenant e integridade financeira do módulo foram reforçados.",
+                        "changes": ["Corrigida a atualização dos campos do instrumento.", "Adicionadas validações de duplicidade, valores, vigência, saldo de rubrica e vínculos por tenant.", "Adicionadas constraints e índice incremental no banco.", "Adicionada exclusão lógica com auditoria e timeline."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.827",
+                        "releaseDate": "2026-08-13",
+                        "title": "Gestao de parcerias e recursos publicos",
+                        "description": "Novo modulo juridico de termos de parceria com persistencia incremental e isolamento por tenant.",
+                        "changes": ["Endpoints protegidos para dashboard, listagem, detalhe 360 graus, unidades executoras e aditivos.", "Validacao de projeto, unidade e consultas filhas sempre pelo tenant da sessao.", "Reuso das tabelas profissionais de prestacao de contas e auditoria existente.", "Migration incremental sem exclusao de dados."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.824",
+                        "releaseDate": "2026-08-13",
+                        "title": "Autenticacao por e-mail e contexto organizacional",
+                        "description": "O login deixa de exigir CNPJ, ambientes autorizados podem ser selecionados com seguranca e a sessao passa a representar o contexto organizacional ativo.",
+                        "changes": ["Criadas estruturas incrementais de identidade global, acesso, entidade juridica, unidade organizacional e local de execucao.", "Usuarios com mais de um ambiente recebem somente os ambientes autorizados.", "Troca de ambiente renova o contexto no backend e registra auditoria.", "Filtros legados por tenant_id permanecem ativos durante a migracao.", "Manual do sistema atualizado."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.823",
                         "releaseDate": "2026-08-11",
                         "title": "Consulta CPF/CNPJ nas cotacoes de compras",

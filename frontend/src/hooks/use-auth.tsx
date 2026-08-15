@@ -29,8 +29,13 @@ type AuthContextValue = {
     slug?: string;
     codigoInstituicao?: string;
   }) => Promise<LoginAuthResult>;
+  selecionarAmbiente: (input: { loginTicket: string; acessoId: string }) => Promise<LoginAuthResult>;
+  listarAmbientes: () => Promise<import("@/types/auth").AmbienteAutorizado[]>;
+  trocarAmbiente: (acessoId: string) => Promise<void>;
   logout: () => Promise<void>;
   atualizarPerfil: () => Promise<void>;
+  obterOpcoesContexto: () => Promise<import("@/types/auth").OpcoesContexto>;
+  trocarContexto: (input: { unidadeId?: string | null; projetoId?: string | null }) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -95,6 +100,22 @@ export function AuthProvider({ children }: PropsWithChildren) {
     return resultado;
   }, []);
 
+  const selecionarAmbiente = useCallback(async (input: { loginTicket: string; acessoId: string }) => {
+    const perfil = await authService.selecionarAmbiente(input);
+    if ("token" in perfil) setUsuario(perfil.usuario);
+    return perfil;
+  }, []);
+
+  const listarAmbientes = useCallback(() => authService.listarAmbientes(), []);
+  const trocarAmbiente = useCallback(async (acessoId: string) => {
+    const perfil = await authService.trocarAmbiente(acessoId);
+    setUsuario(perfil);
+  }, []);
+  const obterOpcoesContexto = useCallback(() => authService.obterOpcoesContexto(), []);
+  const trocarContexto = useCallback(async (input: { unidadeId?: string | null; projetoId?: string | null }) => {
+    setUsuario(await authService.trocarContexto(input));
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await authService.logout();
@@ -111,10 +132,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
       login,
       verificarMfa,
       loginGoogle,
+      selecionarAmbiente,
+      listarAmbientes,
+      trocarAmbiente,
+      obterOpcoesContexto,
+      trocarContexto,
       logout,
       atualizarPerfil
     }),
-    [usuario, carregando, login, verificarMfa, loginGoogle, logout, atualizarPerfil]
+    [usuario, carregando, login, verificarMfa, loginGoogle, selecionarAmbiente, listarAmbientes, trocarAmbiente, obterOpcoesContexto, trocarContexto, logout, atualizarPerfil]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -26,8 +26,9 @@ export class ChamadoTecnicoService {
     async listar(rawFilters, authUser) {
         const filters = chamadoTecnicoListaFiltrosSchema.parse(rawFilters);
         const usuarioId = this.parseId(authUser?.id);
-        const contexto = await this.carregarCatalogos();
-        const resultado = await this.repository.listar(filters, usuarioId);
+        const tenantId = this.parseTenant(authUser?.tenant_id);
+        const contexto = await this.carregarCatalogos(tenantId);
+        const resultado = await this.repository.listar(filters, usuarioId, tenantId);
         return {
             pagina: filters.pagina ?? 1,
             limite: filters.limite ?? 20,
@@ -39,8 +40,9 @@ export class ChamadoTecnicoService {
     async exportar(rawFilters, formato, authUser) {
         const filters = chamadoTecnicoListaFiltrosSchema.parse(rawFilters);
         const usuarioId = this.parseId(authUser?.id);
-        const contexto = await this.carregarCatalogos();
-        const rows = await this.repository.listarExportacao(filters, usuarioId);
+        const tenantId = this.parseTenant(authUser?.tenant_id);
+        const contexto = await this.carregarCatalogos(tenantId);
+        const rows = await this.repository.listarExportacao(filters, usuarioId, tenantId);
         const chamados = rows.map((item) => this.mapChamadoListagem(item, contexto));
         const baseFilename = `chamados-tecnicos-${new Date().toISOString().slice(0, 10)}`;
         if (formato === "pdf") {
@@ -61,15 +63,16 @@ export class ChamadoTecnicoService {
     async buscarPorId(rawId, authUser) {
         const id = this.parseId(rawId);
         const usuarioId = this.parseId(authUser?.id);
-        const contexto = await this.carregarCatalogos();
+        const tenantId = this.parseTenant(authUser?.tenant_id);
+        const contexto = await this.carregarCatalogos(tenantId);
         const [chamado, comentarios, historico, vinculos, anexos] = await Promise.all([
-            this.repository.buscarPorIdOuFalhar(id),
-            this.repository.listarComentarios(id),
-            this.repository.listarHistorico(id),
-            this.repository.listarVinculos(id),
-            this.repository.listarAnexos(id)
+            this.repository.buscarPorIdOuFalhar(id, tenantId),
+            this.repository.listarComentarios(id, tenantId),
+            this.repository.listarHistorico(id, tenantId),
+            this.repository.listarVinculos(id, tenantId),
+            this.repository.listarAnexos(id, tenantId)
         ]);
-        await this.repository.marcarAcesso(id, usuarioId);
+        await this.repository.marcarAcesso(id, usuarioId, tenantId);
         return {
             chamado: this.mapChamadoDetalhe(chamado, contexto),
             comentarios: comentarios.map((item) => ({
@@ -114,8 +117,9 @@ export class ChamadoTecnicoService {
             }))
         };
     }
-    async listarCatalogo() {
-        const contexto = await this.carregarCatalogos();
+    async listarCatalogo(authUser) {
+        const tenantId = this.parseTenant(authUser?.tenant_id);
+        const contexto = await this.carregarCatalogos(tenantId);
         return {
             parametros: contexto.parametrosAgrupados,
             tipos: this.listarParametrosCatalogoPorTipo(contexto, "TIPO"),
@@ -123,10 +127,11 @@ export class ChamadoTecnicoService {
             usuarios: contexto.usuarios
         };
     }
-    async salvarParametro(rawInput, rawId) {
+    async salvarParametro(rawInput, authUser, rawId) {
         const input = chamadoTecnicoParametroInputSchema.parse(rawInput);
         const id = rawId ? this.parseId(rawId) : undefined;
-        const parametro = await this.repository.salvarParametro(input, id);
+        const tenantId = this.parseTenant(authUser?.tenant_id);
+        const parametro = await this.repository.salvarParametro(input, tenantId, id);
         return {
             id: toStringId(parametro.id),
             tipo: parametro.tipo,
@@ -143,15 +148,17 @@ export class ChamadoTecnicoService {
     async criar(rawInput, authUser) {
         const input = await this.normalizarEntrada(chamadoTecnicoInputSchema.parse(rawInput));
         const usuarioId = this.parseId(authUser?.id);
-        const { situacao, prioridade } = await this.validarCamposBase(input);
+        const tenantId = this.parseTenant(authUser?.tenant_id);
+        const { situacao, prioridade } = await this.validarCamposBase(input, tenantId);
         const chamado = await this.repository.criar({
             ...input,
             sla_prazo_horas: input.sla_prazo_horas ?? prioridade.sla_horas ?? undefined
-        }, usuarioId, situacao.id);
+        }, usuarioId, situacao.id, tenantId);
         await this.repository.registrarHistorico(chamado.id, {
             tipo_evento: "CRIACAO",
             descricao: "Chamado tecnico criado.",
-            usuario_id: usuarioId
+            usuario_id: usuarioId,
+            tenantId
         });
         await this.notificarNovoChamado(chamado, authUser);
         return this.buscarPorId(toStringId(chamado.id), authUser);
@@ -160,29 +167,33 @@ export class ChamadoTecnicoService {
         const id = this.parseId(rawId);
         const input = await this.normalizarEntrada(chamadoTecnicoInputSchema.parse(rawInput));
         const usuarioId = this.parseId(authUser?.id);
-        const atual = await this.repository.buscarPorIdOuFalhar(id);
-        const { situacao } = await this.validarCamposBase(input);
-        const atualizado = await this.repository.atualizar(id, input, situacao.id);
-        await this.registrarHistoricoComparativo(atual, atualizado, usuarioId);
+        const tenantId = this.parseTenant(authUser?.tenant_id);
+        const atual = await this.repository.buscarPorIdOuFalhar(id, tenantId);
+        const { situacao } = await this.validarCamposBase(input, tenantId);
+        const atualizado = await this.repository.atualizar(id, input, tenantId, situacao.id);
+        await this.registrarHistoricoComparativo(atual, atualizado, usuarioId, tenantId);
         return this.buscarPorId(toStringId(id), authUser);
     }
     async remover(rawId, authUser) {
         const id = this.parseId(rawId);
         const usuarioId = this.parseId(authUser?.id);
-        await this.repository.desativar(id);
+        const tenantId = this.parseTenant(authUser?.tenant_id);
+        await this.repository.desativar(id, tenantId);
         await this.repository.registrarHistorico(id, {
             tipo_evento: "EXCLUSAO_LOGICA",
             descricao: "Chamado tecnico desativado.",
-            usuario_id: usuarioId
+            usuario_id: usuarioId,
+            tenantId
         });
     }
     async alterarSituacao(rawId, rawInput, authUser) {
         const id = this.parseId(rawId);
         const input = chamadoTecnicoStatusInputSchema.parse(rawInput);
         const usuarioId = this.parseId(authUser?.id);
-        const atual = await this.repository.buscarPorIdOuFalhar(id);
-        const atualSituacao = await this.obterParametroOuFalhar(atual.situacao_id, "SITUACAO");
-        const novaSituacao = await this.obterParametroOuFalhar(BigInt(input.situacao_id), "SITUACAO");
+        const tenantId = this.parseTenant(authUser?.tenant_id);
+        const atual = await this.repository.buscarPorIdOuFalhar(id, tenantId);
+        const atualSituacao = await this.obterParametroOuFalhar(atual.situacao_id, "SITUACAO", tenantId);
+        const novaSituacao = await this.obterParametroOuFalhar(BigInt(input.situacao_id), "SITUACAO", tenantId);
         const permitidas = transicoesPermitidas[atualSituacao.chave] ?? [];
         if (atualSituacao.chave !== novaSituacao.chave && !permitidas.includes(novaSituacao.chave)) {
             throw new AppError("Transicao de situacao nao permitida para este chamado.", 422);
@@ -213,7 +224,7 @@ export class ChamadoTecnicoService {
         if (novaSituacao.chave === "REABERTO" && !trimOrUndefined(input.justificativa_reabertura)) {
             throw new AppError("Informe a justificativa para reabrir o chamado.", 422);
         }
-        const atualizado = await this.repository.registrarResolucao(id, novaSituacao.id, {
+        const atualizado = await this.repository.registrarResolucao(id, tenantId, novaSituacao.id, {
             resolucao: trimOrUndefined(input.resolucao) ?? atual.resolucao,
             justificativa_reabertura: trimOrUndefined(input.justificativa_reabertura) ?? atual.justificativa_reabertura,
             motivo_reabertura_id: input.motivo_reabertura_id ? BigInt(input.motivo_reabertura_id) : null,
@@ -228,31 +239,36 @@ export class ChamadoTecnicoService {
             descricao: `Situacao alterada de ${atualSituacao.nome} para ${novaSituacao.nome}.`,
             valor_anterior: atualSituacao.nome,
             valor_novo: novaSituacao.nome,
-            usuario_id: usuarioId
+            usuario_id: usuarioId,
+            tenantId
         });
         return this.buscarPorId(toStringId(atualizado.id), authUser);
     }
     async adicionarComentario(rawId, rawInput, authUser) {
         const id = this.parseId(rawId);
         const usuarioId = this.parseId(authUser?.id);
+        const tenantId = this.parseTenant(authUser?.tenant_id);
         const input = chamadoTecnicoComentarioInputSchema.parse(rawInput);
-        const comentario = await this.repository.salvarComentario(id, input, usuarioId);
+        const comentario = await this.repository.salvarComentario(id, tenantId, input, usuarioId);
         await this.repository.registrarHistorico(id, {
             tipo_evento: "COMENTARIO",
             descricao: "Comentario adicionado ao chamado.",
-            usuario_id: usuarioId
+            usuario_id: usuarioId,
+            tenantId
         });
         return comentario;
     }
     async adicionarVinculo(rawId, rawInput, authUser) {
         const id = this.parseId(rawId);
         const usuarioId = this.parseId(authUser?.id);
+        const tenantId = this.parseTenant(authUser?.tenant_id);
         const input = chamadoTecnicoVinculoInputSchema.parse(rawInput);
-        const vinculo = await this.repository.salvarVinculo(id, input, usuarioId);
+        const vinculo = await this.repository.salvarVinculo(id, tenantId, input, usuarioId);
         await this.repository.registrarHistorico(id, {
             tipo_evento: "VINCULO",
             descricao: `Vinculo adicionado: ${input.tipo_vinculo}.`,
-            usuario_id: usuarioId
+            usuario_id: usuarioId,
+            tenantId
         });
         return vinculo;
     }
@@ -260,16 +276,19 @@ export class ChamadoTecnicoService {
         const id = this.parseId(rawId);
         const vinculoId = this.parseId(rawVinculoId);
         const usuarioId = this.parseId(authUser?.id);
-        await this.repository.removerVinculo(id, vinculoId);
+        const tenantId = this.parseTenant(authUser?.tenant_id);
+        await this.repository.removerVinculo(id, tenantId, vinculoId);
         await this.repository.registrarHistorico(id, {
             tipo_evento: "VINCULO",
             descricao: "Vinculo removido do chamado.",
-            usuario_id: usuarioId
+            usuario_id: usuarioId,
+            tenantId
         });
     }
     async listarFiltrosSalvos(authUser) {
         const usuarioId = this.parseId(authUser?.id);
-        const filtros = await this.repository.listarFiltrosSalvos(usuarioId);
+        const tenantId = this.parseTenant(authUser?.tenant_id);
+        const filtros = await this.repository.listarFiltrosSalvos(usuarioId, tenantId);
         return filtros.map((item) => ({
             id: toStringId(item.id),
             nome: item.nome,
@@ -282,7 +301,8 @@ export class ChamadoTecnicoService {
     async salvarFiltro(rawInput, authUser, rawId) {
         const input = chamadoTecnicoFiltroSalvoInputSchema.parse(rawInput);
         const usuarioId = this.parseId(authUser?.id);
-        const filtro = await this.repository.salvarFiltroSalvo(usuarioId, input, rawId ? this.parseId(rawId) : undefined);
+        const tenantId = this.parseTenant(authUser?.tenant_id);
+        const filtro = await this.repository.salvarFiltroSalvo(usuarioId, tenantId, input, rawId ? this.parseId(rawId) : undefined);
         if (!filtro) {
             throw new AppError("Nao foi possivel salvar o filtro.", 500);
         }
@@ -297,11 +317,13 @@ export class ChamadoTecnicoService {
     }
     async removerFiltro(rawId, authUser) {
         const usuarioId = this.parseId(authUser?.id);
-        await this.repository.removerFiltroSalvo(usuarioId, this.parseId(rawId));
+        const tenantId = this.parseTenant(authUser?.tenant_id);
+        await this.repository.removerFiltroSalvo(usuarioId, tenantId, this.parseId(rawId));
     }
     async adicionarAnexos(rawId, files, authUser) {
         const id = this.parseId(rawId);
         const usuarioId = this.parseId(authUser?.id);
+        const tenantId = this.parseTenant(authUser?.tenant_id);
         if (!files?.length) {
             throw new AppError("Nenhum arquivo foi enviado.", 400);
         }
@@ -316,14 +338,16 @@ export class ChamadoTecnicoService {
         await this.repository.registrarHistorico(id, {
             tipo_evento: "ANEXO",
             descricao: `${files.length} anexo(s) adicionado(s) ao chamado.`,
-            usuario_id: usuarioId
+            usuario_id: usuarioId,
+            tenantId
         });
         return this.buscarPorId(rawId, authUser);
     }
     async removerAnexo(rawId, rawArquivoId, authUser) {
         const id = this.parseId(rawId);
         const usuarioId = this.parseId(authUser?.id);
-        const anexo = await this.repository.buscarAnexoPorId(id, this.parseId(rawArquivoId));
+        const tenantId = this.parseTenant(authUser?.tenant_id);
+        const anexo = await this.repository.buscarAnexoPorId(id, tenantId, this.parseId(rawArquivoId));
         if (!anexo) {
             throw new AppError("Anexo do chamado nao encontrado.", 404);
         }
@@ -331,7 +355,8 @@ export class ChamadoTecnicoService {
         await this.repository.registrarHistorico(id, {
             tipo_evento: "ANEXO",
             descricao: "Anexo removido do chamado.",
-            usuario_id: usuarioId
+            usuario_id: usuarioId,
+            tenantId
         });
     }
     parseId(rawId) {
@@ -341,10 +366,17 @@ export class ChamadoTecnicoService {
         }
         return BigInt(parsed);
     }
-    async carregarCatalogos() {
+    parseTenant(rawTenantId) {
+        const tenantId = trimOrUndefined(rawTenantId ?? undefined);
+        if (!tenantId) {
+            throw new AppError("Tenant da sessao nao identificado.", 401);
+        }
+        return tenantId;
+    }
+    async carregarCatalogos(tenantId) {
         const [parametros, usuarios] = await Promise.all([
             this.repository.listarParametros(),
-            this.repository.listarUsuariosCatalogo()
+            this.repository.listarUsuariosCatalogo(tenantId)
         ]);
         const parametrosById = new Map(parametros.map((item) => [
             toStringId(item.id),
@@ -470,30 +502,30 @@ export class ChamadoTecnicoService {
                 .filter(Boolean)
         };
     }
-    async obterParametroOuFalhar(rawId, tipoEsperado) {
+    async obterParametroOuFalhar(rawId, tipoEsperado, tenantId) {
         if (!rawId)
             throw new AppError("Parametro nao informado.", 422);
-        const parametro = await this.repository.buscarParametroPorId(rawId);
+        const parametro = await this.repository.buscarParametroPorId(rawId, tenantId);
         if (!parametro || parametro.tipo !== tipoEsperado) {
             throw new AppError(`Parametro de ${tipoEsperado.toLowerCase()} invalido.`, 422);
         }
         return parametro;
     }
-    async validarCamposBase(input) {
-        await this.obterParametroOuFalhar(BigInt(input.tipo_id), "TIPO");
+    async validarCamposBase(input, tenantId) {
+        await this.obterParametroOuFalhar(BigInt(input.tipo_id), "TIPO", tenantId);
         if (input.categoria_id) {
-            await this.obterParametroOuFalhar(BigInt(input.categoria_id), "CATEGORIA");
+            await this.obterParametroOuFalhar(BigInt(input.categoria_id), "CATEGORIA", tenantId);
         }
-        const prioridade = await this.obterParametroOuFalhar(BigInt(input.prioridade_id), "PRIORIDADE");
-        await this.obterParametroOuFalhar(BigInt(input.sistema_id), "SISTEMA");
+        const prioridade = await this.obterParametroOuFalhar(BigInt(input.prioridade_id), "PRIORIDADE", tenantId);
+        await this.obterParametroOuFalhar(BigInt(input.sistema_id), "SISTEMA", tenantId);
         const situacao = input.situacao_id
-            ? await this.obterParametroOuFalhar(BigInt(input.situacao_id), "SITUACAO")
-            : await this.repository.buscarParametroPorChave("SITUACAO", "ABERTO");
+            ? await this.obterParametroOuFalhar(BigInt(input.situacao_id), "SITUACAO", tenantId)
+            : await this.repository.buscarParametroPorChave("SITUACAO", "ABERTO", tenantId);
         if (!situacao)
             throw new AppError("Situacao inicial nao encontrada.", 500);
         return { prioridade, situacao };
     }
-    async registrarHistoricoComparativo(atual, proximo, usuarioId) {
+    async registrarHistoricoComparativo(atual, proximo, usuarioId, tenantId) {
         const campos = [
             ["resumo", "Resumo", atual.resumo, proximo.resumo],
             ["cliente", "Cliente", atual.cliente, proximo.cliente],
@@ -512,12 +544,13 @@ export class ChamadoTecnicoService {
                 descricao: `${label} atualizado(a).`,
                 valor_anterior: valorAnterior ? String(valorAnterior) : null,
                 valor_novo: valorNovo ? String(valorNovo) : null,
-                usuario_id: usuarioId
+                usuario_id: usuarioId,
+                tenantId
             });
         }
     }
     async normalizarEntrada(input) {
-        const categoriaPadrao = input.categoria_id ?? (await this.repository.buscarParametroPorChave("CATEGORIA", "REGRAS_NEGOCIO"))?.id;
+        const categoriaPadrao = input.categoria_id ?? null;
         return {
             ...input,
             categoria_id: categoriaPadrao ? Number(categoriaPadrao) : undefined,

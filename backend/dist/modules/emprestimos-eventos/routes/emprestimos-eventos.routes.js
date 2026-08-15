@@ -22,8 +22,12 @@ emprestimosEventosRoutes.get("/", ensureAuthenticated, ensurePermissions(permiss
 emprestimosEventosRoutes.post("/", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.criar.bind(controller)));
 emprestimosEventosRoutes.get("/:id/movimentacoes", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listarMovimentacoes.bind(controller)));
 emprestimosEventosRoutes.post("/:id/confirmar-retirada", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.confirmarRetirada.bind(controller)));
+emprestimosEventosRoutes.post("/:id/confirmar-reserva", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.confirmarReserva.bind(controller)));
 emprestimosEventosRoutes.post("/:id/confirmar-devolucao", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.confirmarDevolucao.bind(controller)));
 emprestimosEventosRoutes.post("/:id/cancelar", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.cancelar.bind(controller)));
+emprestimosEventosRoutes.post("/:id/alerta-devolucao/email", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.enviarAlertaDevolucaoEmail.bind(controller)));
+emprestimosEventosRoutes.post("/:id/confirmacao-reserva/email", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.enviarConfirmacaoReservaEmail.bind(controller)));
+emprestimosEventosRoutes.get("/:id/confirmacao-reserva/email/preview", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.obterPreviewConfirmacaoReservaEmail.bind(controller)));
 emprestimosEventosRoutes.get("/:id", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.obter.bind(controller)));
 emprestimosEventosRoutes.put("/:id", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.atualizar.bind(controller)));
 emprestimosEventosRoutes.delete("/:id", ensureAuthenticated, ensurePermissions(permissaoExclusao), asyncHandler(controller.excluir.bind(controller)));

@@ -13,6 +13,17 @@ export type UsuarioAutenticado = {
   perfil?: string;
   is_superadmin?: boolean;
   permissoes: string[];
+  contexto?: ContextoOrganizacional;
+};
+
+export type ContextoOrganizacional = {
+  identidade_id?: string;
+  acesso_id?: string;
+  instituicao_id?: string;
+  entidade_juridica_id?: string;
+  unidade_id?: string;
+  projeto_id?: string;
+  escopo?: string;
 };
 
 export type JwtPayload = {
@@ -28,4 +39,5 @@ export type JwtPayload = {
   perfil?: string;
   is_superadmin?: boolean;
   permissoes: string[];
+  contexto?: ContextoOrganizacional;
 };

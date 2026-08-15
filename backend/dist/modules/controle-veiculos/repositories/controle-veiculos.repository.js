@@ -19,11 +19,16 @@ function calcularMediaConsumo(kmRodados, combustivelConsumidoLitros) {
         return null;
     return Number((kmRodados / combustivelConsumidoLitros).toFixed(2));
 }
+function tenantSql(alias, tenantId) {
+    return Prisma.sql `${Prisma.raw(alias)}.tenant_id::text = ${tenantId}`;
+}
 const controleVeiculosEstruturaStatements = [
     "ALTER TABLE controle_veiculos ADD COLUMN IF NOT EXISTS cor VARCHAR(80)",
+    "ALTER TABLE controle_veiculos ADD COLUMN IF NOT EXISTS tenant_id UUID",
     `
     CREATE TABLE IF NOT EXISTS controle_veiculos_local_destino (
       id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
       nome VARCHAR(160) NOT NULL,
       endereco VARCHAR(220),
       telefone VARCHAR(30),
@@ -33,10 +38,30 @@ const controleVeiculosEstruturaStatements = [
       atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
     )
   `,
+    `
+    CREATE TABLE IF NOT EXISTS controle_veiculos_motoristas_autorizados (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
+      veiculo_id BIGINT NOT NULL,
+      tipo_origem VARCHAR(20) NOT NULL,
+      profissional_id BIGINT,
+      voluntario_id BIGINT,
+      nome_motorista VARCHAR(200) NOT NULL,
+      numero_carteira VARCHAR(60),
+      categoria_carteira VARCHAR(20),
+      vencimento_carteira DATE,
+      arquivo_carteira_pdf TEXT,
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+      atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `,
     "ALTER TABLE controle_veiculos_local_destino ADD COLUMN IF NOT EXISTS telefone VARCHAR(30)",
+    "ALTER TABLE controle_veiculos_local_destino ADD COLUMN IF NOT EXISTS tenant_id UUID",
     "ALTER TABLE controle_veiculos_diario ADD COLUMN IF NOT EXISTS data_saida DATE",
     "ALTER TABLE controle_veiculos_diario ADD COLUMN IF NOT EXISTS data_chegada DATE",
     "ALTER TABLE controle_veiculos_diario ADD COLUMN IF NOT EXISTS local_destino_id BIGINT",
+    "ALTER TABLE controle_veiculos_diario ADD COLUMN IF NOT EXISTS tenant_id UUID",
+    "ALTER TABLE controle_veiculos_motoristas_autorizados ADD COLUMN IF NOT EXISTS tenant_id UUID",
     `
     DO $$
     BEGIN
@@ -52,8 +77,69 @@ const controleVeiculosEstruturaStatements = [
       END IF;
     END $$;
   `,
+    "CREATE INDEX IF NOT EXISTS controle_veiculos_tenant_idx ON controle_veiculos(tenant_id, modelo, placa)",
+    "CREATE INDEX IF NOT EXISTS controle_veiculos_diario_tenant_idx ON controle_veiculos_diario(tenant_id, data DESC, id DESC)",
+    "CREATE INDEX IF NOT EXISTS controle_veiculos_local_destino_tenant_idx ON controle_veiculos_local_destino(tenant_id, ativo, nome)",
+    "CREATE INDEX IF NOT EXISTS controle_veiculos_motoristas_tenant_idx ON controle_veiculos_motoristas_autorizados(tenant_id, veiculo_id, nome_motorista)",
     "CREATE INDEX IF NOT EXISTS controle_veiculos_diario_local_destino_idx ON controle_veiculos_diario(local_destino_id)",
-    "CREATE INDEX IF NOT EXISTS controle_veiculos_local_destino_nome_idx ON controle_veiculos_local_destino(nome)"
+    "CREATE INDEX IF NOT EXISTS controle_veiculos_local_destino_nome_idx ON controle_veiculos_local_destino(nome)",
+    `
+    UPDATE controle_veiculos AS v
+    SET tenant_id = ref.tenant_id
+    FROM (
+      SELECT tenant_id
+      FROM instituicoes
+      ORDER BY criado_em ASC
+      LIMIT 1
+    ) ref
+    WHERE v.tenant_id IS NULL
+  `,
+    `
+    UPDATE controle_veiculos_local_destino AS ld
+    SET tenant_id = ref.tenant_id
+    FROM (
+      SELECT tenant_id
+      FROM instituicoes
+      ORDER BY criado_em ASC
+      LIMIT 1
+    ) ref
+    WHERE ld.tenant_id IS NULL
+  `,
+    `
+    UPDATE controle_veiculos_diario AS d
+    SET tenant_id = v.tenant_id
+    FROM controle_veiculos v
+    WHERE d.tenant_id IS NULL
+      AND v.id = d.veiculo_id
+      AND v.tenant_id IS NOT NULL
+  `,
+    `
+    UPDATE controle_veiculos_diario AS d
+    SET tenant_id = ld.tenant_id
+    FROM controle_veiculos_local_destino ld
+    WHERE d.tenant_id IS NULL
+      AND ld.id = d.local_destino_id
+      AND ld.tenant_id IS NOT NULL
+  `,
+    `
+    UPDATE controle_veiculos_diario AS d
+    SET tenant_id = ref.tenant_id
+    FROM (
+      SELECT tenant_id
+      FROM instituicoes
+      ORDER BY criado_em ASC
+      LIMIT 1
+    ) ref
+    WHERE d.tenant_id IS NULL
+  `,
+    `
+    UPDATE controle_veiculos_motoristas_autorizados AS ma
+    SET tenant_id = v.tenant_id
+    FROM controle_veiculos v
+    WHERE ma.tenant_id IS NULL
+      AND v.id = ma.veiculo_id
+      AND v.tenant_id IS NOT NULL
+  `
 ];
 let ensureControleVeiculosEstruturaPromise = null;
 export async function ensureControleVeiculosEstrutura() {
@@ -75,7 +161,8 @@ export class ControleVeiculosRepository {
         if (error instanceof Prisma.PrismaClientKnownRequestError) {
             const rawCode = typeof error.meta?.code === "string" ? error.meta.code : undefined;
             const rawMessage = typeof error.meta?.message === "string" ? error.meta.message : error.message;
-            if ((error.code === "P2002" || (error.code === "P2010" && rawCode === "23505")) && /\bplaca\b/i.test(rawMessage)) {
+            if ((error.code === "P2002" || (error.code === "P2010" && rawCode === "23505")) &&
+                /\bplaca\b/i.test(rawMessage)) {
                 throw new AppError("Ja existe um veiculo cadastrado com esta placa.", 409);
             }
         }
@@ -85,20 +172,30 @@ export class ControleVeiculosRepository {
         if (!this.fontesMotoristasPromise) {
             this.fontesMotoristasPromise = prisma
                 .$queryRaw(Prisma.sql `
-          SELECT table_name
-          FROM information_schema.tables
+          SELECT table_name, column_name
+          FROM information_schema.columns
           WHERE table_schema = 'public'
             AND table_name IN ('cadastro_profissional', 'cadastro_profissionais', 'cadastro_voluntario')
         `)
                 .then((rows) => {
-                const tabelas = new Set(rows.map((row) => row.table_name));
+                const colunasPorTabela = new Map();
+                for (const row of rows) {
+                    const colunas = colunasPorTabela.get(row.table_name) ?? new Set();
+                    colunas.add(row.column_name);
+                    colunasPorTabela.set(row.table_name, colunas);
+                }
+                const montarFonte = (nomeTabela) => {
+                    const colunas = colunasPorTabela.get(nomeTabela);
+                    if (!colunas?.size)
+                        return null;
+                    return {
+                        nomeTabela,
+                        possuiTenant: colunas.has("tenant_id")
+                    };
+                };
                 return {
-                    tabelaProfissionais: tabelas.has("cadastro_profissional")
-                        ? "cadastro_profissional"
-                        : tabelas.has("cadastro_profissionais")
-                            ? "cadastro_profissionais"
-                            : null,
-                    possuiVoluntarios: tabelas.has("cadastro_voluntario")
+                    profissionais: montarFonte("cadastro_profissionais") ?? montarFonte("cadastro_profissional"),
+                    voluntarios: montarFonte("cadastro_voluntario")
                 };
             });
         }
@@ -107,7 +204,7 @@ export class ControleVeiculosRepository {
     async ensureEstrutura() {
         await ensureControleVeiculosEstrutura();
     }
-    async listarVeiculos() {
+    async listarVeiculos(tenantId) {
         await this.ensureEstrutura();
         return prisma.$queryRaw(Prisma.sql `
       SELECT
@@ -128,10 +225,11 @@ export class ControleVeiculosRepository {
         foto_traseira,
         documento_veiculo_pdf
       FROM controle_veiculos
+      WHERE ${tenantSql("controle_veiculos", tenantId)}
       ORDER BY modelo ASC NULLS LAST, placa ASC NULLS LAST, id DESC
     `);
     }
-    async buscarVeiculoPorId(id) {
+    async buscarVeiculoPorId(id, tenantId) {
         await this.ensureEstrutura();
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT
@@ -153,23 +251,25 @@ export class ControleVeiculosRepository {
         documento_veiculo_pdf
       FROM controle_veiculos
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
         return rows[0] ?? null;
     }
-    async buscarVeiculoPorIdOuFalhar(id) {
-        const registro = await this.buscarVeiculoPorId(id);
+    async buscarVeiculoPorIdOuFalhar(id, tenantId) {
+        const registro = await this.buscarVeiculoPorId(id, tenantId);
         if (!registro) {
-            throw new AppError("Veículo não encontrado.", 404);
+            throw new AppError("Veiculo nao encontrado.", 404);
         }
         return registro;
     }
-    async criarVeiculo(input) {
+    async criarVeiculo(input, tenantId) {
         await this.ensureEstrutura();
         let inserted;
         try {
             inserted = await prisma.$queryRaw(Prisma.sql `
         INSERT INTO controle_veiculos (
+          tenant_id,
           placa,
           modelo,
           marca,
@@ -188,6 +288,7 @@ export class ControleVeiculosRepository {
           criado_em,
           atualizado_em
         ) VALUES (
+          CAST(${tenantId} AS UUID),
           ${trimOrUndefined(input.placa)},
           ${trimOrUndefined(input.modelo)},
           ${trimOrUndefined(input.marca)},
@@ -214,13 +315,13 @@ export class ControleVeiculosRepository {
         }
         const id = inserted[0]?.id;
         if (!id) {
-            throw new AppError("Não foi possível criar o veículo.", 500);
+            throw new AppError("Nao foi possivel criar o veiculo.", 500);
         }
-        return this.buscarVeiculoPorIdOuFalhar(id);
+        return this.buscarVeiculoPorIdOuFalhar(id, tenantId);
     }
-    async atualizarVeiculo(id, input) {
+    async atualizarVeiculo(id, input, tenantId) {
         await this.ensureEstrutura();
-        await this.buscarVeiculoPorIdOuFalhar(id);
+        await this.buscarVeiculoPorIdOuFalhar(id, tenantId);
         try {
             await prisma.$executeRaw(Prisma.sql `
         UPDATE controle_veiculos
@@ -242,22 +343,24 @@ export class ControleVeiculosRepository {
           documento_veiculo_pdf = ${trimOrUndefined(input.documentoVeiculoPdf ?? undefined)},
           atualizado_em = NOW()
         WHERE id = ${id}
+          AND tenant_id::text = ${tenantId}
       `);
         }
         catch (error) {
             this.tratarErroPersistenciaVeiculo(error);
         }
-        return this.buscarVeiculoPorIdOuFalhar(id);
+        return this.buscarVeiculoPorIdOuFalhar(id, tenantId);
     }
-    async removerVeiculo(id) {
+    async removerVeiculo(id, tenantId) {
         await this.ensureEstrutura();
-        await this.buscarVeiculoPorIdOuFalhar(id);
+        await this.buscarVeiculoPorIdOuFalhar(id, tenantId);
         await prisma.$executeRaw(Prisma.sql `
       DELETE FROM controle_veiculos
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
     }
-    async listarDiario() {
+    async listarDiario(tenantId) {
         await this.ensureEstrutura();
         return prisma.$queryRaw(Prisma.sql `
       SELECT
@@ -279,11 +382,14 @@ export class ControleVeiculosRepository {
         d.media_consumo::float8 AS media_consumo,
         d.observacoes
       FROM controle_veiculos_diario d
-      LEFT JOIN controle_veiculos_local_destino ld ON ld.id = d.local_destino_id
+      LEFT JOIN controle_veiculos_local_destino ld
+        ON ld.id = d.local_destino_id
+       AND ld.tenant_id::text = ${tenantId}
+      WHERE d.tenant_id::text = ${tenantId}
       ORDER BY d.data DESC NULLS LAST, d.id DESC
     `);
     }
-    async buscarDiarioPorId(id) {
+    async buscarDiarioPorId(id, tenantId) {
         await this.ensureEstrutura();
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT
@@ -305,25 +411,35 @@ export class ControleVeiculosRepository {
         d.media_consumo::float8 AS media_consumo,
         d.observacoes
       FROM controle_veiculos_diario d
-      LEFT JOIN controle_veiculos_local_destino ld ON ld.id = d.local_destino_id
+      LEFT JOIN controle_veiculos_local_destino ld
+        ON ld.id = d.local_destino_id
+       AND ld.tenant_id::text = ${tenantId}
       WHERE d.id = ${id}
+        AND d.tenant_id::text = ${tenantId}
       LIMIT 1
     `);
         return rows[0] ?? null;
     }
-    async buscarDiarioPorIdOuFalhar(id) {
-        const registro = await this.buscarDiarioPorId(id);
+    async buscarDiarioPorIdOuFalhar(id, tenantId) {
+        const registro = await this.buscarDiarioPorId(id, tenantId);
         if (!registro) {
-            throw new AppError("Registro de diário de bordo não encontrado.", 404);
+            throw new AppError("Registro de diario de bordo nao encontrado.", 404);
         }
         return registro;
     }
-    async criarDiario(input) {
+    async criarDiario(input, tenantId) {
         await this.ensureEstrutura();
+        if (input.veiculoId) {
+            await this.buscarVeiculoPorIdOuFalhar(BigInt(input.veiculoId), tenantId);
+        }
+        if (input.localDestinoId) {
+            await this.buscarLocalDestinoPorIdOuFalhar(BigInt(input.localDestinoId), tenantId);
+        }
         const kmRodados = calcularKmRodados(input.kmInicial, input.kmFinal);
         const mediaConsumo = calcularMediaConsumo(kmRodados, input.combustivelConsumidoLitros);
         const inserted = await prisma.$queryRaw(Prisma.sql `
       INSERT INTO controle_veiculos_diario (
+        tenant_id,
         veiculo_id,
         data,
         data_saida,
@@ -342,6 +458,7 @@ export class ControleVeiculosRepository {
         criado_em,
         atualizado_em
       ) VALUES (
+        CAST(${tenantId} AS UUID),
         ${input.veiculoId ? BigInt(input.veiculoId) : null},
         ${toOptionalDate(input.data ?? input.dataSaida ?? undefined)},
         ${toOptionalDate(input.dataSaida ?? input.data ?? undefined)},
@@ -364,13 +481,19 @@ export class ControleVeiculosRepository {
     `);
         const id = inserted[0]?.id;
         if (!id) {
-            throw new AppError("Não foi possível criar o registro de diário.", 500);
+            throw new AppError("Nao foi possivel criar o registro de diario.", 500);
         }
-        return this.buscarDiarioPorIdOuFalhar(id);
+        return this.buscarDiarioPorIdOuFalhar(id, tenantId);
     }
-    async atualizarDiario(id, input) {
+    async atualizarDiario(id, input, tenantId) {
         await this.ensureEstrutura();
-        await this.buscarDiarioPorIdOuFalhar(id);
+        await this.buscarDiarioPorIdOuFalhar(id, tenantId);
+        if (input.veiculoId) {
+            await this.buscarVeiculoPorIdOuFalhar(BigInt(input.veiculoId), tenantId);
+        }
+        if (input.localDestinoId) {
+            await this.buscarLocalDestinoPorIdOuFalhar(BigInt(input.localDestinoId), tenantId);
+        }
         const kmRodados = calcularKmRodados(input.kmInicial, input.kmFinal);
         const mediaConsumo = calcularMediaConsumo(kmRodados, input.combustivelConsumidoLitros);
         await prisma.$executeRaw(Prisma.sql `
@@ -393,44 +516,63 @@ export class ControleVeiculosRepository {
         observacoes = ${trimOrUndefined(input.observacoes ?? undefined)},
         atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
-        return this.buscarDiarioPorIdOuFalhar(id);
+        return this.buscarDiarioPorIdOuFalhar(id, tenantId);
     }
-    async removerDiario(id) {
+    async removerDiario(id, tenantId) {
         await this.ensureEstrutura();
-        await this.buscarDiarioPorIdOuFalhar(id);
+        await this.buscarDiarioPorIdOuFalhar(id, tenantId);
         await prisma.$executeRaw(Prisma.sql `
       DELETE FROM controle_veiculos_diario
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
     }
-    async listarMotoristasDisponiveis(nome) {
+    async listarMotoristasDisponiveis(nome, tenantId) {
         await this.ensureEstrutura();
         const termo = trimOrUndefined(nome);
-        const { tabelaProfissionais, possuiVoluntarios } = await this.obterFontesMotoristas();
-        const fontes = [];
-        if (tabelaProfissionais) {
-            fontes.push(`SELECT id, 'PROFISSIONAL'::text AS tipo_origem, nome_completo AS nome FROM ${tabelaProfissionais}`);
+        const fontes = await this.obterFontesMotoristas();
+        const consultas = [];
+        const parametros = [tenantId];
+        const filtroTermo = termo ? "AND nome_completo ILIKE $2" : "";
+        if (termo) {
+            parametros.push(`%${termo}%`);
         }
-        if (possuiVoluntarios) {
-            fontes.push("SELECT id, 'VOLUNTARIO'::text AS tipo_origem, nome_completo AS nome FROM cadastro_voluntario");
+        if (fontes.profissionais?.possuiTenant) {
+            consultas.push(`
+        SELECT id, 'PROFISSIONAL'::text AS tipo_origem, nome_completo AS nome
+        FROM ${fontes.profissionais.nomeTabela}
+        WHERE tenant_id::text = $1
+          ${filtroTermo}
+      `);
         }
-        if (!fontes.length) {
+        if (fontes.voluntarios?.possuiTenant) {
+            consultas.push(`
+        SELECT id, 'VOLUNTARIO'::text AS tipo_origem, nome_completo AS nome
+        FROM ${fontes.voluntarios.nomeTabela}
+        WHERE tenant_id::text = $1
+          ${filtroTermo}
+      `);
+        }
+        if (!consultas.length) {
             return [];
         }
         const sql = `
-      SELECT *
-      FROM (${fontes.join(" UNION ALL ")}) motoristas
-      ${termo ? "WHERE nome ILIKE $1" : ""}
+      SELECT id, tipo_origem, nome
+      FROM (
+        ${consultas.join("\nUNION ALL\n")}
+      ) motoristas
       ORDER BY nome ASC
       LIMIT 30
     `;
-        return termo
-            ? prisma.$queryRawUnsafe(sql, `%${termo}%`)
-            : prisma.$queryRawUnsafe(sql);
+        return prisma.$queryRawUnsafe(sql, ...parametros);
     }
-    async listarMotoristasAutorizados(veiculoId) {
+    async listarMotoristasAutorizados(veiculoId, tenantId) {
         await this.ensureEstrutura();
+        if (veiculoId) {
+            await this.buscarVeiculoPorIdOuFalhar(BigInt(veiculoId), tenantId);
+        }
         const filtroVeiculo = veiculoId
             ? Prisma.sql `AND ma.veiculo_id = ${BigInt(veiculoId)}`
             : Prisma.empty;
@@ -449,13 +591,15 @@ export class ControleVeiculosRepository {
         ma.vencimento_carteira,
         ma.arquivo_carteira_pdf
       FROM controle_veiculos_motoristas_autorizados ma
-      INNER JOIN controle_veiculos v ON v.id = ma.veiculo_id
-      WHERE 1 = 1
+      INNER JOIN controle_veiculos v
+        ON v.id = ma.veiculo_id
+       AND v.tenant_id::text = ${tenantId}
+      WHERE ma.tenant_id::text = ${tenantId}
       ${filtroVeiculo}
       ORDER BY ma.nome_motorista ASC, ma.id DESC
     `);
     }
-    async buscarMotoristaAutorizadoPorId(id) {
+    async buscarMotoristaAutorizadoPorId(id, tenantId) {
         await this.ensureEstrutura();
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT
@@ -472,25 +616,29 @@ export class ControleVeiculosRepository {
         ma.vencimento_carteira,
         ma.arquivo_carteira_pdf
       FROM controle_veiculos_motoristas_autorizados ma
-      INNER JOIN controle_veiculos v ON v.id = ma.veiculo_id
+      INNER JOIN controle_veiculos v
+        ON v.id = ma.veiculo_id
+       AND v.tenant_id::text = ${tenantId}
       WHERE ma.id = ${id}
+        AND ma.tenant_id::text = ${tenantId}
       LIMIT 1
     `);
         return rows[0] ?? null;
     }
-    async buscarMotoristaAutorizadoPorIdOuFalhar(id) {
-        const registro = await this.buscarMotoristaAutorizadoPorId(id);
+    async buscarMotoristaAutorizadoPorIdOuFalhar(id, tenantId) {
+        const registro = await this.buscarMotoristaAutorizadoPorId(id, tenantId);
         if (!registro) {
-            throw new AppError("Motorista autorizado não encontrado.", 404);
+            throw new AppError("Motorista autorizado nao encontrado.", 404);
         }
         return registro;
     }
-    async criarMotoristaAutorizado(input) {
+    async criarMotoristaAutorizado(input, tenantId) {
         await this.ensureEstrutura();
-        await this.buscarVeiculoPorIdOuFalhar(BigInt(input.veiculoId));
-        const nomeMotorista = await this.buscarNomeMotorista(input.tipoOrigem, input.motoristaId);
+        await this.buscarVeiculoPorIdOuFalhar(BigInt(input.veiculoId), tenantId);
+        const nomeMotorista = await this.buscarNomeMotorista(input.tipoOrigem, input.motoristaId, tenantId);
         const inserted = await prisma.$queryRaw(Prisma.sql `
       INSERT INTO controle_veiculos_motoristas_autorizados (
+        tenant_id,
         veiculo_id,
         tipo_origem,
         profissional_id,
@@ -503,6 +651,7 @@ export class ControleVeiculosRepository {
         criado_em,
         atualizado_em
       ) VALUES (
+        CAST(${tenantId} AS UUID),
         ${BigInt(input.veiculoId)},
         ${input.tipoOrigem},
         ${input.tipoOrigem === "PROFISSIONAL" ? BigInt(input.motoristaId) : null},
@@ -519,15 +668,15 @@ export class ControleVeiculosRepository {
     `);
         const id = inserted[0]?.id;
         if (!id) {
-            throw new AppError("Não foi possível criar o motorista autorizado.", 500);
+            throw new AppError("Nao foi possivel criar o motorista autorizado.", 500);
         }
-        return this.buscarMotoristaAutorizadoPorIdOuFalhar(id);
+        return this.buscarMotoristaAutorizadoPorIdOuFalhar(id, tenantId);
     }
-    async atualizarMotoristaAutorizado(id, input) {
+    async atualizarMotoristaAutorizado(id, input, tenantId) {
         await this.ensureEstrutura();
-        await this.buscarMotoristaAutorizadoPorIdOuFalhar(id);
-        await this.buscarVeiculoPorIdOuFalhar(BigInt(input.veiculoId));
-        const nomeMotorista = await this.buscarNomeMotorista(input.tipoOrigem, input.motoristaId);
+        await this.buscarMotoristaAutorizadoPorIdOuFalhar(id, tenantId);
+        await this.buscarVeiculoPorIdOuFalhar(BigInt(input.veiculoId), tenantId);
+        const nomeMotorista = await this.buscarNomeMotorista(input.tipoOrigem, input.motoristaId, tenantId);
         await prisma.$executeRaw(Prisma.sql `
       UPDATE controle_veiculos_motoristas_autorizados
       SET
@@ -542,18 +691,20 @@ export class ControleVeiculosRepository {
         arquivo_carteira_pdf = ${trimOrUndefined(input.arquivoCarteiraPdf ?? undefined)},
         atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
-        return this.buscarMotoristaAutorizadoPorIdOuFalhar(id);
+        return this.buscarMotoristaAutorizadoPorIdOuFalhar(id, tenantId);
     }
-    async removerMotoristaAutorizado(id) {
+    async removerMotoristaAutorizado(id, tenantId) {
         await this.ensureEstrutura();
-        await this.buscarMotoristaAutorizadoPorIdOuFalhar(id);
+        await this.buscarMotoristaAutorizadoPorIdOuFalhar(id, tenantId);
         await prisma.$executeRaw(Prisma.sql `
       DELETE FROM controle_veiculos_motoristas_autorizados
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
     }
-    async listarLocaisDestino() {
+    async listarLocaisDestino(tenantId) {
         await this.ensureEstrutura();
         return prisma.$queryRaw(Prisma.sql `
       SELECT
@@ -566,10 +717,11 @@ export class ControleVeiculosRepository {
         criado_em,
         atualizado_em
       FROM controle_veiculos_local_destino
+      WHERE tenant_id::text = ${tenantId}
       ORDER BY ativo DESC, nome ASC, id DESC
     `);
     }
-    async buscarLocalDestinoPorId(id) {
+    async buscarLocalDestinoPorId(id, tenantId) {
         await this.ensureEstrutura();
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT
@@ -583,21 +735,23 @@ export class ControleVeiculosRepository {
         atualizado_em
       FROM controle_veiculos_local_destino
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
         return rows[0] ?? null;
     }
-    async buscarLocalDestinoPorIdOuFalhar(id) {
-        const registro = await this.buscarLocalDestinoPorId(id);
+    async buscarLocalDestinoPorIdOuFalhar(id, tenantId) {
+        const registro = await this.buscarLocalDestinoPorId(id, tenantId);
         if (!registro) {
             throw new AppError("Local de destino nao encontrado.", 404);
         }
         return registro;
     }
-    async criarLocalDestino(input) {
+    async criarLocalDestino(input, tenantId) {
         await this.ensureEstrutura();
         const inserted = await prisma.$queryRaw(Prisma.sql `
       INSERT INTO controle_veiculos_local_destino (
+        tenant_id,
         nome,
         endereco,
         telefone,
@@ -606,6 +760,7 @@ export class ControleVeiculosRepository {
         criado_em,
         atualizado_em
       ) VALUES (
+        CAST(${tenantId} AS UUID),
         ${trimOrUndefined(input.nome ?? undefined)},
         ${trimOrUndefined(input.endereco ?? undefined)},
         ${trimOrUndefined(input.telefone ?? undefined)},
@@ -620,11 +775,11 @@ export class ControleVeiculosRepository {
         if (!id) {
             throw new AppError("Nao foi possivel criar o local de destino.", 500);
         }
-        return this.buscarLocalDestinoPorIdOuFalhar(id);
+        return this.buscarLocalDestinoPorIdOuFalhar(id, tenantId);
     }
-    async atualizarLocalDestino(id, input) {
+    async atualizarLocalDestino(id, input, tenantId) {
         await this.ensureEstrutura();
-        await this.buscarLocalDestinoPorIdOuFalhar(id);
+        await this.buscarLocalDestinoPorIdOuFalhar(id, tenantId);
         await prisma.$executeRaw(Prisma.sql `
       UPDATE controle_veiculos_local_destino
       SET
@@ -635,49 +790,61 @@ export class ControleVeiculosRepository {
         ativo = ${input.ativo ?? true},
         atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
-        return this.buscarLocalDestinoPorIdOuFalhar(id);
+        return this.buscarLocalDestinoPorIdOuFalhar(id, tenantId);
     }
-    async removerLocalDestino(id) {
+    async removerLocalDestino(id, tenantId) {
         await this.ensureEstrutura();
-        await this.buscarLocalDestinoPorIdOuFalhar(id);
+        await this.buscarLocalDestinoPorIdOuFalhar(id, tenantId);
         await prisma.$executeRaw(Prisma.sql `
       UPDATE controle_veiculos_diario
       SET local_destino_id = NULL
       WHERE local_destino_id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
         await prisma.$executeRaw(Prisma.sql `
       DELETE FROM controle_veiculos_local_destino
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
     }
-    async buscarNomeMotorista(tipoOrigem, motoristaId) {
+    async buscarNomeMotorista(tipoOrigem, motoristaId, tenantId) {
+        const fontes = await this.obterFontesMotoristas();
         if (tipoOrigem === "PROFISSIONAL") {
-            const { tabelaProfissionais } = await this.obterFontesMotoristas();
+            const tabelaProfissionais = fontes.profissionais;
             if (!tabelaProfissionais) {
                 throw new AppError("Tabela de profissionais nao encontrada para vinculo.", 500);
             }
+            if (!tabelaProfissionais.possuiTenant) {
+                throw new AppError("Tabela de profissionais sem suporte a tenant.", 500);
+            }
             const rows = await prisma.$queryRawUnsafe(`
           SELECT nome_completo
-          FROM ${tabelaProfissionais}
+          FROM ${tabelaProfissionais.nomeTabela}
           WHERE id = $1
+            AND tenant_id::text = $2
           LIMIT 1
-        `, BigInt(motoristaId));
+        `, BigInt(motoristaId), tenantId);
             if (!rows.length) {
                 throw new AppError("Profissional nao encontrado para vinculo.", 404);
             }
             return rows[0].nome_completo;
         }
-        const { possuiVoluntarios } = await this.obterFontesMotoristas();
-        if (!possuiVoluntarios) {
+        const tabelaVoluntarios = fontes.voluntarios;
+        if (!tabelaVoluntarios) {
             throw new AppError("Tabela de voluntarios nao encontrada para vinculo.", 500);
         }
-        const rows = await prisma.$queryRaw(Prisma.sql `
-      SELECT nome_completo
-      FROM cadastro_voluntario
-      WHERE id = ${BigInt(motoristaId)}
-      LIMIT 1
-    `);
+        if (!tabelaVoluntarios.possuiTenant) {
+            throw new AppError("Tabela de voluntarios sem suporte a tenant.", 500);
+        }
+        const rows = await prisma.$queryRawUnsafe(`
+        SELECT nome_completo
+        FROM ${tabelaVoluntarios.nomeTabela}
+        WHERE id = $1
+          AND tenant_id::text = $2
+        LIMIT 1
+      `, BigInt(motoristaId), tenantId);
         if (!rows.length) {
             throw new AppError("Voluntario nao encontrado para vinculo.", 404);
         }

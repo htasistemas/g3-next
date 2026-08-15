@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { joinSemicolonList, normalizeDigits, toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
@@ -17,57 +18,75 @@ function hasAnyAddressData(input) {
         trimOrUndefined(input.subzona));
 }
 export class ProfissionalRepository {
-    async listar(filters) {
-        const where = {};
-        const andFilters = [];
+    async listar(filters, tenantId) {
+        const condicoes = [Prisma.sql `p.tenant_id::text = ${tenantId}`];
         const nome = trimOrUndefined(filters.nome);
         if (nome) {
-            where.OR = [
-                { nomeCompleto: { contains: nome, mode: "insensitive" } },
-                { nomeSocial: { contains: nome, mode: "insensitive" } },
-                { apelido: { contains: nome, mode: "insensitive" } },
-                { especialidade: { contains: nome, mode: "insensitive" } }
-            ];
+            condicoes.push(Prisma.sql `(
+          p.nome_completo ILIKE ${`%${nome}%`}
+          OR COALESCE(p.nome_social, '') ILIKE ${`%${nome}%`}
+          OR COALESCE(p.apelido, '') ILIKE ${`%${nome}%`}
+          OR COALESCE(p.especialidade, '') ILIKE ${`%${nome}%`}
+        )`);
         }
         const categoria = trimOrUndefined(filters.categoria);
         if (categoria) {
-            andFilters.push({ categoria: { contains: categoria, mode: "insensitive" } });
+            condicoes.push(Prisma.sql `COALESCE(p.categoria, '') ILIKE ${`%${categoria}%`}`);
         }
         const status = trimOrUndefined(filters.status);
         if (status) {
-            andFilters.push({ status: status.toUpperCase() });
+            condicoes.push(Prisma.sql `COALESCE(p.status, '') = ${status.toUpperCase()}`);
         }
         const cpf = normalizeDigits(filters.cpf);
         if (cpf) {
-            andFilters.push({ cpf: { contains: cpf } });
+            condicoes.push(Prisma.sql `COALESCE(p.cpf, '') LIKE ${`%${cpf}%`}`);
         }
         const vinculo = trimOrUndefined(filters.vinculo);
         if (vinculo) {
-            andFilters.push({ vinculo: { equals: vinculo, mode: "insensitive" } });
+            condicoes.push(Prisma.sql `COALESCE(p.vinculo, '') ILIKE ${vinculo}`);
         }
-        if (andFilters.length) {
-            where.AND = andFilters;
+        const whereSql = Prisma.sql `${Prisma.join(condicoes, " AND ")}`;
+        const rows = await prisma.$queryRaw `
+      SELECT p.id
+      FROM cadastro_profissionais p
+      WHERE ${whereSql}
+      ORDER BY p.nome_completo ASC
+    `;
+        if (!rows.length) {
+            return [];
         }
-        return prisma.cadastroProfissional.findMany({
-            where,
-            include: profissionalInclude,
-            orderBy: [{ nomeCompleto: "asc" }]
+        const ids = rows.map((row) => row.id);
+        const profissionais = await prisma.cadastroProfissional.findMany({
+            where: { id: { in: ids } },
+            include: profissionalInclude
         });
+        const ordem = new Map(ids.map((id, index) => [id.toString(), index]));
+        return profissionais.sort((a, b) => (ordem.get(a.id.toString()) ?? 0) - (ordem.get(b.id.toString()) ?? 0));
     }
-    async buscarPorId(id) {
+    async buscarPorId(id, tenantId) {
+        const row = await prisma.$queryRaw `
+      SELECT p.id
+      FROM cadastro_profissionais p
+      WHERE p.id = ${id}
+        AND p.tenant_id::text = ${tenantId}
+      LIMIT 1
+    `;
+        if (!row.length) {
+            return null;
+        }
         return prisma.cadastroProfissional.findUnique({
             where: { id },
             include: profissionalInclude
         });
     }
-    async buscarPorIdOuFalhar(id) {
-        const profissional = await this.buscarPorId(id);
+    async buscarPorIdOuFalhar(id, tenantId) {
+        const profissional = await this.buscarPorId(id, tenantId);
         if (!profissional) {
             throw new AppError("Profissional nao encontrado.", 404);
         }
         return profissional;
     }
-    async criar(input) {
+    async criar(input, tenantId) {
         return prisma.$transaction(async (tx) => {
             const now = new Date();
             let enderecoId;
@@ -127,12 +146,21 @@ export class ProfissionalRepository {
                     atualizadoEm: now
                 }
             });
-            return this.buscarPorIdTransacao(tx, profissional.id);
+            await tx.$executeRaw `
+        UPDATE cadastro_profissionais
+        SET tenant_id = ${tenantId}::uuid
+        WHERE id = ${profissional.id}
+      `;
+            const salvo = await this.buscarPorIdTransacao(tx, profissional.id, tenantId);
+            if (!salvo) {
+                throw new AppError("Profissional nao encontrado apos criar o registro.", 500);
+            }
+            return salvo;
         });
     }
-    async atualizar(id, input) {
+    async atualizar(id, input, tenantId) {
         return prisma.$transaction(async (tx) => {
-            const existing = await tx.cadastroProfissional.findUnique({ where: { id } });
+            const existing = await this.buscarPorIdTransacao(tx, id, tenantId);
             if (!existing) {
                 throw new AppError("Profissional nao encontrado.", 404);
             }
@@ -218,14 +246,33 @@ export class ProfissionalRepository {
                     atualizadoEm: now
                 }
             });
-            return this.buscarPorIdTransacao(tx, id);
+            await tx.$executeRaw `
+        UPDATE cadastro_profissionais
+        SET tenant_id = ${tenantId}::uuid
+        WHERE id = ${id}
+      `;
+            const atualizado = await this.buscarPorIdTransacao(tx, id, tenantId);
+            if (!atualizado) {
+                throw new AppError("Profissional nao encontrado apos atualizar o registro.", 500);
+            }
+            return atualizado;
         });
     }
-    async remover(id) {
-        await this.buscarPorIdOuFalhar(id);
+    async remover(id, tenantId) {
+        await this.buscarPorIdOuFalhar(id, tenantId);
         await prisma.cadastroProfissional.delete({ where: { id } });
     }
-    async buscarPorIdTransacao(tx, id) {
+    async buscarPorIdTransacao(tx, id, tenantId) {
+        const row = await tx.$queryRaw `
+      SELECT p.id
+      FROM cadastro_profissionais p
+      WHERE p.id = ${id}
+        AND p.tenant_id::text = ${tenantId}
+      LIMIT 1
+    `;
+        if (!row.length) {
+            return null;
+        }
         const profissional = await tx.cadastroProfissional.findUnique({
             where: { id },
             include: profissionalInclude

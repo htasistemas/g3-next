@@ -50,6 +50,9 @@ import {
   useResetarSenhaUsuario,
   useSalvarUsuario,
   useSalvarUsuarioFace,
+  useCatalogoAcessos,
+  useSalvarUsuarioAcessos,
+  useUsuarioAcessos,
   useUsuario,
   useUsuarioFace,
   useUsuarios
@@ -65,6 +68,7 @@ import type { Beneficiario } from "@/types/beneficiario";
 import type { Profissional } from "@/types/profissional";
 import type {
   Usuario,
+  UsuarioAcessoInput,
   UsuarioFiltros,
   UsuarioOrigemTipo,
   UsuarioPayload,
@@ -359,6 +363,7 @@ export function UsuariosPage() {
   const [rascunhoFace, setRascunhoFace] = useState("");
   const [previewFaceUrl, setPreviewFaceUrl] = useState("");
   const [cameraFaceAtiva, setCameraFaceAtiva] = useState(false);
+  const [acessosRascunho, setAcessosRascunho] = useState<UsuarioAcessoInput[]>([]);
   const [filtroDraft, setFiltroDraft] = useState<UsuarioFiltros>({
     nome: "",
     login: "",
@@ -378,6 +383,8 @@ export function UsuariosPage() {
   const { data: usuarioData, isLoading: carregandoUsuario } = useUsuario(idSelecionado);
   const { data: faceData, isLoading: carregandoFace } = useUsuarioFace(idSelecionado);
   const { data: permissoesData, isLoading: carregandoPermissoes } = usePermissoesUsuarios();
+  const { data: acessosData, isLoading: carregandoAcessos } = useUsuarioAcessos(idSelecionado);
+  const { data: catalogoAcessos } = useCatalogoAcessos();
 
   const salvarMutation = useSalvarUsuario();
   const atualizarStatusMutation = useAtualizarStatusUsuario();
@@ -385,8 +392,27 @@ export function UsuariosPage() {
   const salvarFaceMutation = useSalvarUsuarioFace();
   const removerFaceMutation = useRemoverUsuarioFace();
   const removerMutation = useRemoverUsuario();
+  const salvarAcessosMutation = useSalvarUsuarioAcessos();
   const videoFaceRef = useRef<HTMLVideoElement | null>(null);
   const streamFaceRef = useRef<MediaStream | null>(null);
+
+  useEffect(() => {
+    if (!idSelecionado) {
+      setAcessosRascunho([]);
+      return;
+    }
+    if (acessosData?.acessos) {
+      setAcessosRascunho(acessosData.acessos.map((acesso) => ({
+        instituicao_id: acesso.instituicao_id,
+        entidade_juridica_id: acesso.entidade_juridica_id,
+        unidade_id: acesso.unidade_id,
+        projeto_id: acesso.projeto_id,
+        perfil_nome: acesso.perfil_nome,
+        escopo: acesso.escopo,
+        ativo: acesso.ativo
+      })));
+    }
+  }, [acessosData?.acessos, idSelecionado]);
 
   const {
     register,
@@ -424,7 +450,8 @@ export function UsuariosPage() {
     resetarSenhaMutation.isPending ||
     salvarFaceMutation.isPending ||
     removerFaceMutation.isPending ||
-    removerMutation.isPending;
+    removerMutation.isPending ||
+    salvarAcessosMutation.isPending;
 
   const gruposPermissoes = useMemo(() => {
     const todos = ordenarPermissoesPorModulo(permissoesData?.permissoes ?? []);
@@ -1685,6 +1712,48 @@ export function UsuariosPage() {
 
         {abaAtiva === "permissoes" && (
           <section className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <CardTitle className="text-sm">Escopo organizacional</CardTitle>
+                    <p className="mt-1 text-xs text-[var(--g3-muted)]">Instituição vinculada: somente a instituição do administrador atual. Defina onde este usuário pode atuar; as permissões abaixo definem o que ele pode fazer.</p>
+                  </div>
+                  <Button type="button" size="sm" variant="outline" disabled={!usuarioIdAtual || ehAdminImutavel || !usuario?.instituicao_id} onClick={() => setAcessosRascunho((atual) => [...atual, { instituicao_id: usuario?.instituicao_id ?? "", escopo: "INSTITUICAO", ativo: true, perfil_nome: perfilSelecionado }])}>
+                    <Plus className="mr-1 h-4 w-4" />Adicionar escopo
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {!usuarioIdAtual ? <p className="text-sm text-[var(--g3-muted)]">Salve o usuário antes de configurar os vínculos de acesso.</p> : null}
+                {usuarioIdAtual && !usuario?.instituicao_id ? <p className="text-sm text-amber-700">Este usuário ainda não possui instituição vinculada. Vincule-o à instituição no cadastro antes de definir o escopo.</p> : null}
+                {carregandoAcessos ? <p className="text-sm text-[var(--g3-muted)]">Carregando escopos...</p> : null}
+                {acessosRascunho.map((acesso, indice) => (
+                  <div key={`${indice}-${acesso.escopo}`} className="grid gap-2 rounded-lg border border-[var(--g3-border)] p-3 md:grid-cols-[180px_1fr_1fr_1fr_auto] md:items-end">
+                    <div>
+                      <Label>Nível do escopo</Label>
+                      <Select value={acesso.escopo} onChange={(event) => setAcessosRascunho((atual) => atual.map((item, itemIndex) => itemIndex === indice ? { ...item, escopo: event.target.value as UsuarioAcessoInput["escopo"], entidade_juridica_id: undefined, unidade_id: undefined, projeto_id: undefined } : item))}>
+                        <option value="INSTITUICAO">Toda a instituição</option>
+                        <option value="ENTIDADE_JURIDICA">Entidade jurídica</option>
+                        <option value="UNIDADE">Unidade</option>
+                        <option value="PROJETO">Projeto</option>
+                      </Select>
+                    </div>
+                    {acesso.escopo === "ENTIDADE_JURIDICA" ? <div><Label>Entidade jurídica</Label><Select value={acesso.entidade_juridica_id ?? ""} onChange={(event) => setAcessosRascunho((atual) => atual.map((item, itemIndex) => itemIndex === indice ? { ...item, entidade_juridica_id: event.target.value || undefined } : item))}><option value="">Selecione</option>{(catalogoAcessos?.entidades ?? []).map((item) => <option key={item.id} value={item.id}>{item.nome}{item.cnpj ? ` · ${item.cnpj}` : ""}</option>)}</Select></div> : null}
+                    {acesso.escopo === "UNIDADE" ? <div><Label>Unidade</Label><Select value={acesso.unidade_id ?? ""} onChange={(event) => setAcessosRascunho((atual) => atual.map((item, itemIndex) => itemIndex === indice ? { ...item, unidade_id: event.target.value || undefined } : item))}><option value="">Selecione</option>{(catalogoAcessos?.unidades ?? []).map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</Select></div> : null}
+                    {acesso.escopo === "PROJETO" ? <div><Label>Projeto</Label><Select value={acesso.projeto_id ?? ""} onChange={(event) => setAcessosRascunho((atual) => atual.map((item, itemIndex) => itemIndex === indice ? { ...item, projeto_id: event.target.value || undefined } : item))}><option value="">Selecione</option>{(catalogoAcessos?.projetos ?? []).map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</Select></div> : null}
+                    <div><Label>Perfil no escopo</Label><Input value={acesso.perfil_nome ?? perfilSelecionado} onChange={(event) => setAcessosRascunho((atual) => atual.map((item, itemIndex) => itemIndex === indice ? { ...item, perfil_nome: event.target.value } : item))} /></div>
+                    <Button type="button" variant="ghost" size="sm" aria-label="Remover escopo" disabled={ehAdminImutavel} onClick={() => setAcessosRascunho((atual) => atual.filter((_, itemIndex) => itemIndex !== indice))}><Trash2 className="h-4 w-4 text-red-600" /></Button>
+                  </div>
+                ))}
+                {usuarioIdAtual && !acessosRascunho.length ? <p className="rounded-md border border-dashed border-[var(--g3-border)] p-3 text-sm text-amber-700">Nenhum escopo configurado.</p> : null}
+                <div className="flex justify-end border-t border-[var(--g3-border)] pt-3">
+                  <Button type="button" disabled={!usuarioIdAtual || ehAdminImutavel || salvarAcessosMutation.isPending || !acessosRascunho.length} onClick={() => { if (usuarioIdAtual) salvarAcessosMutation.mutate({ id: usuarioIdAtual, acessos: acessosRascunho }); }}>
+                    {salvarAcessosMutation.isPending ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}Salvar escopos
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
             <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
               <div className="space-y-3">
                 <div className="flex flex-col gap-3 border-b border-[var(--g3-border)] pb-4 md:flex-row md:items-center">

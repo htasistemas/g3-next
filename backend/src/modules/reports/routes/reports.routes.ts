@@ -155,3 +155,15 @@ reportsRoutes.post(
   ensurePermissions(permissoesLeitura),
   asyncHandler(controller.espelhoPonto.bind(controller))
 );
+reportsRoutes.post(
+  "/termos-parceria/relacao",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.relacaoTermosParceria.bind(controller))
+);
+reportsRoutes.post(
+  "/termos-parceria/completo",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.termoParceriaCompleto.bind(controller))
+);

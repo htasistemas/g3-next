@@ -1,7 +1,9 @@
 import { env } from "../../../config/env.js";
 import { AUTH_COOKIE_NAME } from "../middlewares/auth.middleware.js";
 import { AuthService } from "../services/auth.service.js";
+import { ParametrosSistemaService } from "../../configuracoes-gerais/services/parametros-sistema.service.js";
 const authService = new AuthService();
+const parametrosSistemaService = new ParametrosSistemaService();
 function authCookieOptions() {
     const cookieOptions = {
         httpOnly: true,
@@ -17,13 +19,52 @@ function authCookieOptions() {
 }
 export class AuthController {
     async login(request, response) {
-        const data = await authService.login(request.body);
-        response.cookie(AUTH_COOKIE_NAME, data.token, authCookieOptions());
+        const data = await authService.login({
+            ...request.body,
+            host: request.headers.host
+        });
+        if ("token" in data) {
+            response.cookie(AUTH_COOKIE_NAME, data.token, authCookieOptions());
+        }
+        return response.json(data);
+    }
+    async selecionarAmbiente(request, response) {
+        const data = await authService.selecionarAmbiente(request.body);
+        if ("token" in data)
+            response.cookie(AUTH_COOKIE_NAME, data.token, authCookieOptions());
+        return response.json(data);
+    }
+    async listarAmbientes(request, response) {
+        if (!request.authUser?.id)
+            return response.status(401).json({ ambientes: [] });
+        return response.json({ ambientes: await authService.listarAmbientes(request.authUser.id) });
+    }
+    async trocarAmbiente(request, response) {
+        if (!request.authUser?.id)
+            return response.status(401).json({ message: "Não autenticado." });
+        const data = await authService.trocarAmbiente(request.authUser.id, request.body);
+        if ("token" in data)
+            response.cookie(AUTH_COOKIE_NAME, data.token, authCookieOptions());
+        return response.json(data);
+    }
+    async listarOpcoesContexto(request, response) {
+        if (!request.authUser?.id)
+            return response.status(401).json({ unidades: [], projetos: [] });
+        return response.json(await authService.listarOpcoesContexto(request.authUser.id, request.authUser.tenant_id));
+    }
+    async trocarContexto(request, response) {
+        if (!request.authUser?.id)
+            return response.status(401).json({ message: "Não autenticado." });
+        const data = await authService.trocarContexto(request.authUser.id, request.authUser.tenant_id, request.body);
+        if ("token" in data)
+            response.cookie(AUTH_COOKIE_NAME, data.token, authCookieOptions());
         return response.json(data);
     }
     async loginGoogle(request, response) {
         const data = await authService.loginGoogle(request.body);
-        response.cookie(AUTH_COOKIE_NAME, data.token, authCookieOptions());
+        if ("token" in data) {
+            response.cookie(AUTH_COOKIE_NAME, data.token, authCookieOptions());
+        }
         return response.json(data);
     }
     async me(request, response) {
@@ -32,6 +73,24 @@ export class AuthController {
         }
         const usuario = await authService.obterPerfilUsuario(request.authUser.id);
         return response.json({ usuario });
+    }
+    async obterPreferenciaAgendamentos(request, response) {
+        if (!request.authUser?.id || !request.authUser?.tenant_id) {
+            return response.status(401).json({ dataVisualizacao: null });
+        }
+        const dataVisualizacao = await parametrosSistemaService.obterPreferenciaAgendamentosVisualizacao(request.authUser.id, request.authUser.tenant_id);
+        return response.json({ dataVisualizacao });
+    }
+    async salvarPreferenciaAgendamentos(request, response) {
+        if (!request.authUser?.id || !request.authUser?.tenant_id) {
+            return response.status(401).json({ dataVisualizacao: null });
+        }
+        const dataVisualizacao = typeof request.body?.dataVisualizacao === "string" ? request.body.dataVisualizacao.trim() : "";
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(dataVisualizacao)) {
+            return response.status(400).json({ message: "Data de visualizacao invalida." });
+        }
+        const salvo = await parametrosSistemaService.salvarPreferenciaAgendamentosVisualizacao(dataVisualizacao, request.authUser.id, request.authUser.nomeUsuario, request.authUser.tenant_id);
+        return response.json(salvo);
     }
     async logout(_request, response) {
         response.clearCookie(AUTH_COOKIE_NAME, {
@@ -43,7 +102,61 @@ export class AuthController {
     async esqueciSenha(request, response) {
         await authService.esqueciSenha(request.body);
         return response.status(200).json({
-            message: "Se o e-mail informado estiver cadastrado, uma senha temporaria foi enviada."
+            message: "Se o e-mail informado estiver cadastrado, uma senha temporaria foi enviada. Para acessos institucionais, use o mesmo CNPJ e o mesmo e-mail na tela de login."
         });
+    }
+    async verificarMfa(request, response) {
+        const data = await authService.verificarMfa(request.body);
+        response.cookie(AUTH_COOKIE_NAME, data.token, authCookieOptions());
+        return response.json(data);
+    }
+    async verificarFace(request, response) {
+        const data = await authService.verificarFace(request.body);
+        response.cookie(AUTH_COOKIE_NAME, data.token, authCookieOptions());
+        return response.json(data);
+    }
+    async iniciarCadastroPasskey(request, response) {
+        if (!request.authUser?.id) {
+            return response.status(401).json({ message: "Usuario autenticado invalido." });
+        }
+        const data = await authService.iniciarCadastroPasskey(request.authUser.id, {
+            ...request.body,
+            host: request.headers.host
+        });
+        return response.json(data);
+    }
+    async concluirCadastroPasskey(request, response) {
+        if (!request.authUser?.id) {
+            return response.status(401).json({ message: "Usuario autenticado invalido." });
+        }
+        const data = await authService.concluirCadastroPasskey(request.authUser.id, {
+            ...request.body,
+            host: request.headers.host
+        });
+        return response.json(data);
+    }
+    async iniciarLoginPasskey(request, response) {
+        const data = await authService.iniciarLoginPasskey({
+            ...request.body,
+            host: request.headers.host
+        });
+        return response.json(data);
+    }
+    async concluirLoginPasskey(request, response) {
+        const data = await authService.concluirLoginPasskey({
+            ...request.body,
+            host: request.headers.host
+        });
+        response.cookie(AUTH_COOKIE_NAME, data.token, authCookieOptions());
+        return response.json(data);
+    }
+    async tenantContext(request, response) {
+        const contexto = await authService.obterContextoTenant({
+            cnpj: typeof request.query.cnpj === "string" ? request.query.cnpj : undefined,
+            slug: typeof request.query.slug === "string" ? request.query.slug : undefined,
+            codigoInstituicao: typeof request.query.codigoInstituicao === "string" ? request.query.codigoInstituicao : undefined,
+            host: request.headers.host
+        });
+        return response.status(200).json({ instituicao: contexto });
     }
 }

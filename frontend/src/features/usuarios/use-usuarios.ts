@@ -39,6 +39,29 @@ export function useUsuarioFace(id?: string) {
   });
 }
 
+export function useUsuarioAcessos(id?: string) {
+  const { usuario } = useAuth();
+  return useQuery({
+    queryKey: ["usuario", usuario?.tenant_id ?? "sem-tenant", id, "acessos"],
+    queryFn: () => usuariosService.listarAcessos(id as string),
+    enabled: !!usuario && !!id
+  });
+}
+
+export function useCatalogoAcessos() {
+  const { usuario } = useAuth();
+  return useQuery({ queryKey: ["usuarios", "catalogo-acessos", usuario?.tenant_id ?? "sem-tenant"], queryFn: () => usuariosService.listarCatalogoAcessos(), enabled: !!usuario });
+}
+
+export function useSalvarUsuarioAcessos() {
+  const { usuario } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, acessos }: { id: string; acessos: import("@/types/usuario").UsuarioAcessoInput[] }) => usuariosService.substituirAcessos(id, acessos),
+    onSuccess: async (_resultado, variables) => queryClient.invalidateQueries({ queryKey: ["usuario", usuario?.tenant_id ?? "sem-tenant", variables.id, "acessos"] })
+  });
+}
+
 export function useSalvarUsuario() {
   const { usuario } = useAuth();
   const queryClient = useQueryClient();

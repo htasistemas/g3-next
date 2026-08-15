@@ -12,6 +12,18 @@ const optionalBoolean = z.preprocess((value) => {
         return undefined;
     return value;
 }, z.boolean().optional());
+function isRealIsoDate(value) {
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match)
+        return false;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const date = new Date(year, month - 1, day);
+    return (date.getFullYear() === year &&
+        date.getMonth() === month - 1 &&
+        date.getDate() === day);
+}
 const optionalInteger = z.preprocess((value) => {
     if (value === null || value === undefined || value === "")
         return undefined;
@@ -26,20 +38,30 @@ const optionalIsoDate = z.preprocess((value) => {
         return value;
     const trimmed = value.trim();
     return trimmed.length ? trimmed : undefined;
-}, z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional());
+}, z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(isRealIsoDate, "Data invalida.").optional());
 const optionalEmail = z.preprocess((value) => {
     if (typeof value !== "string")
         return value;
     const normalized = value.trim().toLowerCase();
     return normalized.length ? normalized : undefined;
 }, z.string().email("E-mail invalido.").optional());
+const optionalPortalPin = z.preprocess((value) => {
+    if (typeof value !== "string")
+        return value;
+    const normalized = value.replace(/\D/g, "").trim();
+    return normalized.length ? normalized : undefined;
+}, z.string().regex(/^\d{4}$/, "A senha do portal deve ter 4 digitos.").optional());
 export const beneficiarioInputSchema = z.object({
     codigo: optionalTrimmedString,
     status: z.enum(beneficiarioStatusValues).default("EM_ANALISE"),
     nome_completo: z.string().trim().min(3, "Informe o nome completo."),
     nome_social: optionalTrimmedString,
     apelido: optionalTrimmedString,
-    data_nascimento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data de nascimento invalida."),
+    data_nascimento: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/, "Data de nascimento invalida.")
+        .refine(isRealIsoDate, "Data de nascimento invalida.")
+        .refine((value) => new Date(`${value}T00:00:00`).getTime() <= Date.now(), "Data de nascimento nao pode ser futura."),
     foto_3x4: optionalTrimmedString,
     sexo_biologico: optionalTrimmedString,
     identidade_genero: optionalTrimmedString,
@@ -85,6 +107,7 @@ export const beneficiarioInputSchema = z.object({
         .string()
         .trim()
         .refine((value) => isValidCpf(value), "Informe um CPF valido."),
+    senha_portal: optionalPortalPin,
     rg_numero: optionalTrimmedString,
     rg_orgao_emissor: optionalTrimmedString,
     rg_uf: optionalTrimmedString,
@@ -142,6 +165,12 @@ export const beneficiarioInputSchema = z.object({
         nomeArquivo: optionalTrimmedString,
         caminhoArquivo: optionalTrimmedString,
         contentType: optionalTrimmedString,
+        dataEmissao: optionalIsoDate,
+        dataValidade: optionalIsoDate,
+        orgaoEmissor: optionalTrimmedString,
+        ufEmissor: optionalTrimmedString,
+        categoria: optionalTrimmedString,
+        observacao: optionalTrimmedString,
         obrigatorio: optionalBoolean,
         ignorado: optionalBoolean,
         conteudo: optionalTrimmedString

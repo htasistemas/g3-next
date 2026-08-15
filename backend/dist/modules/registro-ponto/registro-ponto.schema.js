@@ -147,3 +147,43 @@ export const registroPontoHorarioUsuarioSchema = z
         }
     }
 });
+export const registroPontoHoraExtraConfiguracaoSchema = z.object({
+    tolerancia_entrada_antecipada_minutos: optionalNumber.default(10),
+    exigir_autorizacao_hora_extra_antecipada: optionalBoolean.default(true),
+    limite_hora_extra_diaria_minutos: optionalNumber.default(120),
+    permitir_solicitacao_hora_extra_pelo_funcionario: optionalBoolean.default(false),
+    mensagem_ciencia_hora_extra: optionalTrimmedString.default("Declaro ciência de que a realização de hora extra depende de autorização da empresa.")
+});
+const optionalPositiveNumber = z.preprocess((value) => {
+    if (value === null || value === undefined || value === "")
+        return undefined;
+    if (typeof value === "number")
+        return value;
+    if (typeof value === "string")
+        return Number(value);
+    return value;
+}, z.number().finite().int().nonnegative().optional());
+export const registroPontoHoraExtraFiltroSchema = z.object({
+    funcionario: optionalTrimmedString,
+    data_inicial: optionalIsoDate,
+    data_final: optionalIsoDate,
+    setor: optionalTrimmedString,
+    status: z.enum(["SEM_EXTRA", "EXTRA_PENDENTE_AUTORIZACAO", "EXTRA_AUTORIZADA", "EXTRA_NEGADA", "EXTRA_COMPENSADA_BANCO", "EXTRA_PAGA_FOLHA", "TODOS"]).optional(),
+    tenant_id: optionalTrimmedString
+});
+export const registroPontoHoraExtraDecisaoSchema = z.object({
+    justificativa: z.string().trim().min(5, "Informe a justificativa da decisão."),
+    minutos_aprovados: optionalPositiveNumber,
+    minutos_negados: optionalPositiveNumber
+});
+export const registroPontoHoraExtraCienciaSchema = z.object({
+    justificativa_funcionario: z.string().trim().min(5, "Informe a justificativa do funcionario."),
+    ciencia_registrada: z.literal(true)
+});
+export const registroPontoRelatorioMensalSchema = z.object({
+    data_inicial: optionalIsoDate,
+    data_final: optionalIsoDate,
+    usuario_id: optionalTrimmedString,
+    funcionario: optionalTrimmedString,
+    setor: optionalTrimmedString
+});

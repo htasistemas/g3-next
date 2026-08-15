@@ -5,6 +5,11 @@ import { AppError } from "../../../shared/errors/app-error.js";
 import { toIsoDate, toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
 import { calcularSaldoConta, gerarNumeroRecibo, lancamentoEstaBloqueadoPorOrigem, normalizarDirecaoAjuste, normalizarSituacaoConciliacao, normalizarStatusConta, normalizarStatusLancamento, normalizarTextoEnum, normalizarTipoCategoria, normalizarTipoConta, normalizarTipoLancamento, statusBaixadoPorTipo, tipoMovimentacaoPorLancamento } from "../contabilidade.workflow.js";
 let estruturaPromise = null;
+function tenantSql(alias, tenantId) {
+    if (!tenantId)
+        return Prisma.empty;
+    return Prisma.sql ` AND ${Prisma.raw(alias)}.tenant_id::text = ${tenantId}`;
+}
 const LANCAMENTO_SELECT = Prisma.sql `
   SELECT
     l.id,
@@ -34,6 +39,7 @@ const LANCAMENTO_SELECT = Prisma.sql `
     l.bloqueado_origem,
     l.ativo,
     cb.nome_conta AS conta_bancaria_nome,
+    cb.fonte_pagamento AS conta_bancaria_fonte_pagamento,
     cat.nome AS categoria_nome,
     cc.nome AS centro_custo_nome
   FROM lancamento_financeiro l
@@ -127,6 +133,7 @@ export async function ensureContabilidadeEstrutura() {
       `);
             await prisma.$executeRawUnsafe(`
         ALTER TABLE financeiro_categoria
+          ADD COLUMN IF NOT EXISTS tenant_id UUID,
           ADD COLUMN IF NOT EXISTS grupo VARCHAR(120),
           ADD COLUMN IF NOT EXISTS subgrupo VARCHAR(120),
           ADD COLUMN IF NOT EXISTS categoria_pai_id BIGINT REFERENCES financeiro_categoria(id) ON DELETE SET NULL,
@@ -152,6 +159,7 @@ export async function ensureContabilidadeEstrutura() {
       `);
             await prisma.$executeRawUnsafe(`
         ALTER TABLE financeiro_centro_custo
+          ADD COLUMN IF NOT EXISTS tenant_id UUID,
           ADD COLUMN IF NOT EXISTS codigo VARCHAR(40),
           ADD COLUMN IF NOT EXISTS nome VARCHAR(160),
           ADD COLUMN IF NOT EXISTS setor_responsavel VARCHAR(160),
@@ -180,9 +188,11 @@ export async function ensureContabilidadeEstrutura() {
       `);
             await prisma.$executeRawUnsafe(`
         ALTER TABLE conta_bancaria
+          ADD COLUMN IF NOT EXISTS tenant_id UUID,
           ADD COLUMN IF NOT EXISTS digito VARCHAR(10),
           ADD COLUMN IF NOT EXISTS nome_conta VARCHAR(160),
           ADD COLUMN IF NOT EXISTS titular VARCHAR(160),
+          ADD COLUMN IF NOT EXISTS fonte_pagamento VARCHAR(160),
           ADD COLUMN IF NOT EXISTS saldo_inicial NUMERIC(14,2) NOT NULL DEFAULT 0,
           ADD COLUMN IF NOT EXISTS data_saldo_inicial DATE,
           ADD COLUMN IF NOT EXISTS limite_minimo_alerta NUMERIC(14,2) NOT NULL DEFAULT 0,
@@ -204,6 +214,7 @@ export async function ensureContabilidadeEstrutura() {
       `);
             await prisma.$executeRawUnsafe(`
         ALTER TABLE lancamento_financeiro
+          ADD COLUMN IF NOT EXISTS tenant_id UUID,
           ADD COLUMN IF NOT EXISTS data_lancamento DATE,
           ADD COLUMN IF NOT EXISTS natureza VARCHAR(80),
           ADD COLUMN IF NOT EXISTS conta_bancaria_id BIGINT REFERENCES conta_bancaria(id) ON DELETE SET NULL,
@@ -239,6 +250,7 @@ export async function ensureContabilidadeEstrutura() {
       `);
             await prisma.$executeRawUnsafe(`
         ALTER TABLE movimentacao_financeira
+          ADD COLUMN IF NOT EXISTS tenant_id UUID,
           ADD COLUMN IF NOT EXISTS categoria_financeira_id BIGINT REFERENCES financeiro_categoria(id) ON DELETE SET NULL,
           ADD COLUMN IF NOT EXISTS centro_custo_id BIGINT REFERENCES financeiro_centro_custo(id) ON DELETE SET NULL,
           ADD COLUMN IF NOT EXISTS origem VARCHAR(80),
@@ -258,6 +270,7 @@ export async function ensureContabilidadeEstrutura() {
             await prisma.$executeRawUnsafe(`
         CREATE TABLE IF NOT EXISTS financeiro_transferencia (
           id BIGSERIAL PRIMARY KEY,
+          tenant_id UUID,
           conta_origem_id BIGINT NOT NULL REFERENCES conta_bancaria(id) ON DELETE RESTRICT,
           conta_destino_id BIGINT NOT NULL REFERENCES conta_bancaria(id) ON DELETE RESTRICT,
           data_transferencia DATE NOT NULL,
@@ -276,6 +289,7 @@ export async function ensureContabilidadeEstrutura() {
             await prisma.$executeRawUnsafe(`
         CREATE TABLE IF NOT EXISTS financeiro_conciliacao (
           id BIGSERIAL PRIMARY KEY,
+          tenant_id UUID,
           conta_bancaria_id BIGINT NOT NULL REFERENCES conta_bancaria(id) ON DELETE RESTRICT,
           data_movimento DATE NOT NULL,
           descricao_extrato VARCHAR(240) NOT NULL,
@@ -293,6 +307,7 @@ export async function ensureContabilidadeEstrutura() {
             await prisma.$executeRawUnsafe(`
         CREATE TABLE IF NOT EXISTS financeiro_historico (
           id BIGSERIAL PRIMARY KEY,
+          tenant_id UUID,
           aba VARCHAR(80) NOT NULL,
           acao VARCHAR(160) NOT NULL,
           tipo_registro VARCHAR(80) NOT NULL,
@@ -312,7 +327,23 @@ export async function ensureContabilidadeEstrutura() {
         )
       `);
             await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS financeiro_fechamento_mensal (
+          id BIGSERIAL PRIMARY KEY,
+          tenant_id UUID,
+          competencia VARCHAR(7) NOT NULL,
+          saldo_total NUMERIC(14,2) NOT NULL DEFAULT 0,
+          saldo_bancos NUMERIC(14,2) NOT NULL DEFAULT 0,
+          saldo_caixa NUMERIC(14,2) NOT NULL DEFAULT 0,
+          contas_snapshot JSONB NOT NULL DEFAULT '[]'::jsonb,
+          observacao TEXT,
+          usuario_id BIGINT REFERENCES usuarios(id) ON DELETE SET NULL,
+          usuario_nome VARCHAR(160),
+          criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+            await prisma.$executeRawUnsafe(`
         ALTER TABLE financeiro_historico
+          ADD COLUMN IF NOT EXISTS tenant_id UUID,
           ADD COLUMN IF NOT EXISTS aba VARCHAR(80),
           ADD COLUMN IF NOT EXISTS acao VARCHAR(160),
           ADD COLUMN IF NOT EXISTS tipo_registro VARCHAR(80),
@@ -359,10 +390,186 @@ export async function ensureContabilidadeEstrutura() {
                 `CREATE INDEX IF NOT EXISTS financeiro_transferencia_status_idx ON financeiro_transferencia(status, data_transferencia)`,
                 `CREATE INDEX IF NOT EXISTS financeiro_conciliacao_situacao_idx ON financeiro_conciliacao(situacao, conta_bancaria_id)`,
                 `CREATE INDEX IF NOT EXISTS financeiro_historico_aba_idx ON financeiro_historico(aba, criado_em DESC)`,
+                `CREATE INDEX IF NOT EXISTS financeiro_fechamento_mensal_competencia_idx ON financeiro_fechamento_mensal(competencia, criado_em DESC)`,
             ];
             for (const comandoIndice of comandosIndices) {
                 await prisma.$executeRawUnsafe(comandoIndice);
             }
+            await prisma.$executeRawUnsafe(`
+        ALTER TABLE financeiro_transferencia
+          ADD COLUMN IF NOT EXISTS tenant_id UUID
+      `);
+            await prisma.$executeRawUnsafe(`
+        ALTER TABLE financeiro_conciliacao
+          ADD COLUMN IF NOT EXISTS tenant_id UUID
+      `);
+            await prisma.$executeRawUnsafe(`
+        ALTER TABLE IF EXISTS emenda_impositiva
+          ADD COLUMN IF NOT EXISTS tenant_id UUID
+      `);
+            const comandosTenant = [
+                `CREATE INDEX IF NOT EXISTS conta_bancaria_tenant_idx ON conta_bancaria(tenant_id, ativo)`,
+                `CREATE INDEX IF NOT EXISTS financeiro_categoria_tenant_idx ON financeiro_categoria(tenant_id, ativo)`,
+                `CREATE INDEX IF NOT EXISTS financeiro_centro_custo_tenant_idx ON financeiro_centro_custo(tenant_id, ativo)`,
+                `CREATE INDEX IF NOT EXISTS lancamento_financeiro_tenant_idx ON lancamento_financeiro(tenant_id, ativo)`,
+                `CREATE INDEX IF NOT EXISTS movimentacao_financeira_tenant_idx ON movimentacao_financeira(tenant_id, ativo)`,
+                `CREATE INDEX IF NOT EXISTS financeiro_transferencia_tenant_idx ON financeiro_transferencia(tenant_id, ativo)`,
+                `CREATE INDEX IF NOT EXISTS financeiro_conciliacao_tenant_idx ON financeiro_conciliacao(tenant_id, ativo)`,
+                `CREATE INDEX IF NOT EXISTS financeiro_historico_tenant_idx ON financeiro_historico(tenant_id, criado_em DESC)`,
+                `CREATE INDEX IF NOT EXISTS financeiro_fechamento_mensal_tenant_idx ON financeiro_fechamento_mensal(tenant_id, competencia DESC)`
+            ];
+            for (const comandoTenant of comandosTenant) {
+                await prisma.$executeRawUnsafe(comandoTenant);
+            }
+            await prisma.$executeRawUnsafe(`
+        UPDATE conta_bancaria
+        SET tenant_id = origem.tenant_id
+        FROM (
+          SELECT tenant_id
+          FROM unidade_assistencial
+          WHERE tenant_id IS NOT NULL
+          ORDER BY unidade_principal DESC, atualizado_em DESC, criado_em ASC
+          LIMIT 1
+        ) origem
+        WHERE conta_bancaria.tenant_id IS NULL
+      `);
+            await prisma.$executeRawUnsafe(`
+        UPDATE financeiro_categoria
+        SET tenant_id = origem.tenant_id
+        FROM (
+          SELECT tenant_id
+          FROM unidade_assistencial
+          WHERE tenant_id IS NOT NULL
+          ORDER BY unidade_principal DESC, atualizado_em DESC, criado_em ASC
+          LIMIT 1
+        ) origem
+        WHERE financeiro_categoria.tenant_id IS NULL
+      `);
+            await prisma.$executeRawUnsafe(`
+        UPDATE financeiro_centro_custo
+        SET tenant_id = origem.tenant_id
+        FROM (
+          SELECT tenant_id
+          FROM unidade_assistencial
+          WHERE tenant_id IS NOT NULL
+          ORDER BY unidade_principal DESC, atualizado_em DESC, criado_em ASC
+          LIMIT 1
+        ) origem
+        WHERE financeiro_centro_custo.tenant_id IS NULL
+      `);
+            await prisma.$executeRawUnsafe(`
+        UPDATE lancamento_financeiro l
+        SET tenant_id = COALESCE(
+          (
+            SELECT cb.tenant_id
+            FROM conta_bancaria cb
+            WHERE cb.id IS NOT DISTINCT FROM l.conta_bancaria_id
+            LIMIT 1
+          ),
+          origem.tenant_id
+        )
+        FROM (
+          SELECT tenant_id
+          FROM unidade_assistencial
+          WHERE tenant_id IS NOT NULL
+          ORDER BY unidade_principal DESC, atualizado_em DESC, criado_em ASC
+          LIMIT 1
+        ) origem
+        WHERE l.tenant_id IS NULL
+      `);
+            await prisma.$executeRawUnsafe(`
+        UPDATE movimentacao_financeira m
+        SET tenant_id = COALESCE(
+          (
+            SELECT cb.tenant_id
+            FROM conta_bancaria cb
+            WHERE cb.id IS NOT DISTINCT FROM m.conta_bancaria_id
+            LIMIT 1
+          ),
+          (
+            SELECT l.tenant_id
+            FROM lancamento_financeiro l
+            WHERE l.id = m.lancamento_financeiro_id
+            LIMIT 1
+          )
+        )
+        WHERE m.tenant_id IS NULL
+      `);
+            await prisma.$executeRawUnsafe(`
+        UPDATE financeiro_transferencia t
+        SET tenant_id = COALESCE(
+          (
+            SELECT co.tenant_id
+            FROM conta_bancaria co
+            WHERE co.id = t.conta_origem_id
+            LIMIT 1
+          ),
+          (
+            SELECT cd.tenant_id
+            FROM conta_bancaria cd
+            WHERE cd.id = t.conta_destino_id
+            LIMIT 1
+          )
+        )
+        WHERE t.tenant_id IS NULL
+      `);
+            await prisma.$executeRawUnsafe(`
+        UPDATE financeiro_conciliacao c
+        SET tenant_id = COALESCE(
+          (
+            SELECT cb.tenant_id
+            FROM conta_bancaria cb
+            WHERE cb.id = c.conta_bancaria_id
+            LIMIT 1
+          ),
+          (
+            SELECT l.tenant_id
+            FROM lancamento_financeiro l
+            WHERE l.id = c.lancamento_financeiro_id
+            LIMIT 1
+          ),
+          (
+            SELECT m.tenant_id
+            FROM movimentacao_financeira m
+            WHERE m.id = c.movimentacao_financeira_id
+            LIMIT 1
+          )
+        )
+        WHERE c.tenant_id IS NULL
+      `);
+            await prisma.$executeRawUnsafe(`
+        UPDATE financeiro_historico
+        SET tenant_id = origem.tenant_id
+        FROM (
+          SELECT tenant_id
+          FROM unidade_assistencial
+          WHERE tenant_id IS NOT NULL
+          ORDER BY unidade_principal DESC, atualizado_em DESC, criado_em ASC
+          LIMIT 1
+        ) origem
+        WHERE financeiro_historico.tenant_id IS NULL
+      `);
+            await prisma.$executeRawUnsafe(`
+        DO $$
+        BEGIN
+          IF to_regclass('public.emenda_impositiva') IS NOT NULL THEN
+            EXECUTE 'CREATE INDEX IF NOT EXISTS emenda_impositiva_tenant_idx ON emenda_impositiva(tenant_id, atualizado_em DESC)';
+            EXECUTE '
+              UPDATE emenda_impositiva
+              SET tenant_id = origem.tenant_id
+              FROM (
+                SELECT tenant_id
+                FROM unidade_assistencial
+                WHERE tenant_id IS NOT NULL
+                ORDER BY unidade_principal DESC, atualizado_em DESC, criado_em ASC
+                LIMIT 1
+              ) origem
+              WHERE emenda_impositiva.tenant_id IS NULL
+            ';
+          END IF;
+        END
+        $$;
+      `);
             await prisma.$executeRawUnsafe(`
         INSERT INTO financeiro_categoria (codigo, nome, tipo, grupo, subgrupo, status)
         SELECT 'REC-DOA', 'Doações', 'RECEITA', 'Receitas', 'Doações', 'ATIVA'
@@ -393,8 +600,9 @@ export async function ensureContabilidadeEstrutura() {
     return estruturaPromise;
 }
 export class ContabilidadeRepository {
-    async listarContasBancarias() {
+    async listarContasBancarias(ator) {
         await ensureContabilidadeEstrutura();
+        const tenantId = ator?.tenantId;
         return prisma.$queryRaw(Prisma.sql `
       SELECT
         cb.id,
@@ -406,6 +614,7 @@ export class ContabilidadeRepository {
         cb.tipo,
         cb.titular,
         cb.projeto_vinculado,
+        cb.fonte_pagamento,
         cb.pix_vinculado,
         cb.tipo_chave_pix,
         cb.chave_pix,
@@ -421,10 +630,11 @@ export class ContabilidadeRepository {
         cb.ativo
       FROM conta_bancaria cb
       WHERE cb.ativo = TRUE
+      ${tenantSql("cb", tenantId)}
       ORDER BY cb.nome_conta ASC, cb.banco ASC, cb.numero ASC
     `);
     }
-    async buscarContaBancariaPorId(id, tx = prisma) {
+    async buscarContaBancariaPorId(id, tx = prisma, tenantId) {
         await ensureContabilidadeEstrutura();
         const rows = await tx.$queryRaw(Prisma.sql `
       SELECT
@@ -437,6 +647,7 @@ export class ContabilidadeRepository {
         cb.tipo,
         cb.titular,
         cb.projeto_vinculado,
+        cb.fonte_pagamento,
         cb.pix_vinculado,
         cb.tipo_chave_pix,
         cb.chave_pix,
@@ -456,7 +667,7 @@ export class ContabilidadeRepository {
     `);
         return rows[0] ?? null;
     }
-    async buscarContaBancariaPorIdComSaldoReal(id, tx = prisma) {
+    async buscarContaBancariaPorIdComSaldoReal(id, tx = prisma, tenantId) {
         await ensureContabilidadeEstrutura();
         const rows = await tx.$queryRaw(Prisma.sql `
       SELECT
@@ -469,6 +680,7 @@ export class ContabilidadeRepository {
         cb.tipo,
         cb.titular,
         cb.projeto_vinculado,
+        cb.fonte_pagamento,
         cb.pix_vinculado,
         cb.tipo_chave_pix,
         cb.chave_pix,
@@ -484,19 +696,20 @@ export class ContabilidadeRepository {
         cb.ativo
       FROM conta_bancaria cb
       WHERE cb.id = ${id}
+      ${tenantSql("cb", tenantId)}
       LIMIT 1
     `);
         return rows[0] ?? null;
     }
-    async buscarContaBancariaPorIdOuFalhar(id, tx = prisma) {
-        const conta = await this.buscarContaBancariaPorId(id, tx);
+    async buscarContaBancariaPorIdOuFalhar(id, tx = prisma, tenantId) {
+        const conta = await this.buscarContaBancariaPorId(id, tx, tenantId);
         if (!conta || !conta.ativo) {
             throw new AppError("Conta bancária não encontrada.", 404);
         }
         return conta;
     }
-    async buscarContaBancariaPorIdComSaldoRealOuFalhar(id, tx = prisma) {
-        const conta = await this.buscarContaBancariaPorIdComSaldoReal(id, tx);
+    async buscarContaBancariaPorIdComSaldoRealOuFalhar(id, tx = prisma, tenantId) {
+        const conta = await this.buscarContaBancariaPorIdComSaldoReal(id, tx, tenantId);
         if (!conta || !conta.ativo) {
             throw new AppError("Conta bancÃ¡ria nÃ£o encontrada.", 404);
         }
@@ -505,6 +718,7 @@ export class ContabilidadeRepository {
     async criarContaBancaria(input, ator) {
         await ensureContabilidadeEstrutura();
         return prisma.$transaction(async (tx) => {
+            const tenantId = ator?.tenantId;
             const status = normalizarStatusConta(input.status);
             const tipo = normalizarTipoConta(input.tipo);
             const rows = await tx.$queryRaw(Prisma.sql `
@@ -517,6 +731,7 @@ export class ContabilidadeRepository {
           tipo,
           titular,
           projeto_vinculado,
+          fonte_pagamento,
           pix_vinculado,
           tipo_chave_pix,
           chave_pix,
@@ -530,6 +745,7 @@ export class ContabilidadeRepository {
           observacao,
           data_atualizacao,
           ativo,
+          tenant_id,
           criado_em,
           atualizado_em
         ) VALUES (
@@ -541,6 +757,7 @@ export class ContabilidadeRepository {
           ${tipo},
           ${trimOrUndefined(input.titular ?? undefined)},
           ${trimOrUndefined(input.projetoVinculado ?? undefined)},
+          ${trimOrUndefined(input.fontePagamento ?? undefined)},
           ${!!input.pixVinculado},
           ${trimOrUndefined(input.tipoChavePix ?? undefined)},
           ${trimOrUndefined(input.chavePix ?? undefined)},
@@ -554,6 +771,7 @@ export class ContabilidadeRepository {
           ${trimOrUndefined(input.observacao ?? undefined)},
           ${toOptionalDate(input.dataSaldoInicial)},
           TRUE,
+          ${tenantId ? Prisma.sql `CAST(${tenantId} AS UUID)` : Prisma.sql `NULL`},
           NOW(),
           NOW()
         )
@@ -562,7 +780,7 @@ export class ContabilidadeRepository {
             const id = rows[0]?.id;
             if (!id)
                 throw new AppError("Não foi possível criar a conta bancária.", 500);
-            const conta = await this.buscarContaBancariaPorIdOuFalhar(id, tx);
+            const conta = await this.buscarContaBancariaPorIdOuFalhar(id, tx, tenantId);
             await this.registrarHistorico(tx, {
                 aba: "Contas bancárias e caixa",
                 acao: "Conta criada",
@@ -582,7 +800,8 @@ export class ContabilidadeRepository {
     async atualizarContaBancaria(id, input, ator) {
         await ensureContabilidadeEstrutura();
         return prisma.$transaction(async (tx) => {
-            const atual = await this.buscarContaBancariaPorIdOuFalhar(id, tx);
+            const tenantId = ator?.tenantId;
+            const atual = await this.buscarContaBancariaPorIdOuFalhar(id, tx, tenantId);
             const status = normalizarStatusConta(input.status);
             const tipo = normalizarTipoConta(input.tipo);
             await tx.$executeRaw(Prisma.sql `
@@ -596,6 +815,7 @@ export class ContabilidadeRepository {
           tipo = ${tipo},
           titular = ${trimOrUndefined(input.titular ?? undefined)},
           projeto_vinculado = ${trimOrUndefined(input.projetoVinculado ?? undefined)},
+          fonte_pagamento = ${trimOrUndefined(input.fontePagamento ?? undefined)},
           pix_vinculado = ${!!input.pixVinculado},
           tipo_chave_pix = ${trimOrUndefined(input.tipoChavePix ?? undefined)},
           chave_pix = ${trimOrUndefined(input.chavePix ?? undefined)},
@@ -609,8 +829,9 @@ export class ContabilidadeRepository {
           data_atualizacao = NOW(),
           atualizado_em = NOW()
         WHERE id = ${id}
+        ${tenantSql("conta_bancaria", tenantId)}
       `);
-            const conta = await this.buscarContaBancariaPorIdOuFalhar(id, tx);
+            const conta = await this.buscarContaBancariaPorIdOuFalhar(id, tx, tenantId);
             await this.registrarHistorico(tx, {
                 aba: "Contas bancárias e caixa",
                 acao: "Conta atualizada",
@@ -630,13 +851,14 @@ export class ContabilidadeRepository {
     async removerContaBancaria(id, ator) {
         await ensureContabilidadeEstrutura();
         await prisma.$transaction(async (tx) => {
-            const atual = await this.buscarContaBancariaPorIdOuFalhar(id, tx);
+            const tenantId = ator?.tenantId;
+            const atual = await this.buscarContaBancariaPorIdOuFalhar(id, tx, tenantId);
             const vinculacoes = await tx.$queryRaw(Prisma.sql `
         SELECT COUNT(*)::BIGINT AS total
         FROM (
-          SELECT id FROM lancamento_financeiro WHERE conta_bancaria_id = ${id} AND ativo = TRUE
+          SELECT id FROM lancamento_financeiro WHERE conta_bancaria_id = ${id} AND ativo = TRUE AND tenant_id::text = ${tenantId ?? ""}
           UNION ALL
-          SELECT id FROM movimentacao_financeira WHERE conta_bancaria_id = ${id} AND ativo = TRUE
+          SELECT id FROM movimentacao_financeira WHERE conta_bancaria_id = ${id} AND ativo = TRUE AND tenant_id::text = ${tenantId ?? ""}
         ) base
       `);
             if (Number(vinculacoes[0]?.total ?? 0) > 0) {
@@ -646,6 +868,7 @@ export class ContabilidadeRepository {
         UPDATE conta_bancaria
         SET ativo = FALSE, status = 'INATIVA', atualizado_em = NOW()
         WHERE id = ${id}
+        ${tenantSql("conta_bancaria", tenantId)}
       `);
             await this.registrarHistorico(tx, {
                 aba: "Contas bancárias e caixa",
@@ -662,8 +885,9 @@ export class ContabilidadeRepository {
             });
         });
     }
-    async listarCategorias() {
+    async listarCategorias(ator) {
         await ensureContabilidadeEstrutura();
+        const tenantId = ator?.tenantId;
         return prisma.$queryRaw(Prisma.sql `
       SELECT
         id,
@@ -679,10 +903,11 @@ export class ContabilidadeRepository {
         ativo
       FROM financeiro_categoria
       WHERE ativo = TRUE
+      ${tenantSql("financeiro_categoria", tenantId)}
       ORDER BY tipo ASC, grupo ASC NULLS LAST, nome ASC
     `);
     }
-    async buscarCategoriaPorIdOuFalhar(id, tx = prisma) {
+    async buscarCategoriaPorIdOuFalhar(id, tx = prisma, tenantId) {
         await ensureContabilidadeEstrutura();
         const rows = await tx.$queryRaw(Prisma.sql `
       SELECT
@@ -699,6 +924,7 @@ export class ContabilidadeRepository {
         ativo
       FROM financeiro_categoria
       WHERE id = ${id}
+      ${tenantSql("financeiro_categoria", tenantId)}
       LIMIT 1
     `);
         const categoria = rows[0];
@@ -710,8 +936,9 @@ export class ContabilidadeRepository {
     async criarCategoria(input, ator) {
         await ensureContabilidadeEstrutura();
         return prisma.$transaction(async (tx) => {
+            const tenantId = ator?.tenantId;
             if (input.categoriaPaiId) {
-                await this.buscarCategoriaPorIdOuFalhar(BigInt(input.categoriaPaiId), tx);
+                await this.buscarCategoriaPorIdOuFalhar(BigInt(input.categoriaPaiId), tx, tenantId);
             }
             const rows = await tx.$queryRaw(Prisma.sql `
         INSERT INTO financeiro_categoria (
@@ -725,6 +952,7 @@ export class ContabilidadeRepository {
           status,
           observacao,
           ativo,
+          tenant_id,
           criado_em,
           atualizado_em
         ) VALUES (
@@ -738,6 +966,7 @@ export class ContabilidadeRepository {
           ${normalizarStatusConta(input.status)},
           ${trimOrUndefined(input.observacao ?? undefined)},
           TRUE,
+          ${tenantId ? Prisma.sql `CAST(${tenantId} AS UUID)` : Prisma.sql `NULL`},
           NOW(),
           NOW()
         )
@@ -746,7 +975,7 @@ export class ContabilidadeRepository {
             const id = rows[0]?.id;
             if (!id)
                 throw new AppError("Não foi possível criar a categoria financeira.", 500);
-            const categoria = await this.buscarCategoriaPorIdOuFalhar(id, tx);
+            const categoria = await this.buscarCategoriaPorIdOuFalhar(id, tx, tenantId);
             await this.registrarHistorico(tx, {
                 aba: "Categorias financeiras / contábeis",
                 acao: "Categoria criada",
@@ -831,8 +1060,9 @@ export class ContabilidadeRepository {
             });
         });
     }
-    async listarCentrosCusto() {
+    async listarCentrosCusto(ator) {
         await ensureContabilidadeEstrutura();
+        const tenantId = ator?.tenantId;
         return prisma.$queryRaw(Prisma.sql `
       SELECT
         id,
@@ -844,10 +1074,11 @@ export class ContabilidadeRepository {
         ativo
       FROM financeiro_centro_custo
       WHERE ativo = TRUE
+      ${tenantSql("financeiro_centro_custo", tenantId)}
       ORDER BY nome ASC
     `);
     }
-    async buscarCentroCustoPorIdOuFalhar(id, tx = prisma) {
+    async buscarCentroCustoPorIdOuFalhar(id, tx = prisma, tenantId) {
         await ensureContabilidadeEstrutura();
         const rows = await tx.$queryRaw(Prisma.sql `
       SELECT
@@ -860,6 +1091,7 @@ export class ContabilidadeRepository {
         ativo
       FROM financeiro_centro_custo
       WHERE id = ${id}
+      ${tenantSql("financeiro_centro_custo", tenantId)}
       LIMIT 1
     `);
         const centro = rows[0];
@@ -971,11 +1203,13 @@ export class ContabilidadeRepository {
             });
         });
     }
-    async listarLancamentos() {
+    async listarLancamentos(ator) {
         await ensureContabilidadeEstrutura();
+        const tenantId = ator?.tenantId;
         return prisma.$queryRaw(Prisma.sql `
       ${LANCAMENTO_SELECT}
       WHERE l.ativo = TRUE
+      ${tenantSql("l", tenantId)}
       ORDER BY COALESCE(l.data_lancamento, l.vencimento) DESC, l.id DESC
     `);
     }
@@ -998,6 +1232,7 @@ export class ContabilidadeRepository {
     async criarLancamento(input, ator) {
         await ensureContabilidadeEstrutura();
         return prisma.$transaction(async (tx) => {
+            const tenantId = ator?.tenantId;
             const tipo = normalizarTipoLancamento(input.tipo);
             const direcaoAjuste = tipo === "AJUSTE" ? input.direcaoAjuste ?? "DIMINUIR" : null;
             const status = normalizarStatusLancamento(input.status, tipo, direcaoAjuste);
@@ -1005,14 +1240,20 @@ export class ContabilidadeRepository {
             const contaId = input.contaBancariaId ? BigInt(input.contaBancariaId) : null;
             const categoriaId = input.categoriaId ? BigInt(input.categoriaId) : null;
             const centroId = input.centroCustoId ? BigInt(input.centroCustoId) : null;
+            const descricaoLancamento = trimOrUndefined(input.historico ?? undefined) ??
+                trimOrUndefined(input.natureza ?? undefined) ??
+                input.contraparte;
             if (contaId) {
                 await this.validarContaMovimentavel(tx, contaId);
             }
             if (categoriaId) {
-                await this.buscarCategoriaPorIdOuFalhar(categoriaId, tx);
+                await this.buscarCategoriaPorIdOuFalhar(categoriaId, tx, tenantId);
             }
             if (centroId) {
-                await this.buscarCentroCustoPorIdOuFalhar(centroId, tx);
+                await this.buscarCentroCustoPorIdOuFalhar(centroId, tx, tenantId);
+            }
+            if (["PAGO", "RECEBIDO", "CONCILIADO"].includes(status) && !contaId) {
+                throw new AppError("Selecione a conta bancária para salvar um lançamento já pago ou recebido.", 400);
             }
             if (input.compraId) {
                 const existente = await tx.$queryRaw(Prisma.sql `
@@ -1020,6 +1261,7 @@ export class ContabilidadeRepository {
           FROM lancamento_financeiro
           WHERE compra_id = ${BigInt(input.compraId)}
             AND ativo = TRUE
+            ${tenantSql("lancamento_financeiro", tenantId)}
           LIMIT 1
         `);
                 if (existente[0]) {
@@ -1028,6 +1270,7 @@ export class ContabilidadeRepository {
             }
             const rows = await tx.$queryRaw(Prisma.sql `
         INSERT INTO lancamento_financeiro (
+          tenant_id,
           data_lancamento,
           tipo,
           direcao_ajuste,
@@ -1056,6 +1299,7 @@ export class ContabilidadeRepository {
           criado_em,
           atualizado_em
         ) VALUES (
+          ${tenantId ? Prisma.sql `CAST(${tenantId} AS UUID)` : Prisma.sql `NULL`},
           ${toOptionalDate(input.dataLancamento)},
           ${tipo},
           ${direcaoAjuste},
@@ -1064,7 +1308,7 @@ export class ContabilidadeRepository {
           ${categoriaId},
           ${centroId},
           ${trimOrUndefined(input.setor ?? undefined)},
-          ${input.historico},
+          ${descricaoLancamento},
           ${input.contraparte},
           ${trimOrUndefined(input.documento ?? undefined)},
           ${input.historico},
@@ -1118,6 +1362,7 @@ export class ContabilidadeRepository {
     async atualizarLancamento(id, input, ator) {
         await ensureContabilidadeEstrutura();
         return prisma.$transaction(async (tx) => {
+            const tenantId = ator?.tenantId;
             const atual = await this.buscarLancamentoPorIdOuFalhar(id, tx);
             const tipo = normalizarTipoLancamento(input.tipo);
             const direcaoAjuste = tipo === "AJUSTE" ? input.direcaoAjuste ?? "DIMINUIR" : null;
@@ -1125,6 +1370,9 @@ export class ContabilidadeRepository {
             const contaId = input.contaBancariaId ? BigInt(input.contaBancariaId) : null;
             const categoriaId = input.categoriaId ? BigInt(input.categoriaId) : null;
             const centroId = input.centroCustoId ? BigInt(input.centroCustoId) : null;
+            const descricaoLancamento = trimOrUndefined(input.historico ?? undefined) ??
+                trimOrUndefined(input.natureza ?? undefined) ??
+                input.contraparte;
             if (atual.bloqueado_origem) {
                 const camposCriticosAlterados = atual.tipo !== tipo ||
                     atual.valor !== input.valor ||
@@ -1137,9 +1385,12 @@ export class ContabilidadeRepository {
             if (contaId)
                 await this.validarContaMovimentavel(tx, contaId);
             if (categoriaId)
-                await this.buscarCategoriaPorIdOuFalhar(categoriaId, tx);
+                await this.buscarCategoriaPorIdOuFalhar(categoriaId, tx, tenantId);
             if (centroId)
-                await this.buscarCentroCustoPorIdOuFalhar(centroId, tx);
+                await this.buscarCentroCustoPorIdOuFalhar(centroId, tx, tenantId);
+            if (["PAGO", "RECEBIDO", "CONCILIADO"].includes(status) && !contaId) {
+                throw new AppError("Selecione a conta bancária para salvar um lançamento já pago ou recebido.", 400);
+            }
             await tx.$executeRaw(Prisma.sql `
         UPDATE lancamento_financeiro
         SET
@@ -1151,7 +1402,7 @@ export class ContabilidadeRepository {
           categoria_financeira_id = ${categoriaId},
           centro_custo_id = ${centroId},
           setor = ${trimOrUndefined(input.setor ?? undefined)},
-          descricao = ${input.historico},
+          descricao = ${descricaoLancamento},
           contraparte = ${input.contraparte},
           documento = ${trimOrUndefined(input.documento ?? undefined)},
           historico = ${input.historico},
@@ -1269,12 +1520,26 @@ export class ContabilidadeRepository {
             return lancamento;
         });
     }
-    async removerLancamento(id, ator) {
+    async removerLancamento(id, input) {
         await ensureContabilidadeEstrutura();
         await prisma.$transaction(async (tx) => {
             const atual = await this.buscarLancamentoPorIdOuFalhar(id, tx);
             if (atual.bloqueado_origem) {
                 throw new AppError("Lançamentos integrados de compras não podem ser removidos manualmente.", 409);
+            }
+            const movimentacoesVinculadas = await tx.$queryRaw(Prisma.sql `
+        ${MOVIMENTACAO_SELECT}
+        WHERE m.ativo = TRUE
+          AND m.lancamento_financeiro_id = ${id}
+        ORDER BY m.id ASC
+      `);
+            for (const movimentacao of movimentacoesVinculadas) {
+                await this.reverterMovimentacaoConta(tx, movimentacao);
+                await tx.$executeRaw(Prisma.sql `
+          UPDATE movimentacao_financeira
+          SET ativo = FALSE, atualizado_em = NOW()
+          WHERE id = ${movimentacao.id}
+        `);
             }
             await tx.$executeRaw(Prisma.sql `
         UPDATE lancamento_financeiro
@@ -1290,17 +1555,20 @@ export class ContabilidadeRepository {
                 conta: atual.conta_bancaria_nome,
                 statusAnterior: atual.situacao,
                 statusNovo: "CANCELADO",
-                observacao: "Lançamento cancelado e mantido no histórico.",
+                observacao: trimOrUndefined(input?.observacaoAuditoria ?? undefined) ??
+                    "Lançamento cancelado e mantido no histórico para auditoria.",
                 origem: atual.origem,
-                ator
+                ator: input?.ator
             });
         });
     }
-    async listarMovimentacoes() {
+    async listarMovimentacoes(ator) {
         await ensureContabilidadeEstrutura();
+        const tenantId = ator?.tenantId;
         return prisma.$queryRaw(Prisma.sql `
       ${MOVIMENTACAO_SELECT}
       WHERE m.ativo = TRUE
+      ${tenantSql("m", tenantId)}
       ORDER BY m.data_movimentacao DESC, m.id DESC
     `);
     }
@@ -1374,6 +1642,9 @@ export class ContabilidadeRepository {
             let saldoAtual = null;
             if (contaId) {
                 const conta = await this.validarContaMovimentavel(tx, contaId, true, true);
+                if (tipo === "SAIDA" && conta.saldo < input.valor) {
+                    throw new AppError("Não há saldo suficiente nesta conta para concluir o débito informado.", 409);
+                }
                 saldoAnterior = conta.saldo;
                 saldoAtual = calcularSaldoConta(conta.saldo, input.valor, tipo);
                 await tx.$executeRaw(Prisma.sql `
@@ -1451,8 +1722,9 @@ export class ContabilidadeRepository {
             }
         });
     }
-    async listarTransferencias() {
+    async listarTransferencias(ator) {
         await ensureContabilidadeEstrutura();
+        const tenantId = ator?.tenantId;
         return prisma.$queryRaw(Prisma.sql `
       SELECT
         t.id,
@@ -1472,6 +1744,7 @@ export class ContabilidadeRepository {
       LEFT JOIN conta_bancaria co ON co.id = t.conta_origem_id
       LEFT JOIN conta_bancaria cd ON cd.id = t.conta_destino_id
       WHERE t.ativo = TRUE
+      ${tenantSql("t", tenantId)}
       ORDER BY t.data_transferencia DESC, t.id DESC
     `);
     }
@@ -1625,8 +1898,9 @@ export class ContabilidadeRepository {
             return atualizada;
         });
     }
-    async listarConciliacoes() {
+    async listarConciliacoes(ator) {
         await ensureContabilidadeEstrutura();
+        const tenantId = ator?.tenantId;
         return prisma.$queryRaw(Prisma.sql `
       SELECT
         c.id,
@@ -1647,6 +1921,7 @@ export class ContabilidadeRepository {
       LEFT JOIN lancamento_financeiro l ON l.id = c.lancamento_financeiro_id
       LEFT JOIN movimentacao_financeira m ON m.id = c.movimentacao_financeira_id
       WHERE c.ativo = TRUE
+      ${tenantSql("c", tenantId)}
       ORDER BY c.data_movimento DESC, c.id DESC
     `);
     }
@@ -1766,8 +2041,9 @@ export class ContabilidadeRepository {
             return conciliacao;
         });
     }
-    async listarHistorico() {
+    async listarHistorico(ator) {
         await ensureContabilidadeEstrutura();
+        const tenantId = ator?.tenantId;
         return prisma.$queryRaw(Prisma.sql `
       SELECT
         id,
@@ -1788,11 +2064,138 @@ export class ContabilidadeRepository {
         maquina,
         criado_em
       FROM financeiro_historico
+      WHERE 1 = 1
+      ${tenantSql("financeiro_historico", tenantId)}
       ORDER BY criado_em DESC, id DESC
     `);
     }
-    async listarComprasIntegradas() {
+    async listarFechamentosMensais(ator) {
         await ensureContabilidadeEstrutura();
+        const tenantId = ator?.tenantId;
+        return prisma.$queryRaw(Prisma.sql `
+      SELECT
+        id,
+        competencia,
+        saldo_total::float8 AS saldo_total,
+        saldo_bancos::float8 AS saldo_bancos,
+        saldo_caixa::float8 AS saldo_caixa,
+        observacao,
+        usuario_nome,
+        contas_snapshot,
+        criado_em
+      FROM financeiro_fechamento_mensal
+      WHERE 1 = 1
+      ${tenantSql("financeiro_fechamento_mensal", tenantId)}
+      ORDER BY competencia DESC, id DESC
+    `);
+    }
+    async fecharMes(input, ator) {
+        await ensureContabilidadeEstrutura();
+        return prisma.$transaction(async (tx) => {
+            const tenantId = ator?.tenantId;
+            const existente = await tx.$queryRaw(Prisma.sql `
+        SELECT id
+        FROM financeiro_fechamento_mensal
+        WHERE competencia = ${input.competencia}
+          ${tenantId ? Prisma.sql `AND tenant_id::text = ${tenantId}` : Prisma.empty}
+        LIMIT 1
+      `);
+            if (existente[0]) {
+                throw new AppError("Esta competência já foi fechada no financeiro.", 409);
+            }
+            const contas = await tx.$queryRaw(Prisma.sql `
+        SELECT
+          cb.id,
+          cb.banco,
+          cb.nome_conta,
+          cb.tipo,
+          cb.saldo::float8 AS saldo
+        FROM conta_bancaria cb
+        WHERE cb.ativo = TRUE
+          ${tenantId ? Prisma.sql `AND cb.tenant_id::text = ${tenantId}` : Prisma.empty}
+        ORDER BY cb.nome_conta ASC, cb.id ASC
+      `);
+            const snapshot = contas.map((conta) => ({
+                contaId: Number(conta.id),
+                banco: conta.banco,
+                nomeConta: conta.nome_conta ?? `Conta ${String(conta.id)}`,
+                tipo: conta.tipo,
+                saldo: Number(conta.saldo ?? 0)
+            }));
+            const saldoTotal = snapshot.reduce((acc, item) => acc + item.saldo, 0);
+            const saldoBancos = snapshot
+                .filter((item) => normalizarTipoConta(item.tipo) !== "CAIXA_INTERNO")
+                .reduce((acc, item) => acc + item.saldo, 0);
+            const saldoCaixa = snapshot
+                .filter((item) => normalizarTipoConta(item.tipo) === "CAIXA_INTERNO")
+                .reduce((acc, item) => acc + item.saldo, 0);
+            const rows = await tx.$queryRaw(Prisma.sql `
+        INSERT INTO financeiro_fechamento_mensal (
+          tenant_id,
+          competencia,
+          saldo_total,
+          saldo_bancos,
+          saldo_caixa,
+          contas_snapshot,
+          observacao,
+          usuario_id,
+          usuario_nome,
+          criado_em
+        ) VALUES (
+          ${tenantId ? Prisma.sql `CAST(${tenantId} AS UUID)` : Prisma.sql `NULL`},
+          ${input.competencia},
+          ${saldoTotal},
+          ${saldoBancos},
+          ${saldoCaixa},
+          ${JSON.stringify(snapshot)}::jsonb,
+          ${trimOrUndefined(input.observacao ?? undefined)},
+          ${ator?.usuarioId ?? null},
+          ${trimOrUndefined(ator?.nomeUsuario ?? undefined)},
+          NOW()
+        )
+        RETURNING id
+      `);
+            const id = rows[0]?.id;
+            if (!id) {
+                throw new AppError("Não foi possível fechar a competência informada.", 500);
+            }
+            await this.registrarHistorico(tx, {
+                aba: "Fechamento mensal",
+                acao: "Mês fechado",
+                tipoRegistro: "FECHAMENTO_MENSAL",
+                registroId: String(id),
+                valor: saldoTotal,
+                conta: "Todas as contas",
+                statusNovo: input.competencia,
+                observacao: `Fechamento realizado para ${input.competencia} com abertura automática do mês seguinte baseada nos saldos fechados.`,
+                origem: "FECHAMENTO_MENSAL",
+                ator
+            });
+            const registros = await tx.$queryRaw(Prisma.sql `
+        SELECT
+          id,
+          competencia,
+          saldo_total::float8 AS saldo_total,
+          saldo_bancos::float8 AS saldo_bancos,
+          saldo_caixa::float8 AS saldo_caixa,
+          observacao,
+          usuario_nome,
+          contas_snapshot,
+          criado_em
+        FROM financeiro_fechamento_mensal
+        WHERE id = ${id}
+        LIMIT 1
+      `);
+            const registro = registros[0];
+            if (!registro) {
+                throw new AppError("Não foi possível localizar o fechamento recém-criado.", 500);
+            }
+            return registro;
+        });
+    }
+    async listarComprasIntegradas(ator) {
+        await ensureContabilidadeEstrutura();
+        const tenantId = ator?.tenantId;
         return prisma.$queryRaw(Prisma.sql `
       SELECT
         ac.id AS compra_id,
@@ -1820,6 +2223,7 @@ export class ContabilidadeRepository {
       LEFT JOIN conta_bancaria cb ON cb.id = ac.conta_pagadora_id
       LEFT JOIN lancamento_financeiro lf ON lf.id = ac.lancamento_financeiro_id
       WHERE ac.ativo = TRUE
+        AND ac.tenant_id::text = ${tenantId ?? ""}
       ORDER BY ac.atualizado_em DESC NULLS LAST, ac.id DESC
     `);
     }
@@ -1876,8 +2280,9 @@ export class ContabilidadeRepository {
             return lancamento;
         });
     }
-    async listarEmendas() {
+    async listarEmendas(ator) {
         await ensureContabilidadeEstrutura();
+        const tenantId = ator?.tenantId;
         return prisma.$queryRaw(Prisma.sql `
       SELECT
         id,
@@ -1889,10 +2294,12 @@ export class ContabilidadeRepository {
         status,
         observacoes
       FROM emenda_impositiva
+      WHERE 1 = 1
+      ${tenantSql("emenda_impositiva", tenantId)}
       ORDER BY data_prevista DESC, id DESC
     `);
     }
-    async buscarEmendaPorIdOuFalhar(id, tx = prisma) {
+    async buscarEmendaPorIdOuFalhar(id, tx = prisma, tenantId) {
         const rows = await tx.$queryRaw(Prisma.sql `
       SELECT
         id,
@@ -1905,6 +2312,7 @@ export class ContabilidadeRepository {
         observacoes
       FROM emenda_impositiva
       WHERE id = ${id}
+        ${tenantId ? Prisma.sql `AND tenant_id::text = ${tenantId}` : Prisma.empty}
       LIMIT 1
     `);
         const emenda = rows[0];
@@ -1912,10 +2320,12 @@ export class ContabilidadeRepository {
             throw new AppError("Emenda impositiva não encontrada.", 404);
         return emenda;
     }
-    async criarEmenda(input) {
+    async criarEmenda(input, ator) {
         await ensureContabilidadeEstrutura();
+        const tenantId = ator?.tenantId;
         const rows = await prisma.$queryRaw(Prisma.sql `
       INSERT INTO emenda_impositiva (
+        tenant_id,
         identificacao,
         referencia_legal,
         data_prevista,
@@ -1926,6 +2336,7 @@ export class ContabilidadeRepository {
         criado_em,
         atualizado_em
       ) VALUES (
+        ${tenantId ? Prisma.sql `CAST(${tenantId} AS UUID)` : Prisma.sql `NULL`},
         ${input.identificacao},
         ${trimOrUndefined(input.referenciaLegal ?? undefined)},
         ${toOptionalDate(input.dataPrevista)},
@@ -1941,17 +2352,19 @@ export class ContabilidadeRepository {
         const id = rows[0]?.id;
         if (!id)
             throw new AppError("Não foi possível criar a emenda.", 500);
-        return this.buscarEmendaPorIdOuFalhar(id);
+        return this.buscarEmendaPorIdOuFalhar(id, prisma, tenantId);
     }
-    async atualizarStatusEmenda(id, status) {
+    async atualizarStatusEmenda(id, status, ator) {
         await ensureContabilidadeEstrutura();
-        await this.buscarEmendaPorIdOuFalhar(id);
+        const tenantId = ator?.tenantId;
+        await this.buscarEmendaPorIdOuFalhar(id, prisma, tenantId);
         await prisma.$executeRaw(Prisma.sql `
       UPDATE emenda_impositiva
       SET status = ${status}, atualizado_em = NOW()
       WHERE id = ${id}
+        AND ${tenantId ? Prisma.sql `tenant_id::text = ${tenantId}` : Prisma.sql `1 = 1`}
     `);
-        return this.buscarEmendaPorIdOuFalhar(id);
+        return this.buscarEmendaPorIdOuFalhar(id, prisma, tenantId);
     }
     async baixarLancamentoTx(tx, id, input, ator) {
         const lancamento = await this.buscarLancamentoPorIdOuFalhar(id, tx);
@@ -2035,6 +2448,9 @@ export class ContabilidadeRepository {
         let saldoAtual = null;
         if (input.contaId) {
             const conta = await this.validarContaMovimentavel(tx, input.contaId, true, true);
+            if (input.tipo === "SAIDA" && conta.saldo < input.valor) {
+                throw new AppError("Não há saldo suficiente nesta conta para concluir o débito informado.", 409);
+            }
             saldoAnterior = conta.saldo;
             saldoAtual = calcularSaldoConta(conta.saldo, input.valor, input.tipo);
             await tx.$executeRaw(Prisma.sql `
@@ -2196,6 +2612,7 @@ export class ContabilidadeRepository {
         const usuarioIdValido = await this.resolverUsuarioIdHistorico(tx, input.ator?.usuarioId);
         await tx.$executeRaw(Prisma.sql `
       INSERT INTO financeiro_historico (
+        tenant_id,
         aba,
         acao,
         tipo_registro,
@@ -2213,6 +2630,7 @@ export class ContabilidadeRepository {
         maquina,
         criado_em
       ) VALUES (
+        ${input.ator?.tenantId ? Prisma.sql `CAST(${input.ator.tenantId} AS UUID)` : Prisma.sql `NULL`},
         ${input.aba},
         ${input.acao},
         ${input.tipoRegistro},

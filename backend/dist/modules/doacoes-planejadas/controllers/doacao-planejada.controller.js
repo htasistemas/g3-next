@@ -2,23 +2,23 @@ import { DoacaoPlanejadaService } from "../services/doacao-planejada.service.js"
 export class DoacaoPlanejadaController {
     service = new DoacaoPlanejadaService();
     async listar(request, response) {
-        const doacoes = await this.service.listar(request.query);
+        const doacoes = await this.service.listar(request.query, request.authUser?.tenant_id);
         response.json({ doacoes });
     }
     async buscarPorId(request, response) {
-        const doacao = await this.service.buscarPorId(request.params.id);
+        const doacao = await this.service.buscarPorId(request.params.id, request.authUser?.tenant_id);
         response.json({ doacao });
     }
     async criar(request, response) {
-        const doacao = await this.service.criar(request.body);
+        const doacao = await this.service.criar(request.body, request.authUser?.tenant_id);
         response.status(201).json({ doacao });
     }
     async atualizar(request, response) {
-        const doacao = await this.service.atualizar(request.params.id, request.body);
+        const doacao = await this.service.atualizar(request.params.id, request.body, request.authUser?.tenant_id);
         response.json({ doacao });
     }
     async remover(request, response) {
-        await this.service.remover(request.params.id);
+        await this.service.remover(request.params.id, request.authUser?.tenant_id);
         response.status(204).send();
     }
 }

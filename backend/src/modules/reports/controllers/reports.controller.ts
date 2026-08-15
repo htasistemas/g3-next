@@ -165,4 +165,16 @@ export class ReportsController {
     const resultado = await service.gerarEspelhoPonto(request.body, request.authUser);
     return responderRelatorio(response, resultado, formato);
   }
+
+  async relacaoTermosParceria(request: AuthenticatedRequest, response: Response) {
+    const formato = formatoRelatorioSchema.parse(request.query.formato);
+    const resultado = await service.gerarRelacaoTermosParceria(request.body, request.authUser);
+    return responderRelatorio(response, resultado, formato);
+  }
+
+  async termoParceriaCompleto(request: AuthenticatedRequest, response: Response) {
+    const formato = formatoRelatorioSchema.parse(request.query.formato);
+    const resultado = await service.gerarTermoParceriaCompleto(request.body, request.authUser);
+    return responderRelatorio(response, resultado, formato);
+  }
 }

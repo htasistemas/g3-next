@@ -16,25 +16,26 @@ function obterAtor(request) {
         usuarioId: request.authUser?.id ? BigInt(request.authUser.id) : undefined,
         nomeUsuario: request.authUser?.nomeUsuario,
         permissoes: request.authUser?.permissoes ?? [],
+        tenantId: request.authUser?.tenant_id,
         ip: obterIp(request),
         maquina: obterOrigem(request)
     };
 }
 export class AutorizacaoComprasController {
-    async listar(_request, response) {
-        const lista = await service.listar();
+    async listar(request, response) {
+        const lista = await service.listar(request.authUser?.tenant_id);
         return response.json(lista);
     }
-    async listarIndicadores(_request, response) {
-        const indicadores = await service.listarIndicadores();
+    async listarIndicadores(request, response) {
+        const indicadores = await service.listarIndicadores(request.authUser?.tenant_id);
         return response.json(indicadores);
     }
-    async listarSetoresSolicitantes(_request, response) {
-        const setores = await service.listarSetoresSolicitantes();
+    async listarSetoresSolicitantes(request, response) {
+        const setores = await service.listarSetoresSolicitantes(request.authUser?.tenant_id);
         return response.json(setores);
     }
     async buscarDetalhe(request, response) {
-        const registro = await service.buscarDetalhe(request.params.id);
+        const registro = await service.buscarDetalhe(request.params.id, request.authUser?.tenant_id);
         return response.json(registro);
     }
     async criar(request, response) {
@@ -58,7 +59,7 @@ export class AutorizacaoComprasController {
         return response.json(item);
     }
     async listarCotacoes(request, response) {
-        const lista = await service.listarCotacoes(request.params.id);
+        const lista = await service.listarCotacoes(request.params.id, request.authUser?.tenant_id);
         return response.json(lista);
     }
     async criarCotacao(request, response) {
@@ -74,7 +75,11 @@ export class AutorizacaoComprasController {
         return response.json(registro);
     }
     async buscarFornecedorPorCnpj(request, response) {
-        const fornecedor = await service.buscarFornecedorPorCnpj(request.params.cnpj);
+        const fornecedor = await service.buscarFornecedorPorCnpj(request.params.cnpj, request.authUser?.tenant_id);
+        return response.json(fornecedor);
+    }
+    async consultarDocumentoFornecedor(request, response) {
+        const fornecedor = await service.consultarDocumentoFornecedor(request.params.tipo, request.params.documento, request.authUser?.tenant_id);
         return response.json(fornecedor);
     }
     async registrarReservaBancaria(request, response) {
@@ -82,7 +87,7 @@ export class AutorizacaoComprasController {
         return response.status(201).json(reservas);
     }
     async listarReservas(request, response) {
-        const reservas = await service.listarReservas(request.params.id);
+        const reservas = await service.listarReservas(request.params.id, request.authUser?.tenant_id);
         return response.json(reservas);
     }
     async removerReservaBancaria(request, response) {

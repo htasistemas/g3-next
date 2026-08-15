@@ -136,6 +136,7 @@ export const projetoTarefaInputSchema = z
   });
 
 export const projetoFiltersSchema = z.object({
+  projeto_id: optionalTrimmedString,
   nome: optionalTrimmedString,
   responsavel: optionalTrimmedString,
   status: projetoStatusSchema.optional(),

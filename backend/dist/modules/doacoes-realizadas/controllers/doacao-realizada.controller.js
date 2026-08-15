@@ -2,11 +2,11 @@ import { DoacaoRealizadaService } from "../services/doacao-realizada.service.js"
 const service = new DoacaoRealizadaService();
 export class DoacaoRealizadaController {
     async listar(request, response) {
-        const doacoes = await service.listar(request.query);
+        const doacoes = await service.listar(request.query, request.authUser?.tenant_id);
         return response.json({ doacoes });
     }
     async buscarPorId(request, response) {
-        const doacao = await service.buscarPorId(request.params.id);
+        const doacao = await service.buscarPorId(request.params.id, request.authUser?.tenant_id);
         return response.json({ doacao });
     }
     async criar(request, response) {
@@ -18,19 +18,19 @@ export class DoacaoRealizadaController {
         return response.json({ doacao });
     }
     async remover(request, response) {
-        await service.remover(request.params.id);
+        await service.remover(request.params.id, request.authUser?.tenant_id);
         return response.status(204).send();
     }
     async listarBeneficiarios(request, response) {
-        const beneficiarios = await service.listarBeneficiarios(request.query.termo);
+        const beneficiarios = await service.listarBeneficiarios(request.query.termo, request.authUser?.tenant_id);
         return response.json({ beneficiarios });
     }
     async listarFamilias(request, response) {
-        const familias = await service.listarFamilias(request.query.termo);
+        const familias = await service.listarFamilias(request.query.termo, request.authUser?.tenant_id);
         return response.json({ familias });
     }
     async listarItensEstoque(request, response) {
-        const itens = await service.listarItensEstoque(request.query.termo);
+        const itens = await service.listarItensEstoque(request.query.termo, request.authUser?.tenant_id);
         return response.json({ itens });
     }
 }

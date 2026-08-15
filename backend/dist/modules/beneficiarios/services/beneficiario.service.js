@@ -1,16 +1,22 @@
+import { randomInt } from "node:crypto";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { EmailService } from "../../email/services/email.service.js";
 import { beneficiarioAddressSuggestionSchema, beneficiarioFiltersSchema, beneficiarioInputSchema } from "../beneficiario.schema.js";
 import { mapBeneficiarioToResponse } from "../beneficiario.mapper.js";
-import { BeneficiarioRepository } from "../repositories/beneficiario.repository.js";
+import { BeneficiarioRepository, possuiBeneficiarioPortalAcesso } from "../repositories/beneficiario.repository.js";
 import { montarMensagemAlteracoesBeneficiario, montarResumoAlteracoesBeneficiario, obterDestinatariosAlteracaoBeneficiario } from "./beneficiario-email-notificacao.js";
 import { mapaCamposTextoBeneficiario, mapaDocumentoBeneficiario } from "../../../utils/text-format-config.js";
 import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
 import { storageService } from "../../arquivos/services/storage-instance.js";
+import { ParametrosSistemaService } from "../../configuracoes-gerais/services/parametros-sistema.service.js";
+import { prisma } from "../../../database/prisma.js";
+import { BeneficiarioEvolucaoService } from "./beneficiario-evolucao.service.js";
 export class BeneficiarioService {
     repository = new BeneficiarioRepository();
     emailService = new EmailService();
-    async listar(rawFilters) {
+    parametrosSistemaService = new ParametrosSistemaService();
+    evolucaoService = new BeneficiarioEvolucaoService();
+    async listar(rawFilters, tenantId) {
         const filtersNormalizados = rawFilters && typeof rawFilters === "object"
             ? normalizarObjetoTexto(rawFilters, {
                 nome: "nomePessoa",
@@ -18,42 +24,99 @@ export class BeneficiarioService {
             })
             : rawFilters;
         const filters = beneficiarioFiltersSchema.parse(filtersNormalizados);
-        const beneficiarios = await this.repository.listar(filters);
+        const beneficiarios = await this.repository.listar(filters, this.parseTenantId(tenantId));
         return beneficiarios.map(mapBeneficiarioToResponse);
     }
-    async buscarPorId(rawId) {
+    async buscarPorId(rawId, tenantId) {
         const id = this.parseId(rawId);
-        const beneficiario = await this.repository.buscarPorIdOuFalhar(id);
+        const beneficiario = await this.repository.buscarPorIdOuFalhar(id, this.parseTenantId(tenantId));
         return mapBeneficiarioToResponse(beneficiario);
     }
-    async criar(rawInput, rawUsuarioId) {
+    async criar(rawInput, rawUsuarioId, tenantId) {
         const inputNormalizado = this.normalizarPayload(rawInput);
         const input = beneficiarioInputSchema.parse(inputNormalizado);
-        await this.validarDuplicidadeCadastro(input);
+        const tenantObrigatorio = this.parseTenantId(tenantId);
+        await this.validarDocumentosObrigatorios(input, tenantObrigatorio);
+        await this.validarDuplicidadeCadastro(input, tenantObrigatorio);
         const usuarioId = this.parseUsuarioId(rawUsuarioId);
-        const preparado = await this.prepararArquivosPayload(input, usuarioId);
+        const senhaPortalGerada = this.resolverSenhaPortal(input.senha_portal, false);
+        const preparado = await this.prepararArquivosPayload(input, usuarioId, undefined, tenantObrigatorio);
         try {
-            const beneficiario = await this.repository.criar(preparado.input);
-            await this.vincularArquivos(preparado.novosCaminhos, beneficiario.id);
-            return mapBeneficiarioToResponse(beneficiario);
+            const beneficiario = await this.repository.criar({
+                ...preparado.input,
+                senha_portal: senhaPortalGerada
+            }, tenantObrigatorio);
+            await this.vincularArquivos(preparado.novosCaminhos, beneficiario.id, tenantObrigatorio);
+            await this.finalizarEvolucaoCadastro(beneficiario.id, usuarioId, tenantObrigatorio, "CRIACAO");
+            return {
+                beneficiario: mapBeneficiarioToResponse(beneficiario),
+                senha_portal_gerada: senhaPortalGerada
+            };
         }
         catch (error) {
             await storageService.rollbackArquivos(preparado.novosCaminhos);
             throw error;
         }
     }
-    async atualizar(rawId, rawInput, rawUsuarioId) {
+    async criarPendenteImportacao(rawInput, tenantId) {
+        const inputNormalizado = this.normalizarPayload(rawInput);
+        if (!inputNormalizado || typeof inputNormalizado !== "object") {
+            throw new AppError("Dados da importação inválidos.", 422);
+        }
+        const dados = { ...inputNormalizado };
+        const camposBooleanos = [
+            "opta_receber_cesta_basica", "apto_receber_cesta_basica", "telefone_principal_whatsapp",
+            "permite_contato_tel", "permite_contato_whatsapp", "permite_contato_sms", "permite_contato_email",
+            "mora_com_familia", "responsavel_legal", "acompanhamento_cras", "acompanhamento_saude",
+            "sabe_ler_escrever", "estuda_atualmente", "possui_deficiencia", "usa_medicacao_continua",
+            "recebe_beneficio", "aceite_lgpd"
+        ];
+        for (const campo of camposBooleanos) {
+            const valor = dados[campo];
+            if (valor === undefined || valor === null || valor === "")
+                dados[campo] = undefined;
+            else if (typeof valor === "string")
+                dados[campo] = ["sim", "s", "true", "1", "yes"].includes(valor.trim().toLowerCase());
+        }
+        for (const campo of ["criancas_adolescentes", "idosos"]) {
+            if (dados[campo] === "")
+                dados[campo] = undefined;
+            else if (typeof dados[campo] === "string")
+                dados[campo] = Number(String(dados[campo]).replace(",", "."));
+        }
+        if (typeof dados.beneficios_recebidos === "string") {
+            const itens = dados.beneficios_recebidos.split(/[;,]/).map((item) => item.trim()).filter(Boolean);
+            dados.beneficios_recebidos = itens.length ? itens : undefined;
+        }
+        if (!Array.isArray(dados.documentos_obrigatorios))
+            dados.documentos_obrigatorios = undefined;
+        // Mantém compatibilidade com bancos de produção que ainda não receberam
+        // a migration de campos incompletos. A operação é idempotente e não cria
+        // valores artificiais: apenas permite NULL nos campos pendentes.
+        await prisma.$executeRawUnsafe("ALTER TABLE cadastro_beneficiario ALTER COLUMN data_nascimento DROP NOT NULL");
+        await prisma.$executeRawUnsafe("ALTER TABLE cadastro_beneficiario ALTER COLUMN nome_mae DROP NOT NULL");
+        return this.repository.criar(dados, tenantId);
+    }
+    async atualizar(rawId, rawInput, rawUsuarioId, tenantId) {
         const id = this.parseId(rawId);
         const inputNormalizado = this.normalizarPayload(rawInput);
         const input = beneficiarioInputSchema.parse(inputNormalizado);
+        const tenantObrigatorio = this.parseTenantId(tenantId);
         const usuarioId = this.parseUsuarioId(rawUsuarioId);
-        const existente = await this.repository.buscarPorIdOuFalhar(id);
+        await this.validarDocumentosObrigatorios(input, tenantObrigatorio);
+        await this.validarDuplicidadeCadastro(input, tenantObrigatorio, id);
+        const senhaPortalExistente = await possuiBeneficiarioPortalAcesso(id, tenantObrigatorio);
+        const senhaPortalGerada = this.resolverSenhaPortal(input.senha_portal, senhaPortalExistente);
+        const existente = await this.repository.buscarPorIdOuFalhar(id, tenantObrigatorio);
         const snapshotAnterior = mapBeneficiarioToResponse(existente);
-        const preparado = await this.prepararArquivosPayload(input, usuarioId, id);
+        const preparado = await this.prepararArquivosPayload(input, usuarioId, id, tenantObrigatorio);
         try {
             let beneficiario;
             try {
-                beneficiario = await this.repository.atualizar(id, preparado.input);
+                beneficiario = await this.repository.atualizar(id, {
+                    ...preparado.input,
+                    senha_portal: senhaPortalGerada
+                }, tenantObrigatorio);
             }
             catch (error) {
                 if (error instanceof AppError) {
@@ -65,7 +128,7 @@ export class BeneficiarioService {
                 throw new AppError(`Nao foi possivel atualizar o beneficiario. ${motivo}.`, 500);
             }
             try {
-                await this.vincularArquivos(preparado.novosCaminhos, id);
+                await this.vincularArquivos(preparado.novosCaminhos, id, tenantObrigatorio);
             }
             catch (error) {
                 if (error instanceof AppError) {
@@ -83,28 +146,33 @@ export class BeneficiarioService {
                 console.warn("[beneficiario] falha ao limpar arquivos substituidos apos atualizar cadastro:", error);
             }
             const response = mapBeneficiarioToResponse(beneficiario);
+            await this.finalizarEvolucaoCadastro(id, usuarioId, tenantObrigatorio, "EDICAO");
             await this.enviarEmailAtualizacaoCadastro(snapshotAnterior, response);
-            return response;
+            return {
+                beneficiario: response,
+                senha_portal_gerada: senhaPortalGerada
+            };
         }
         catch (error) {
             await storageService.rollbackArquivos(preparado.novosCaminhos);
             throw error;
         }
     }
-    async remover(rawId, rawUsuarioId) {
+    async remover(rawId, rawUsuarioId, tenantId) {
         const id = this.parseId(rawId);
+        const tenantObrigatorio = this.parseTenantId(tenantId);
         const usuarioId = this.parseUsuarioId(rawUsuarioId);
-        const existente = await this.repository.buscarPorIdOuFalhar(id);
-        await this.repository.remover(id);
+        const existente = await this.repository.buscarPorIdOuFalhar(id, tenantObrigatorio);
+        await this.repository.remover(id, tenantObrigatorio);
         await this.limparArquivosSubstituidos(this.coletarCaminhosRegistro(existente), [], usuarioId);
     }
-    async obterProximoCodigo() {
-        const codigo = await this.repository.obterProximoCodigo();
+    async obterProximoCodigo(tenantId) {
+        const codigo = await this.repository.obterProximoCodigo(this.parseTenantId(tenantId));
         return { codigo };
     }
-    async obterSugestaoEndereco(rawQuery) {
+    async obterSugestaoEndereco(rawQuery, tenantId) {
         const query = beneficiarioAddressSuggestionSchema.parse(rawQuery);
-        return this.repository.buscarSugestaoEndereco(query);
+        return this.repository.buscarSugestaoEndereco(query, this.parseTenantId(tenantId));
     }
     parseId(rawId) {
         const id = Number(rawId);
@@ -127,8 +195,8 @@ export class BeneficiarioService {
         }
         return inputBase;
     }
-    async validarDuplicidadeCadastro(input, idIgnorado) {
-        const duplicidade = await this.repository.buscarDuplicidadeCadastro(input, idIgnorado);
+    async validarDuplicidadeCadastro(input, tenantId, idIgnorado) {
+        const duplicidade = await this.repository.buscarDuplicidadeCadastro(input, tenantId, idIgnorado);
         if (!duplicidade) {
             return;
         }
@@ -139,7 +207,7 @@ export class BeneficiarioService {
         const sufixo = detalhes.length ? ` (${detalhes.join(", ")})` : "";
         throw new AppError(`Já existe um beneficiário cadastrado com os mesmos dados${sufixo}.`, 409);
     }
-    async prepararArquivosPayload(input, usuarioId, entidadeId) {
+    async prepararArquivosPayload(input, usuarioId, entidadeId, tenantId) {
         const novosCaminhos = [];
         let foto;
         try {
@@ -150,6 +218,7 @@ export class BeneficiarioService {
                 mimeType: "image/jpeg",
                 entidadeId,
                 usuarioUploadId: usuarioId,
+                tenantId,
                 observacao: "Foto 3x4 do beneficiario"
             });
         }
@@ -173,6 +242,7 @@ export class BeneficiarioService {
                     mimeType: documento.contentType,
                     entidadeId,
                     usuarioUploadId: usuarioId,
+                    tenantId,
                     observacao: documento.nome
                 });
             }
@@ -217,10 +287,55 @@ export class BeneficiarioService {
         }
         return [...caminhos];
     }
-    async vincularArquivos(caminhos, entidadeId) {
+    async vincularArquivos(caminhos, entidadeId, tenantId) {
         for (const caminho of caminhos) {
-            await storageService.vincularEntidade(caminho, entidadeId);
+            await storageService.vincularEntidade(caminho, entidadeId, tenantId);
         }
+    }
+    async validarDocumentosObrigatorios(input, tenantId) {
+        const configuracao = await this.parametrosSistemaService.obterObrigatoriedadeDocumentosBeneficiario(tenantId);
+        const documentos = input.documentos_obrigatorios ?? [];
+        const porChave = new Map();
+        for (const documento of documentos) {
+            const chaves = [
+                documento.id ? String(documento.id) : undefined,
+                documento.nome ? this.normalizarNomeDocumento(documento.nome) : undefined
+            ].filter((valor) => !!valor);
+            for (const chave of chaves) {
+                porChave.set(chave, documento);
+            }
+        }
+        const pendencias = [];
+        for (const documentoConfig of configuracao.obrigatoriedade.documentos) {
+            if (!documentoConfig.obrigatorio)
+                continue;
+            const documento = porChave.get(documentoConfig.id) ??
+                porChave.get(this.normalizarNomeDocumento(documentoConfig.nome));
+            const numeroDocumento = documento?.numeroDocumento?.trim();
+            const caminhoArquivo = documento?.caminhoArquivo?.trim() || documento?.conteudo?.trim();
+            if (documentoConfig.id === "cpf") {
+                continue;
+            }
+            if (documentoConfig.id === "comprovante_endereco") {
+                if (!numeroDocumento || !caminhoArquivo || documento?.ignorado) {
+                    pendencias.push(documentoConfig.nome);
+                }
+                continue;
+            }
+            if ((!numeroDocumento && !caminhoArquivo) || documento?.ignorado) {
+                pendencias.push(documentoConfig.nome);
+            }
+        }
+        if (pendencias.length) {
+            throw new AppError(`Documentos obrigatorios pendentes: ${pendencias.join(", ")}.`, 400);
+        }
+    }
+    normalizarNomeDocumento(nome) {
+        return nome
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .trim()
+            .toLowerCase();
     }
     async limparArquivosSubstituidos(caminhosAntigos, caminhosAtuais, usuarioId) {
         const atuais = new Set(caminhosAtuais);
@@ -244,6 +359,26 @@ export class BeneficiarioService {
             return undefined;
         }
         return BigInt(parsed);
+    }
+    parseTenantId(rawTenantId) {
+        const tenantId = rawTenantId?.trim();
+        if (!tenantId) {
+            throw new AppError("Tenant da sessao nao identificado.", 401);
+        }
+        return tenantId;
+    }
+    resolverSenhaPortal(senhaPortal, senhaExistente = false) {
+        const senhaNormalizada = senhaPortal?.replace(/\D/g, "").trim();
+        if (senhaNormalizada) {
+            if (senhaNormalizada.length !== 4) {
+                throw new AppError("A senha do portal deve ter 4 digitos.", 422);
+            }
+            return senhaNormalizada;
+        }
+        if (senhaExistente) {
+            return undefined;
+        }
+        return String(randomInt(1000, 10000));
     }
     async enviarEmailAtualizacaoCadastro(anterior, atual) {
         const alteracoes = montarResumoAlteracoesBeneficiario(anterior, atual);
@@ -285,6 +420,22 @@ export class BeneficiarioService {
                     error
                 });
             }
+        }
+    }
+    async finalizarEvolucaoCadastro(beneficiarioId, usuarioId, tenantId, acao) {
+        const ator = {
+            usuarioId: usuarioId ? String(usuarioId) : undefined,
+            usuarioNome: "sistema",
+            tenantId
+        };
+        try {
+            await this.evolucaoService.garantirPessoaBeneficiario(String(beneficiarioId), ator);
+            await this.evolucaoService.registrarAtualizacaoGrupos(String(beneficiarioId), ator);
+            await this.evolucaoService.registrarAuditoria(beneficiarioId, acao, "cadastro", null, acao === "CRIACAO" ? "Cadastro criado" : "Cadastro atualizado", ator);
+            await this.evolucaoService.recalcularCompletude(String(beneficiarioId), ator);
+        }
+        catch (error) {
+            console.warn("[beneficiario] falha ao atualizar estruturas evolutivas do cadastro:", error);
         }
     }
 }

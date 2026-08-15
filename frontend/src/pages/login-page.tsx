@@ -27,14 +27,14 @@ import { useSystemVersion } from "@/hooks/use-system-version";
 import { formatarCnpj, normalizarCnpj } from "@/lib/br-utils";
 import { precarregarRota } from "@/routes/route-modules";
 import { authService } from "@/services/auth.service";
-import type { LoginMfaRequired, TenantContextoLogin } from "@/types/auth";
+import type { AmbienteAutorizado, LoginMfaRequired, TenantContextoLogin } from "@/types/auth";
 
 const FOTO_LATERAL_URL = "/images/loguim.jpg";
 const LEMBRAR_ACESSO_STORAGE_KEY = "g3n_login_lembrar_acesso";
 const CNPJ_STORAGE_KEY = "g3n_login_cnpj";
 const EMAIL_MASTER_SEM_TENANT = "htasistemas@gmail.com";
 
-type EtapaLogin = "instituicao" | "credenciais" | "mfa";
+type EtapaLogin = "instituicao" | "credenciais" | "mfa" | "ambientes";
 type ModalLogin = "termos" | "politica" | "acesso" | "assistente" | "passkey" | null;
 
 function normalizarValorAmbiente(valor: string | undefined) {
@@ -150,12 +150,14 @@ function BandeiraBrasilIcon() {
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, loginGoogle, verificarMfa, atualizarPerfil } = useAuth();
+  const { login, loginGoogle, verificarMfa, selecionarAmbiente, atualizarPerfil } = useAuth();
   const slugSubdominio = useMemo(() => extrairSlugSubdominio(), []);
   const cnpjSalvo = typeof window !== "undefined" ? window.localStorage.getItem(CNPJ_STORAGE_KEY) ?? "" : "";
   const lembrarSalvo =
     typeof window !== "undefined" ? window.localStorage.getItem(LEMBRAR_ACESSO_STORAGE_KEY) === "1" : false;
-  const [etapa, setEtapa] = useState<EtapaLogin>(slugSubdominio ? "credenciais" : "instituicao");
+  const [etapa, setEtapa] = useState<EtapaLogin>("credenciais");
+  const [ambientes, setAmbientes] = useState<AmbienteAutorizado[]>([]);
+  const [loginTicket, setLoginTicket] = useState<string | null>(null);
   const [modalAberto, setModalAberto] = useState<ModalLogin>(null);
   const [popupEsqueciSenhaAberto, setPopupEsqueciSenhaAberto] = useState(false);
   const [cnpj, setCnpj] = useState(cnpjSalvo);
@@ -264,6 +266,7 @@ export function LoginPage() {
       await confirmarMfa();
       return;
     }
+    if (etapa === "ambientes") return;
     await autenticarComSenha();
   }
 
@@ -272,12 +275,6 @@ export function LoginPage() {
     setAviso(null);
     const cnpjNormalizado = normalizarCnpj(cnpj);
     const emailNormalizado = email.trim().toLowerCase();
-    const dispensarInstituicao = !slugSubdominio && ehEmailMasterSemTenant(emailNormalizado);
-    if (!dispensarInstituicao && !slugSubdominio && cnpjNormalizado.length !== 14) {
-      setErro("Informe o CNPJ da instituição para continuar.");
-      setEtapa("instituicao");
-      return;
-    }
     if (!emailNormalizado) {
       setErro("Informe o e-mail de acesso.");
       return;
@@ -290,11 +287,18 @@ export function LoginPage() {
     setCarregando(true);
     try {
       const resultado = await login({
-        cnpj: slugSubdominio || dispensarInstituicao ? undefined : cnpjNormalizado,
-        slug: slugSubdominio,
+        cnpj: cnpjNormalizado || undefined,
+        slug: slugSubdominio || undefined,
         email: emailNormalizado,
         senha
       });
+      if ("selecaoAmbienteRequired" in resultado) {
+        setAmbientes(resultado.ambientes);
+        setLoginTicket(resultado.loginTicket);
+        setEtapa("ambientes");
+        setAviso("Selecione o ambiente de trabalho para continuar.");
+        return;
+      }
       if ("mfaRequired" in resultado) {
         setMfaPendente(resultado);
         setEtapa("mfa");
@@ -316,6 +320,28 @@ export function LoginPage() {
       abrirOfertaPasskeyOuEntrar();
     } catch (error: any) {
       setErro(obterMensagemErroLogin(error));
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  async function entrarNoAmbiente(acessoId: string) {
+    if (!loginTicket) return;
+    setCarregando(true);
+    setErro(null);
+    try {
+      const resultado = await selecionarAmbiente({ loginTicket, acessoId });
+      if ("mfaRequired" in resultado) {
+        setMfaPendente(resultado);
+        setEtapa("mfa");
+        setAviso(resultado.devCode ? `Código de desenvolvimento: ${resultado.devCode}` : `Enviamos um código de segurança para ${resultado.maskedEmail}.`);
+        return;
+      }
+      setLoginTicket(null);
+      setAmbientes([]);
+      abrirOfertaPasskeyOuEntrar();
+    } catch (error: any) {
+      setErro(obterMensagemErro(error, "Não foi possível abrir o ambiente selecionado."));
     } finally {
       setCarregando(false);
     }
@@ -956,6 +982,31 @@ export function LoginPage() {
                 )}
               </Button>
             </form>
+
+            {etapa === "ambientes" ? (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4" role="dialog" aria-modal="true" aria-labelledby="selecao-ambiente-titulo">
+                <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-5 shadow-2xl">
+                  <div className="mb-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--g3-active)]">Acesso autorizado</p>
+                    <h3 id="selecao-ambiente-titulo" className="mt-1 text-xl font-semibold text-slate-950">Selecione a instituição</h3>
+                    <p className="mt-1 text-sm text-slate-600">Este e-mail possui mais de um ambiente autorizado. Escolha onde deseja trabalhar.</p>
+                  </div>
+                  <div className="max-h-[min(60vh,28rem)] space-y-3 overflow-y-auto">
+                    {ambientes.map((ambiente) => (
+                      <div key={ambiente.acesso_id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                        <p className="font-semibold text-slate-950">{ambiente.nome_fantasia || ambiente.nome_instituicao}</p>
+                        {ambiente.cnpj ? <p className="text-sm text-slate-600">CNPJ {formatarCnpj(ambiente.cnpj)}</p> : null}
+                        {ambiente.unidade_nome ? <p className="text-sm text-slate-600">Unidade: {ambiente.unidade_nome}</p> : null}
+                        <p className="text-sm text-slate-600">Perfil: {ambiente.perfil || "Usuário"}</p>
+                        <Button type="button" className="mt-3 w-full" onClick={() => void entrarNoAmbiente(ambiente.acesso_id)} disabled={carregando}>
+                          {carregando ? "Abrindo..." : "Entrar nesta instituição"}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
             {etapa === "credenciais" ? (
               <div className="grid gap-2 sm:grid-cols-2">

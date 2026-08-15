@@ -17,6 +17,11 @@ const sqlEstruturaRegistroPonto = [
     entrada_2 TIME,
     saida_2 TIME,
     horas_extras_minutos INTEGER NOT NULL DEFAULT 0,
+    horas_extras_pendentes_minutos INTEGER NOT NULL DEFAULT 0,
+    horas_extras_autorizadas_minutos INTEGER NOT NULL DEFAULT 0,
+    horas_extras_negadas_minutos INTEGER NOT NULL DEFAULT 0,
+    horas_extras_compensadas_minutos INTEGER NOT NULL DEFAULT 0,
+    horas_extras_pagas_minutos INTEGER NOT NULL DEFAULT 0,
     banco_horas_minutos INTEGER NOT NULL DEFAULT 0,
     faltas_minutos INTEGER NOT NULL DEFAULT 0,
     atrasos_minutos INTEGER NOT NULL DEFAULT 0,
@@ -28,7 +33,14 @@ const sqlEstruturaRegistroPonto = [
     CONSTRAINT registro_ponto_unidade_fk FOREIGN KEY (unidade_id) REFERENCES unidade_assistencial(id)
   )
   `,
+    "ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS tenant_id UUID",
+    "ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS horas_extras_pendentes_minutos INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS horas_extras_autorizadas_minutos INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS horas_extras_negadas_minutos INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS horas_extras_compensadas_minutos INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS horas_extras_pagas_minutos INTEGER NOT NULL DEFAULT 0",
     "CREATE UNIQUE INDEX IF NOT EXISTS registro_ponto_usuario_data_unique ON registro_ponto(usuario_id, data_referencia)",
+    "CREATE INDEX IF NOT EXISTS registro_ponto_tenant_data_idx ON registro_ponto(tenant_id, data_referencia)",
     "CREATE INDEX IF NOT EXISTS registro_ponto_data_idx ON registro_ponto(data_referencia)",
     "CREATE INDEX IF NOT EXISTS registro_ponto_unidade_idx ON registro_ponto(unidade_id)",
     "CREATE INDEX IF NOT EXISTS registro_ponto_alterado_idx ON registro_ponto(alterado_manualmente)",
@@ -51,7 +63,9 @@ const sqlEstruturaRegistroPonto = [
     CONSTRAINT registro_ponto_batida_sequencia_ck CHECK (sequencia BETWEEN 1 AND 4)
   )
   `,
+    "ALTER TABLE registro_ponto_batida ADD COLUMN IF NOT EXISTS tenant_id UUID",
     "CREATE UNIQUE INDEX IF NOT EXISTS registro_ponto_batida_unique ON registro_ponto_batida(registro_ponto_id, sequencia)",
+    "CREATE INDEX IF NOT EXISTS registro_ponto_batida_tenant_idx ON registro_ponto_batida(tenant_id, registro_ponto_id)",
     "CREATE INDEX IF NOT EXISTS registro_ponto_batida_horario_idx ON registro_ponto_batida(horario_servidor)",
     "CREATE INDEX IF NOT EXISTS registro_ponto_batida_ip_idx ON registro_ponto_batida(ip_origem)",
     `
@@ -67,6 +81,8 @@ const sqlEstruturaRegistroPonto = [
     CONSTRAINT registro_ponto_ocorrencia_registro_fk FOREIGN KEY (registro_ponto_id) REFERENCES registro_ponto(id) ON DELETE CASCADE
   )
   `,
+    "ALTER TABLE registro_ponto_ocorrencia ADD COLUMN IF NOT EXISTS tenant_id UUID",
+    "CREATE INDEX IF NOT EXISTS registro_ponto_ocorrencia_tenant_idx ON registro_ponto_ocorrencia(tenant_id, registro_ponto_id)",
     "CREATE INDEX IF NOT EXISTS registro_ponto_ocorrencia_registro_idx ON registro_ponto_ocorrencia(registro_ponto_id)",
     "CREATE INDEX IF NOT EXISTS registro_ponto_ocorrencia_tipo_idx ON registro_ponto_ocorrencia(tipo)",
     `
@@ -87,9 +103,60 @@ const sqlEstruturaRegistroPonto = [
     CONSTRAINT registro_ponto_auditoria_batida_fk FOREIGN KEY (registro_ponto_batida_id) REFERENCES registro_ponto_batida(id) ON DELETE SET NULL
   )
   `,
+    "ALTER TABLE registro_ponto_auditoria ADD COLUMN IF NOT EXISTS tenant_id UUID",
+    "CREATE INDEX IF NOT EXISTS registro_ponto_auditoria_tenant_idx ON registro_ponto_auditoria(tenant_id, registro_ponto_id)",
     "CREATE INDEX IF NOT EXISTS registro_ponto_auditoria_registro_idx ON registro_ponto_auditoria(registro_ponto_id)",
     "CREATE INDEX IF NOT EXISTS registro_ponto_auditoria_acao_idx ON registro_ponto_auditoria(acao)",
-    "CREATE INDEX IF NOT EXISTS registro_ponto_auditoria_criado_idx ON registro_ponto_auditoria(criado_em)"
+    "CREATE INDEX IF NOT EXISTS registro_ponto_auditoria_criado_idx ON registro_ponto_auditoria(criado_em)",
+    `
+  CREATE TABLE IF NOT EXISTS registro_ponto_configuracao (
+    id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    tolerancia_entrada_antecipada_minutos INTEGER NOT NULL DEFAULT 10,
+    exigir_autorizacao_hora_extra_antecipada BOOLEAN NOT NULL DEFAULT TRUE,
+    limite_hora_extra_diaria_minutos INTEGER NOT NULL DEFAULT 120,
+    permitir_solicitacao_hora_extra_pelo_funcionario BOOLEAN NOT NULL DEFAULT FALSE,
+    mensagem_ciencia_hora_extra TEXT NOT NULL DEFAULT 'Declaro ciência de que a realização de hora extra depende de autorização da empresa.',
+    criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+    atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
+  )
+  `,
+    "CREATE UNIQUE INDEX IF NOT EXISTS registro_ponto_configuracao_tenant_unique ON registro_ponto_configuracao(tenant_id)",
+    "CREATE INDEX IF NOT EXISTS registro_ponto_configuracao_tenant_idx ON registro_ponto_configuracao(tenant_id)",
+    `
+  CREATE TABLE IF NOT EXISTS registro_ponto_hora_extra (
+    id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    registro_ponto_id BIGINT NOT NULL,
+    registro_ponto_batida_id BIGINT NOT NULL,
+    usuario_id BIGINT NOT NULL,
+    data_referencia DATE NOT NULL,
+    campo_batida VARCHAR(20) NOT NULL,
+    horario_previsto TIME NOT NULL,
+    horario_real TIME NOT NULL,
+    minutos_excedentes INTEGER NOT NULL DEFAULT 0,
+    status VARCHAR(40) NOT NULL DEFAULT 'EXTRA_PENDENTE_AUTORIZACAO',
+    justificativa_funcionario TEXT,
+    ciencia_registrada BOOLEAN NOT NULL DEFAULT FALSE,
+    ciencia_em TIMESTAMP,
+    ciencia_usuario_id BIGINT,
+    ciencia_usuario_nome VARCHAR(120),
+    gestor_id BIGINT,
+    gestor_nome VARCHAR(120),
+    gestor_justificativa TEXT,
+    minutos_aprovados INTEGER NOT NULL DEFAULT 0,
+    minutos_negados INTEGER NOT NULL DEFAULT 0,
+    criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+    atualizado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT registro_ponto_hora_extra_registro_fk FOREIGN KEY (registro_ponto_id) REFERENCES registro_ponto(id) ON DELETE CASCADE,
+    CONSTRAINT registro_ponto_hora_extra_batida_fk FOREIGN KEY (registro_ponto_batida_id) REFERENCES registro_ponto_batida(id) ON DELETE CASCADE
+  )
+  `,
+    "CREATE UNIQUE INDEX IF NOT EXISTS registro_ponto_hora_extra_batida_unique ON registro_ponto_hora_extra(registro_ponto_batida_id)",
+    "CREATE INDEX IF NOT EXISTS registro_ponto_hora_extra_tenant_idx ON registro_ponto_hora_extra(tenant_id, registro_ponto_id)",
+    "CREATE INDEX IF NOT EXISTS registro_ponto_hora_extra_usuario_data_idx ON registro_ponto_hora_extra(usuario_id, data_referencia)",
+    "CREATE INDEX IF NOT EXISTS registro_ponto_hora_extra_status_idx ON registro_ponto_hora_extra(status)",
+    "CREATE INDEX IF NOT EXISTS registro_ponto_hora_extra_data_idx ON registro_ponto_hora_extra(data_referencia)"
 ];
 let estruturaInicializada = false;
 let estruturaInicializando = null;
@@ -101,6 +168,53 @@ export async function ensureRegistroPontoEstrutura(db) {
             for (const sql of sqlEstruturaRegistroPonto) {
                 await db.$executeRawUnsafe(sql);
             }
+            await db.$executeRawUnsafe(`
+        UPDATE registro_ponto r
+        SET tenant_id = u.tenant_id
+        FROM usuarios u
+        WHERE r.tenant_id IS NULL
+          AND u.id = r.usuario_id
+          AND u.tenant_id IS NOT NULL
+      `);
+            await db.$executeRawUnsafe(`
+        UPDATE registro_ponto_batida b
+        SET tenant_id = r.tenant_id
+        FROM registro_ponto r
+        WHERE b.tenant_id IS NULL
+          AND r.id = b.registro_ponto_id
+          AND r.tenant_id IS NOT NULL
+      `);
+            await db.$executeRawUnsafe(`
+        UPDATE registro_ponto_ocorrencia o
+        SET tenant_id = r.tenant_id
+        FROM registro_ponto r
+        WHERE o.tenant_id IS NULL
+          AND r.id = o.registro_ponto_id
+          AND r.tenant_id IS NOT NULL
+      `);
+            await db.$executeRawUnsafe(`
+        UPDATE registro_ponto_auditoria a
+        SET tenant_id = r.tenant_id
+        FROM registro_ponto r
+        WHERE a.tenant_id IS NULL
+          AND r.id = a.registro_ponto_id
+          AND r.tenant_id IS NOT NULL
+      `);
+            await db.$executeRawUnsafe(`
+        UPDATE registro_ponto_configuracao c
+        SET tenant_id = u.tenant_id
+        FROM usuarios u
+        WHERE c.tenant_id IS NULL
+          AND u.tenant_id IS NOT NULL
+      `);
+            await db.$executeRawUnsafe(`
+        UPDATE registro_ponto_hora_extra h
+        SET tenant_id = r.tenant_id
+        FROM registro_ponto r
+        WHERE h.tenant_id IS NULL
+          AND r.id = h.registro_ponto_id
+          AND r.tenant_id IS NOT NULL
+      `);
             estruturaInicializada = true;
         })().catch((error) => {
             estruturaInicializando = null;

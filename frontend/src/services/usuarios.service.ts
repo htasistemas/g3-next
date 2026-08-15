@@ -10,8 +10,23 @@ import type {
   UsuarioRemocaoResponse,
   UsuarioStatus
 } from "@/types/usuario";
+import type { UsuarioAcesso, UsuarioAcessoCatalogo, UsuarioAcessoInput } from "@/types/usuario";
 
 export const usuariosService = {
+  async listarAcessos(id: string): Promise<{ acessos: UsuarioAcesso[] }> {
+    const { data } = await httpClient.get<{ acessos: UsuarioAcesso[] }>(`/api/usuarios/${id}/acessos`);
+    return data;
+  },
+
+  async substituirAcessos(id: string, acessos: UsuarioAcessoInput[]): Promise<{ acessos: UsuarioAcesso[] }> {
+    const { data } = await httpClient.put<{ acessos: UsuarioAcesso[] }>(`/api/usuarios/${id}/acessos`, { acessos });
+    return data;
+  },
+
+  async listarCatalogoAcessos(): Promise<UsuarioAcessoCatalogo> {
+    const { data } = await httpClient.get<UsuarioAcessoCatalogo>("/api/usuarios/catalogo-acessos");
+    return data;
+  },
   async listar(filtros: UsuarioFiltros): Promise<UsuarioListaResponse> {
     const { data } = await httpClient.get<UsuarioListaResponse>("/api/usuarios", {
       params: filtros

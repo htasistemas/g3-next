@@ -1,6 +1,9 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { joinSemicolonList, normalizeDigits, toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
+import { voluntarioEscalaDiaValues } from "../voluntario-escala.types.js";
+import { splitSemicolonList } from "../../../utils/string-utils.js";
 const voluntarioInclude = {
     endereco: true,
     profissional: {
@@ -28,74 +31,170 @@ function toBigIntOrUndefined(value) {
         return undefined;
     return BigInt(value);
 }
-async function validarProfissional(tx, profissionalId) {
+function calcularCargaHorariaSemanal(dias, horaInicio, horaFim) {
+    const [inicioHora, inicioMinuto] = horaInicio.split(":").map(Number);
+    const [fimHora, fimMinuto] = horaFim.split(":").map(Number);
+    const minutos = fimHora * 60 + fimMinuto - (inicioHora * 60 + inicioMinuto);
+    if (minutos <= 0) {
+        throw new AppError("O horario final deve ser maior que o horario inicial.", 422);
+    }
+    const total = (minutos / 60) * dias.length;
+    return Number(total.toFixed(2));
+}
+function mapEscalaRow(row) {
+    const dias = splitSemicolonList(row.dias_semana)
+        .map((dia) => dia.toUpperCase())
+        .filter((dia) => voluntarioEscalaDiaValues.includes(dia));
+    return {
+        id_escala: row.id.toString(),
+        voluntario_id: row.voluntario_id.toString(),
+        voluntario_nome: row.voluntario_nome ?? undefined,
+        sala_id: row.sala_id.toString(),
+        sala_nome: row.sala_nome,
+        unidade_nome: row.unidade_nome ?? undefined,
+        atividade_tipo: row.atividade_tipo,
+        titulo: row.titulo ?? undefined,
+        dias_semana: dias,
+        hora_inicio: row.hora_inicio,
+        hora_fim: row.hora_fim,
+        carga_horaria_semanal: Number(row.carga_horaria_semanal ?? 0),
+        status: row.status,
+        observacoes: row.observacoes ?? undefined,
+        criado_em: new Date(row.criado_em).toISOString(),
+        atualizado_em: new Date(row.atualizado_em).toISOString()
+    };
+}
+const sqlEstruturaVoluntarioEscala = [
+    `
+  CREATE TABLE IF NOT EXISTS voluntario_escala (
+    id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    voluntario_id BIGINT NOT NULL REFERENCES cadastro_voluntario(id) ON DELETE CASCADE,
+    sala_id BIGINT NOT NULL REFERENCES salas_unidade(id) ON DELETE RESTRICT,
+    atividade_tipo VARCHAR(120) NOT NULL,
+    titulo VARCHAR(180),
+    dias_semana TEXT NOT NULL,
+    hora_inicio TIME NOT NULL,
+    hora_fim TIME NOT NULL,
+    carga_horaria_semanal NUMERIC(6,2) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'ATIVA',
+    observacoes TEXT,
+    criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+    atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
+  )
+  `,
+    "ALTER TABLE voluntario_escala ADD COLUMN IF NOT EXISTS tenant_id UUID",
+    "ALTER TABLE voluntario_escala ADD COLUMN IF NOT EXISTS titulo VARCHAR(180)",
+    "ALTER TABLE voluntario_escala ADD COLUMN IF NOT EXISTS observacoes TEXT",
+    "ALTER TABLE voluntario_escala ADD COLUMN IF NOT EXISTS carga_horaria_semanal NUMERIC(6,2) NOT NULL DEFAULT 0",
+    "ALTER TABLE voluntario_escala ALTER COLUMN hora_inicio TYPE TIME USING hora_inicio::time",
+    "ALTER TABLE voluntario_escala ALTER COLUMN hora_fim TYPE TIME USING hora_fim::time",
+    "CREATE INDEX IF NOT EXISTS voluntario_escala_tenant_idx ON voluntario_escala (tenant_id, voluntario_id, criado_em DESC)",
+    "CREATE INDEX IF NOT EXISTS voluntario_escala_sala_idx ON voluntario_escala (tenant_id, sala_id)"
+];
+const estruturaVoluntarioEscala = {
+    inicializada: false
+};
+let estruturaVoluntarioEscalaPromise = null;
+async function ensureVoluntarioEscalaEstrutura() {
+    if (estruturaVoluntarioEscala.inicializada)
+        return;
+    if (!estruturaVoluntarioEscalaPromise) {
+        estruturaVoluntarioEscalaPromise = (async () => {
+            for (const sql of sqlEstruturaVoluntarioEscala) {
+                await prisma.$executeRawUnsafe(sql);
+            }
+            estruturaVoluntarioEscala.inicializada = true;
+        })().catch((error) => {
+            estruturaVoluntarioEscalaPromise = null;
+            throw error;
+        });
+    }
+    await estruturaVoluntarioEscalaPromise;
+}
+async function validarProfissional(tx, tenantId, profissionalId) {
     if (!profissionalId)
         return;
-    const profissional = await tx.cadastroProfissional.findUnique({
-        where: { id: profissionalId },
-        select: { id: true }
-    });
-    if (!profissional) {
+    const profissional = await tx.$queryRaw `
+    SELECT p.id
+    FROM cadastro_profissionais p
+    WHERE p.id = ${profissionalId}
+      AND p.tenant_id::text = ${tenantId}
+    LIMIT 1
+  `;
+    if (!profissional.length) {
         throw new AppError("Profissional vinculado nao encontrado.", 404);
     }
 }
 export class VoluntarioRepository {
-    async listar(filters) {
-        const where = {};
-        const andFilters = [];
+    async listar(filters, tenantId) {
+        const condicoes = [Prisma.sql `v.tenant_id::text = ${tenantId}`];
         const nome = trimOrUndefined(filters.nome);
         if (nome) {
-            where.OR = [
-                { nomeCompleto: { contains: nome, mode: "insensitive" } },
-                {
-                    profissional: {
-                        is: {
-                            nomeCompleto: { contains: nome, mode: "insensitive" }
-                        }
-                    }
-                }
-            ];
+            condicoes.push(Prisma.sql `(
+          v.nome_completo ILIKE ${`%${nome}%`}
+          OR COALESCE(p.nome_completo, '') ILIKE ${`%${nome}%`}
+        )`);
         }
         const status = trimOrUndefined(filters.status);
         if (status) {
-            andFilters.push({ status: status.toUpperCase() });
+            condicoes.push(Prisma.sql `COALESCE(v.status, '') = ${status.toUpperCase()}`);
         }
         const cpf = normalizeDigits(filters.cpf);
         if (cpf) {
-            andFilters.push({ cpf: { contains: cpf } });
+            condicoes.push(Prisma.sql `COALESCE(v.cpf, '') LIKE ${`%${cpf}%`}`);
         }
         const email = trimOrUndefined(filters.email);
         if (email) {
-            andFilters.push({ email: { contains: email, mode: "insensitive" } });
+            condicoes.push(Prisma.sql `COALESCE(v.email, '') ILIKE ${`%${email}%`}`);
         }
-        if (andFilters.length) {
-            where.AND = andFilters;
+        const rows = await prisma.$queryRaw `
+      SELECT v.id
+      FROM cadastro_voluntario v
+      LEFT JOIN cadastro_profissionais p ON p.id = v.profissional_id
+      WHERE ${Prisma.join(condicoes, " AND ")}
+      ORDER BY v.nome_completo ASC
+    `;
+        if (!rows.length) {
+            return [];
         }
-        return prisma.cadastroVoluntario.findMany({
-            where,
-            include: voluntarioInclude,
-            orderBy: [{ nomeCompleto: "asc" }]
+        const ids = rows.map((row) => row.id);
+        const voluntarios = await prisma.cadastroVoluntario.findMany({
+            where: { id: { in: ids } },
+            include: voluntarioInclude
         });
+        const ordem = new Map(ids.map((id, index) => [id.toString(), index]));
+        return voluntarios.sort((a, b) => (ordem.get(a.id.toString()) ?? 0) - (ordem.get(b.id.toString()) ?? 0));
     }
-    async buscarPorId(id) {
+    async buscarPorId(id, tenantId) {
+        const row = await prisma.$queryRaw `
+      SELECT v.id
+      FROM cadastro_voluntario v
+      WHERE v.id = ${id}
+        AND v.tenant_id::text = ${tenantId}
+      LIMIT 1
+    `;
+        if (!row.length) {
+            return null;
+        }
         return prisma.cadastroVoluntario.findUnique({
             where: { id },
             include: voluntarioInclude
         });
     }
-    async buscarPorIdOuFalhar(id) {
-        const voluntario = await this.buscarPorId(id);
+    async buscarPorIdOuFalhar(id, tenantId) {
+        const voluntario = await this.buscarPorId(id, tenantId);
         if (!voluntario) {
             throw new AppError("Voluntario nao encontrado.", 404);
         }
         return voluntario;
     }
-    async criar(input) {
+    async criar(input, tenantId) {
         return prisma.$transaction(async (tx) => {
             const now = new Date();
             let enderecoId;
             const profissionalId = toBigIntOrUndefined(input.profissional_id);
-            await validarProfissional(tx, profissionalId);
+            await validarProfissional(tx, tenantId, profissionalId);
             if (hasAnyAddressData(input)) {
                 const endereco = await tx.endereco.create({
                     data: {
@@ -152,14 +251,21 @@ export class VoluntarioRepository {
                     atualizadoEm: now
                 }
             });
-            return this.buscarPorIdTransacao(tx, voluntario.id);
+            await tx.$executeRaw `
+        UPDATE cadastro_voluntario
+        SET tenant_id = ${tenantId}::uuid
+        WHERE id = ${voluntario.id}
+      `;
+            const salvo = await this.buscarPorIdTransacao(tx, voluntario.id, tenantId);
+            if (!salvo) {
+                throw new AppError("Voluntario nao encontrado apos criar o registro.", 500);
+            }
+            return salvo;
         });
     }
-    async atualizar(id, input) {
+    async atualizar(id, input, tenantId) {
         return prisma.$transaction(async (tx) => {
-            const existing = await tx.cadastroVoluntario.findUnique({
-                where: { id }
-            });
+            const existing = await this.buscarPorIdTransacao(tx, id, tenantId);
             if (!existing) {
                 throw new AppError("Voluntario nao encontrado.", 404);
             }
@@ -167,7 +273,7 @@ export class VoluntarioRepository {
             let enderecoId = existing.enderecoId;
             const possuiEndereco = hasAnyAddressData(input);
             const profissionalId = toBigIntOrUndefined(input.profissional_id);
-            await validarProfissional(tx, profissionalId);
+            await validarProfissional(tx, tenantId, profissionalId);
             if (possuiEndereco) {
                 if (existing.enderecoId) {
                     await tx.endereco.update({
@@ -247,21 +353,259 @@ export class VoluntarioRepository {
                     atualizadoEm: now
                 }
             });
-            return this.buscarPorIdTransacao(tx, id);
+            await tx.$executeRaw `
+        UPDATE cadastro_voluntario
+        SET tenant_id = ${tenantId}::uuid
+        WHERE id = ${id}
+      `;
+            const atualizado = await this.buscarPorIdTransacao(tx, id, tenantId);
+            if (!atualizado) {
+                throw new AppError("Voluntario nao encontrado apos atualizar o registro.", 500);
+            }
+            return atualizado;
         });
     }
-    async remover(id) {
-        await this.buscarPorIdOuFalhar(id);
+    async remover(id, tenantId) {
+        await this.buscarPorIdOuFalhar(id, tenantId);
         await prisma.cadastroVoluntario.delete({ where: { id } });
     }
-    async buscarPorIdTransacao(tx, id) {
-        const voluntario = await tx.cadastroVoluntario.findUnique({
+    async listarEscalas(voluntarioId, tenantId) {
+        await ensureVoluntarioEscalaEstrutura();
+        return prisma.$queryRaw(Prisma.sql `
+      SELECT
+        e.id,
+        e.tenant_id::text AS tenant_id,
+        e.voluntario_id,
+        v.nome_completo AS voluntario_nome,
+        e.sala_id,
+        s.nome AS sala_nome,
+        u.nome_fantasia AS unidade_nome,
+        e.atividade_tipo,
+        e.titulo,
+        e.dias_semana,
+        to_char(e.hora_inicio, 'HH24:MI') AS hora_inicio,
+        to_char(e.hora_fim, 'HH24:MI') AS hora_fim,
+        e.carga_horaria_semanal,
+        e.status,
+        e.observacoes,
+        e.criado_em,
+        e.atualizado_em
+      FROM voluntario_escala e
+      INNER JOIN cadastro_voluntario v ON v.id = e.voluntario_id
+      INNER JOIN salas_unidade s ON s.id = e.sala_id
+      LEFT JOIN unidade_assistencial u ON u.id = s.unidade_id
+      WHERE e.voluntario_id = ${voluntarioId}
+        AND e.tenant_id::text = ${tenantId}
+        AND v.tenant_id::text = ${tenantId}
+      ORDER BY e.criado_em DESC
+    `);
+    }
+    async listarEscalasGeral(tenantId) {
+        await ensureVoluntarioEscalaEstrutura();
+        return prisma.$queryRaw(Prisma.sql `
+      SELECT
+        e.id,
+        e.tenant_id::text AS tenant_id,
+        e.voluntario_id,
+        v.nome_completo AS voluntario_nome,
+        e.sala_id,
+        s.nome AS sala_nome,
+        u.nome_fantasia AS unidade_nome,
+        e.atividade_tipo,
+        e.titulo,
+        e.dias_semana,
+        to_char(e.hora_inicio, 'HH24:MI') AS hora_inicio,
+        to_char(e.hora_fim, 'HH24:MI') AS hora_fim,
+        e.carga_horaria_semanal,
+        e.status,
+        e.observacoes,
+        e.criado_em,
+        e.atualizado_em
+      FROM voluntario_escala e
+      INNER JOIN cadastro_voluntario v ON v.id = e.voluntario_id
+      INNER JOIN salas_unidade s ON s.id = e.sala_id
+      LEFT JOIN unidade_assistencial u ON u.id = s.unidade_id
+      WHERE e.tenant_id::text = ${tenantId}
+      ORDER BY e.criado_em DESC
+    `);
+    }
+    async buscarEscalaPorId(id, tenantId) {
+        await ensureVoluntarioEscalaEstrutura();
+        const rows = await prisma.$queryRaw(Prisma.sql `
+      SELECT
+        e.id,
+        e.tenant_id::text AS tenant_id,
+        e.voluntario_id,
+        v.nome_completo AS voluntario_nome,
+        e.sala_id,
+        s.nome AS sala_nome,
+        u.nome_fantasia AS unidade_nome,
+        e.atividade_tipo,
+        e.titulo,
+        e.dias_semana,
+        to_char(e.hora_inicio, 'HH24:MI') AS hora_inicio,
+        to_char(e.hora_fim, 'HH24:MI') AS hora_fim,
+        e.carga_horaria_semanal,
+        e.status,
+        e.observacoes,
+        e.criado_em,
+        e.atualizado_em
+      FROM voluntario_escala e
+      INNER JOIN cadastro_voluntario v ON v.id = e.voluntario_id
+      INNER JOIN salas_unidade s ON s.id = e.sala_id
+      LEFT JOIN unidade_assistencial u ON u.id = s.unidade_id
+      WHERE e.id = ${id}
+        AND e.tenant_id::text = ${tenantId}
+      LIMIT 1
+    `);
+        return rows[0] ? mapEscalaRow(rows[0]) : null;
+    }
+    async criarEscala(input, tenantId) {
+        await ensureVoluntarioEscalaEstrutura();
+        const voluntarioId = input.voluntario_id;
+        const salaId = input.sala_id;
+        const diasSemana = input.dias_semana;
+        const cargaHoraria = typeof input.carga_horaria_semanal === "number" && Number.isFinite(input.carga_horaria_semanal)
+            ? Number(input.carga_horaria_semanal.toFixed(2))
+            : calcularCargaHorariaSemanal(diasSemana, input.hora_inicio, input.hora_fim);
+        const now = new Date();
+        await this.validarVoluntarioSalaEscalaTx(prisma, voluntarioId, salaId, tenantId);
+        const rows = await prisma.$queryRaw(Prisma.sql `
+      INSERT INTO voluntario_escala (
+        tenant_id,
+        voluntario_id,
+        sala_id,
+        atividade_tipo,
+        titulo,
+        dias_semana,
+        hora_inicio,
+        hora_fim,
+        carga_horaria_semanal,
+        status,
+        observacoes,
+        criado_em,
+        atualizado_em
+      )
+      VALUES (
+        ${tenantId}::uuid,
+        ${voluntarioId},
+        ${salaId},
+        ${input.atividade_tipo},
+        ${input.titulo ?? null},
+        ${joinSemicolonList(diasSemana)},
+        CAST(${input.hora_inicio} AS time),
+        CAST(${input.hora_fim} AS time),
+        ${cargaHoraria},
+        ${input.status},
+        ${input.observacoes ?? null},
+        ${now},
+        ${now}
+      )
+      RETURNING id
+    `);
+        const id = rows[0]?.id;
+        if (!id) {
+            throw new AppError("Nao foi possivel criar a escala do voluntario.", 500);
+        }
+        const escala = await this.buscarEscalaPorId(id, tenantId);
+        if (!escala) {
+            throw new AppError("Nao foi possivel recuperar a escala do voluntario.", 500);
+        }
+        return escala;
+    }
+    async atualizarEscala(id, input, tenantId) {
+        await ensureVoluntarioEscalaEstrutura();
+        const voluntarioId = input.voluntario_id;
+        const salaId = input.sala_id;
+        const diasSemana = input.dias_semana;
+        const cargaHoraria = typeof input.carga_horaria_semanal === "number" && Number.isFinite(input.carga_horaria_semanal)
+            ? Number(input.carga_horaria_semanal.toFixed(2))
+            : calcularCargaHorariaSemanal(diasSemana, input.hora_inicio, input.hora_fim);
+        const now = new Date();
+        await this.validarVoluntarioSalaEscalaTx(prisma, voluntarioId, salaId, tenantId);
+        const rows = await prisma.$queryRaw(Prisma.sql `
+      UPDATE voluntario_escala
+      SET
+        voluntario_id = ${voluntarioId},
+        sala_id = ${salaId},
+        atividade_tipo = ${input.atividade_tipo},
+        titulo = ${input.titulo ?? null},
+        dias_semana = ${joinSemicolonList(diasSemana)},
+        hora_inicio = CAST(${input.hora_inicio} AS time),
+        hora_fim = CAST(${input.hora_fim} AS time),
+        carga_horaria_semanal = ${cargaHoraria},
+        status = ${input.status},
+        observacoes = ${input.observacoes ?? null},
+        atualizado_em = ${now}
+      WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
+      RETURNING id
+    `);
+        const row = rows[0];
+        if (!row) {
+            throw new AppError("Escala nao encontrada.", 404);
+        }
+        const escala = await this.buscarEscalaPorId(row.id, tenantId);
+        if (!escala) {
+            throw new AppError("Escala nao encontrada.", 404);
+        }
+        return escala;
+    }
+    async removerEscala(id, tenantId) {
+        await ensureVoluntarioEscalaEstrutura();
+        const rows = await prisma.$queryRaw `
+      SELECT id
+      FROM voluntario_escala
+      WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
+      LIMIT 1
+    `;
+        if (!rows.length) {
+            throw new AppError("Escala nao encontrada.", 404);
+        }
+        await prisma.$executeRaw `
+      DELETE FROM voluntario_escala
+      WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
+    `;
+    }
+    async buscarPorIdTransacao(tx, id, tenantId) {
+        const row = await tx.$queryRaw `
+      SELECT v.id
+      FROM cadastro_voluntario v
+      WHERE v.id = ${id}
+        AND v.tenant_id::text = ${tenantId}
+      LIMIT 1
+    `;
+        if (!row.length) {
+            return null;
+        }
+        return tx.cadastroVoluntario.findUnique({
             where: { id },
             include: voluntarioInclude
         });
-        if (!voluntario) {
-            throw new AppError("Voluntario nao encontrado.", 404);
+    }
+    async validarVoluntarioSalaEscalaTx(db, voluntarioId, salaId, tenantId) {
+        const voluntarioRows = await db.$queryRawUnsafe(`
+      SELECT v.id
+      FROM cadastro_voluntario v
+      WHERE v.id = $1
+        AND v.tenant_id::text = $2
+      LIMIT 1
+      `, voluntarioId, tenantId);
+        if (!voluntarioRows[0]) {
+            throw new AppError("Voluntario nao encontrado para a escala.", 404);
         }
-        return voluntario;
+        const salaRows = await db.$queryRawUnsafe(`
+      SELECT s.id
+      FROM salas_unidade s
+      INNER JOIN unidade_assistencial u ON u.id = s.unidade_id
+      WHERE s.id = $1
+        AND u.tenant_id::text = $2
+      LIMIT 1
+      `, salaId, tenantId);
+        if (!salaRows[0]) {
+            throw new AppError("Sala nao encontrada para a escala.", 404);
+        }
     }
 }

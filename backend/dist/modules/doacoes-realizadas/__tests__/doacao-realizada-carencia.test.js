@@ -100,6 +100,7 @@ test("deve bloquear entrega do mesmo item dentro da carencia sem autorizacao adm
     }, {
         id: "2",
         nomeUsuario: "operador",
+        tenant_id: "tenant-teste",
         permissoes: ["OPERADOR"]
     }), (error) => error instanceof AppError &&
         error.statusCode === 409 &&
@@ -122,6 +123,7 @@ test("deve permitir entrega quando o item ja cumpriu a carencia", async () => {
     }, {
         id: "2",
         nomeUsuario: "operador",
+        tenant_id: "tenant-teste",
         permissoes: ["OPERADOR"]
     });
     const payloadCriado = obterPayloadCriado();
@@ -135,11 +137,15 @@ test("deve registrar autorizacao administrativa ao liberar entrega dentro da car
         ultimaEntregaMesmoItem: "2026-03-10"
     });
     const senhaHash = await bcrypt.hash("123456", 10);
-    service.buscarUsuarioAutenticadoPorId = async () => ({
-        nomeUsuario: "admin",
-        nome: "Administrador G3",
-        senhaHash
-    });
+    let consultaUsuario;
+    service.authRepository.buscarUsuarioPorId = async (id, tenantId) => {
+        consultaUsuario = { id, tenantId };
+        return {
+            nomeUsuario: "admin",
+            nome: "Administrador G3",
+            senhaHash
+        };
+    };
     await service.criar({
         beneficiario_id: 10,
         tipo_doacao: "Doacao entregue",
@@ -153,6 +159,7 @@ test("deve registrar autorizacao administrativa ao liberar entrega dentro da car
     }, {
         id: "99",
         nomeUsuario: "admin",
+        tenant_id: "tenant-teste",
         permissoes: ["ADMINISTRADOR"]
     });
     const payloadCriado = obterPayloadCriado();
@@ -163,4 +170,6 @@ test("deve registrar autorizacao administrativa ao liberar entrega dentro da car
     assert.equal(payloadCriado?.itens[0]?.autorizado_por_nome, "Administrador G3");
     assert.equal(payloadCriado?.itens[0]?.ultima_entrega_em, "2026-03-10");
     assert.ok(payloadCriado?.itens[0]?.autorizacao_carencia_em);
+    assert.equal(consultaUsuario?.id, 99n);
+    assert.equal(consultaUsuario?.tenantId, "tenant-teste");
 });

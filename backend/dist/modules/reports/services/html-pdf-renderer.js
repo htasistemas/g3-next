@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import PDFDocument from "pdfkit";
-import { LocalStorageProvider } from "../../arquivos/services/local-storage.provider.js";
+import { getStorageProvider } from "../../arquivos/services/storage-factory.js";
 function mmToPt(mm) {
     return mm * 2.83464567;
 }
@@ -56,7 +56,7 @@ function extractSectionSpacerLines(value) {
     return lines;
 }
 export class HtmlPdfRenderer {
-    storageProvider = new LocalStorageProvider();
+    storageProvider = getStorageProvider();
     async render(html, rodape, layout) {
         if (!layout) {
             return this.renderLegado(html, rodape);
@@ -350,7 +350,7 @@ export class HtmlPdfRenderer {
                     return coluna?.fonteTamanho ?? 10;
                 };
                 const desenharLinhaTabela = (cels, cabecalho = false) => {
-                    const textos = cels.map((cel) => toSafeText(cel));
+                    const textos = cels.map((cel) => toSafeText(typeof cel === "string" ? cel : cel.valor));
                     const alturas = textos.map((texto, index) => {
                         const coluna = tabela.colunas[index];
                         const larguraTexto = Math.max(20, larguras[index] - paddingX * 2);
@@ -583,11 +583,14 @@ export class HtmlPdfRenderer {
             }
         }
         const caminhoNormalizado = valor.replace(/^file:\/\//i, "");
+        const bufferStorage = await this.storageProvider.lerBuffer(caminhoNormalizado);
+        if (bufferStorage) {
+            return bufferStorage;
+        }
         const candidatos = [
             caminhoNormalizado,
             path.resolve(process.cwd(), caminhoNormalizado),
             path.resolve(process.cwd(), "..", caminhoNormalizado),
-            this.resolverCaminhoStorage(caminhoNormalizado),
             path.resolve(process.cwd(), "..", "frontend", "public", caminhoNormalizado.replace(/^[/\\]/, ""))
         ].filter((candidato) => Boolean(candidato));
         for (const candidato of candidatos) {
@@ -601,14 +604,6 @@ export class HtmlPdfRenderer {
             }
         }
         return undefined;
-    }
-    resolverCaminhoStorage(caminhoArquivo) {
-        try {
-            return this.storageProvider.resolveAbsolutePath(caminhoArquivo);
-        }
-        catch {
-            return undefined;
-        }
     }
     htmlToText(html) {
         return html

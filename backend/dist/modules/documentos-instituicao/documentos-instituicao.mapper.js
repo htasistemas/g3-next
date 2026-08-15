@@ -1,45 +1,5 @@
 import { toIsoDate, toStringId } from "../../utils/string-utils.js";
-function parseDiasAntecedencia(value) {
-    if (!value)
-        return [];
-    if (Array.isArray(value)) {
-        return value.map((item) => Number(item)).filter((item) => Number.isFinite(item));
-    }
-    if (typeof value === "string") {
-        try {
-            const parsed = JSON.parse(value);
-            if (Array.isArray(parsed)) {
-                return parsed.map((item) => Number(item)).filter((item) => Number.isFinite(item));
-            }
-            return [];
-        }
-        catch {
-            return [];
-        }
-    }
-    return [];
-}
-function calcularSituacaoDocumento(row) {
-    if (row.em_renovacao)
-        return "em_renovacao";
-    if (row.sem_vencimento || row.vencimento_indeterminado || !row.validade) {
-        return "sem_vencimento";
-    }
-    const diasAlerta = Math.max(0, ...parseDiasAntecedencia(row.dias_antecedencia));
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    const validade = new Date(row.validade);
-    validade.setHours(0, 0, 0, 0);
-    if (Number.isNaN(validade.getTime()))
-        return "valido";
-    if (validade < hoje)
-        return "vencido";
-    const alerta = new Date(hoje);
-    alerta.setDate(alerta.getDate() + (diasAlerta || 30));
-    if (validade <= alerta)
-        return "vence_em_breve";
-    return "valido";
-}
+import { calcularSituacaoDocumentoInstituicao, parseDiasAntecedenciaDocumentoInstituicao } from "./documentos-instituicao-status.js";
 export function mapDocumentoInstituicaoToResponse(row) {
     return {
         id: toStringId(row.id),
@@ -53,12 +13,13 @@ export function mapDocumentoInstituicaoToResponse(row) {
         modoRenovacao: row.modo_renovacao ?? undefined,
         observacaoRenovacao: row.observacao_renovacao ?? undefined,
         gerarAlerta: row.gerar_alerta,
-        diasAntecedencia: parseDiasAntecedencia(row.dias_antecedencia),
+        diasAntecedencia: parseDiasAntecedenciaDocumentoInstituicao(row.dias_antecedencia),
         formaAlerta: row.forma_alerta ?? undefined,
         emRenovacao: row.em_renovacao,
         semVencimento: row.sem_vencimento,
         vencimentoIndeterminado: row.vencimento_indeterminado,
-        situacao: calcularSituacaoDocumento(row),
+        situacao: calcularSituacaoDocumentoInstituicao(row),
+        anexoQuantidade: row.anexo_quantidade ?? 0,
         criadoEm: row.criado_em.toISOString(),
         atualizadoEm: row.atualizado_em.toISOString()
     };
@@ -66,6 +27,7 @@ export function mapDocumentoInstituicaoToResponse(row) {
 export function mapDocumentoInstituicaoAnexoToResponse(row) {
     return {
         id: toStringId(row.id),
+        arquivoId: row.arquivo_id ? toStringId(row.arquivo_id) : undefined,
         documentoId: toStringId(row.documento_id),
         nomeArquivo: row.nome_arquivo,
         tipo: row.tipo,

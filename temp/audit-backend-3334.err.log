@@ -1,0 +1,12 @@
+SyntaxError: Cannot convert abc to a BigInt
+    at BigInt (<anonymous>)
+    at TermosParceriaService.obter (D:\g3-next\backend\src\modules\termos-parceria\services\termos-parceria.service.ts:184:27)
+    at TermosParceriaController.obter (D:\g3-next\backend\src\modules\termos-parceria\controllers\termos-parceria.controller.ts:10:115)
+    at <anonymous> (D:\g3-next\backend\src\shared\http\async-handler.ts:7:21)
+    at Layer.handle [as handle_request] (D:\g3-next\backend\node_modules\express\lib\router\layer.js:95:5)
+    at next (D:\g3-next\backend\node_modules\express\lib\router\route.js:149:13)
+    at <anonymous> (D:\g3-next\backend\src\modules\auth\middlewares\auth.middleware.ts:133:12)
+    at Layer.handle [as handle_request] (D:\g3-next\backend\node_modules\express\lib\router\layer.js:95:5)
+    at next (D:\g3-next\backend\node_modules\express\lib\router\route.js:149:13)
+    at <anonymous> (D:\g3-next\backend\src\modules\auth\middlewares\auth.middleware.ts:75:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)

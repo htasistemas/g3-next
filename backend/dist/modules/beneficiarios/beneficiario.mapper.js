@@ -33,6 +33,12 @@ export function mapBeneficiarioToResponse(record) {
         nomeArquivo: doc.nomeArquivo ?? undefined,
         caminhoArquivo: doc.caminhoArquivo ?? undefined,
         contentType: doc.contentType ?? undefined,
+        dataEmissao: toIsoDate(doc.dataEmissao),
+        dataValidade: toIsoDate(doc.dataValidade),
+        orgaoEmissor: doc.orgaoEmissor ?? undefined,
+        ufEmissor: doc.ufEmissor ?? undefined,
+        categoria: doc.categoria ?? undefined,
+        observacao: doc.observacao ?? undefined,
         obrigatorio: doc.obrigatorio ?? true,
         ignorado: (doc.obrigatorio ?? true) === false &&
             !doc.nomeArquivo &&

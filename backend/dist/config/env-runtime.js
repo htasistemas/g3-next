@@ -17,6 +17,12 @@ export function loadBackendEnvFiles() {
             config({ path });
         }
     }
+    const presentationEnv = resolve(backendRoot, ".env.g3n-apresentacao");
+    const presentationAtiva = process.env.G3N_PRESENTATION_ATIVA?.trim().toLowerCase() === "true" ||
+        process.env.G3N_PRESENTATION_ATIVA?.trim() === "1";
+    if (presentationAtiva && existsSync(presentationEnv)) {
+        config({ path: presentationEnv, override: true });
+    }
 }
 function buildDatabaseUrlFromLegacyEnv(rawEnv) {
     const databaseUrl = rawEnv.DATABASE_URL?.trim();

@@ -1,0 +1,16 @@
+import { Router } from "express";
+import { asyncHandler } from "../../../shared/http/async-handler.js";
+import { ensureAuthenticated, ensureSuperadmin } from "../../auth/middlewares/auth.middleware.js";
+import { InstituicoesController } from "../controllers/instituicoes.controller.js";
+const controller = new InstituicoesController();
+export const instituicoesRoutes = Router();
+instituicoesRoutes.use(ensureAuthenticated, ensureSuperadmin);
+instituicoesRoutes.get("/", asyncHandler(controller.listar.bind(controller)));
+instituicoesRoutes.post("/", asyncHandler(controller.criar.bind(controller)));
+instituicoesRoutes.put("/:id", asyncHandler(controller.atualizar.bind(controller)));
+instituicoesRoutes.post("/:id/resetar-admin", asyncHandler(controller.resetarAdmin.bind(controller)));
+instituicoesRoutes.post("/:id/desbloquear-acesso", asyncHandler(controller.desbloquearAcesso.bind(controller)));
+instituicoesRoutes.get("/:id/usuarios", asyncHandler(controller.listarUsuarios.bind(controller)));
+instituicoesRoutes.post("/:id/usuarios", asyncHandler(controller.criarUsuario.bind(controller)));
+instituicoesRoutes.put("/:id/usuarios/:usuarioId", asyncHandler(controller.atualizarUsuario.bind(controller)));
+instituicoesRoutes.post("/:id/usuarios/:usuarioId/reset-senha", asyncHandler(controller.resetarSenhaUsuario.bind(controller)));

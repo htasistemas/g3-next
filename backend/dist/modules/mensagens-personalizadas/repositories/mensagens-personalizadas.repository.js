@@ -5,6 +5,7 @@ const estruturaSql = [
     `
   CREATE TABLE IF NOT EXISTS mensagens_personalizadas_taxonomia (
     id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID,
     tipo VARCHAR(30) NOT NULL,
     nome VARCHAR(150) NOT NULL,
     descricao VARCHAR(250),
@@ -14,10 +15,10 @@ const estruturaSql = [
     atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
   )
   `,
-    "CREATE UNIQUE INDEX IF NOT EXISTS mensagens_personalizadas_taxonomia_tipo_nome_udx ON mensagens_personalizadas_taxonomia(tipo, nome)",
     `
   CREATE TABLE IF NOT EXISTS mensagens_personalizadas_modelo (
     id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID,
     titulo VARCHAR(200) NOT NULL,
     assunto VARCHAR(200),
     categoria_id BIGINT REFERENCES mensagens_personalizadas_taxonomia(id) ON DELETE SET NULL,
@@ -43,12 +44,10 @@ const estruturaSql = [
     atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
   )
   `,
-    "CREATE UNIQUE INDEX IF NOT EXISTS mensagens_personalizadas_modelo_chave_sistema_udx ON mensagens_personalizadas_modelo(chave_sistema) WHERE chave_sistema IS NOT NULL",
-    "CREATE INDEX IF NOT EXISTS mensagens_personalizadas_modelo_status_idx ON mensagens_personalizadas_modelo(status)",
-    "CREATE INDEX IF NOT EXISTS mensagens_personalizadas_modelo_titulo_idx ON mensagens_personalizadas_modelo(titulo)",
     `
   CREATE TABLE IF NOT EXISTS mensagens_personalizadas_historico (
     id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID,
     modelo_id BIGINT REFERENCES mensagens_personalizadas_modelo(id) ON DELETE SET NULL,
     nome_mensagem VARCHAR(200) NOT NULL,
     canal VARCHAR(20) NOT NULL,
@@ -69,11 +68,10 @@ const estruturaSql = [
     criado_em TIMESTAMP NOT NULL DEFAULT NOW()
   )
   `,
-    "CREATE INDEX IF NOT EXISTS mensagens_personalizadas_historico_data_idx ON mensagens_personalizadas_historico(criado_em DESC)",
-    "CREATE INDEX IF NOT EXISTS mensagens_personalizadas_historico_status_idx ON mensagens_personalizadas_historico(status)",
     `
   CREATE TABLE IF NOT EXISTS mensagens_personalizadas_auditoria (
     id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID,
     acao VARCHAR(80) NOT NULL,
     modelo_id BIGINT REFERENCES mensagens_personalizadas_modelo(id) ON DELETE SET NULL,
     usuario_id VARCHAR(60),
@@ -82,9 +80,9 @@ const estruturaSql = [
     criado_em TIMESTAMP NOT NULL DEFAULT NOW()
   )
   `,
-    "CREATE INDEX IF NOT EXISTS mensagens_personalizadas_auditoria_data_idx ON mensagens_personalizadas_auditoria(criado_em DESC)"
 ];
 let estruturaPromise = null;
+let estruturaCompletaPromise = null;
 function toJsonText(value) {
     return JSON.stringify(value ?? []);
 }
@@ -103,11 +101,23 @@ function actorId(actor) {
 function actorName(actor) {
     return actor?.nomeUsuario?.trim() || null;
 }
+const caracteresBusca = "áàãâäéèêëíìîïóòõôöúùûüçÁÀÃÂÄÉÈÊËÍÌÎÏÓÒÕÔÖÚÙÛÜÇ";
+const substitutosBusca = "aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC";
+function normalizarTermoBusca(valor) {
+    return (valor ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+function requireTenant(tenantId) {
+    const tenant = String(tenantId ?? "").trim();
+    if (!tenant) {
+        throw new AppError("Tenant da sessao nao identificado.", 401);
+    }
+    return tenant;
+}
 export class MensagensPersonalizadasRepository {
     async garantirEstrutura() {
         await ensureMensagensPersonalizadasEstrutura();
     }
-    async listarTaxonomias() {
+    async listarTaxonomias(tenantId) {
         await this.garantirEstrutura();
         return prisma.$queryRaw(Prisma.sql `
       SELECT
@@ -120,15 +130,18 @@ export class MensagensPersonalizadasRepository {
         criado_em,
         atualizado_em
       FROM mensagens_personalizadas_taxonomia
+      WHERE tenant_id::text = ${requireTenant(tenantId)}
       ORDER BY tipo ASC, ordem ASC, nome ASC
     `);
     }
-    async criarTaxonomia(input) {
+    async criarTaxonomia(input, tenantId) {
         await this.garantirEstrutura();
+        const tenant = requireTenant(tenantId);
         const existente = await prisma.$queryRaw(Prisma.sql `
       SELECT id
       FROM mensagens_personalizadas_taxonomia
-      WHERE tipo = ${input.tipo}
+      WHERE tenant_id::text = ${tenant}
+        AND tipo = ${input.tipo}
         AND lower(nome) = lower(${input.nome})
       LIMIT 1
     `);
@@ -137,6 +150,7 @@ export class MensagensPersonalizadasRepository {
         }
         const rows = await prisma.$queryRaw(Prisma.sql `
       INSERT INTO mensagens_personalizadas_taxonomia (
+        tenant_id,
         tipo,
         nome,
         descricao,
@@ -144,6 +158,7 @@ export class MensagensPersonalizadasRepository {
         ordem
       )
       VALUES (
+        ${tenant}::uuid,
         ${input.tipo},
         ${input.nome},
         ${input.descricao ?? null},
@@ -152,7 +167,8 @@ export class MensagensPersonalizadasRepository {
           (
             SELECT MAX(ordem) + 1
             FROM mensagens_personalizadas_taxonomia
-            WHERE tipo = ${input.tipo}
+            WHERE tenant_id::text = ${tenant}
+              AND tipo = ${input.tipo}
           ),
           1
         )
@@ -169,10 +185,12 @@ export class MensagensPersonalizadasRepository {
     `);
         return rows[0];
     }
-    async upsertTaxonomiaSeed(input) {
+    async upsertTaxonomiaSeed(input, tenantId) {
         await this.garantirEstrutura();
+        const tenant = requireTenant(tenantId);
         await prisma.$executeRaw(Prisma.sql `
       INSERT INTO mensagens_personalizadas_taxonomia (
+        tenant_id,
         tipo,
         nome,
         descricao,
@@ -180,6 +198,7 @@ export class MensagensPersonalizadasRepository {
         ordem
       )
       VALUES (
+        ${tenant}::uuid,
         ${input.tipo},
         ${input.nome},
         ${input.descricao ?? null},
@@ -188,16 +207,18 @@ export class MensagensPersonalizadasRepository {
           (
             SELECT MAX(ordem) + 1
             FROM mensagens_personalizadas_taxonomia
-            WHERE tipo = ${input.tipo}
+            WHERE tenant_id::text = ${tenant}
+              AND tipo = ${input.tipo}
           ),
           1
         )
       )
-      ON CONFLICT (tipo, nome) DO NOTHING
+      ON CONFLICT DO NOTHING
     `);
     }
-    async atualizarTaxonomia(id, input) {
+    async atualizarTaxonomia(id, input, tenantId) {
         await this.garantirEstrutura();
+        const tenant = requireTenant(tenantId);
         const rows = await prisma.$queryRaw(Prisma.sql `
       UPDATE mensagens_personalizadas_taxonomia
       SET
@@ -207,6 +228,7 @@ export class MensagensPersonalizadasRepository {
         status = ${input.status ?? "ATIVA"},
         atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenant}
       RETURNING
         id,
         tipo,
@@ -222,14 +244,18 @@ export class MensagensPersonalizadasRepository {
         }
         return rows[0];
     }
-    async removerTaxonomia(id) {
+    async removerTaxonomia(id, tenantId) {
         await this.garantirEstrutura();
+        const tenant = requireTenant(tenantId);
         const uso = await prisma.$queryRaw(Prisma.sql `
       SELECT COUNT(*)::bigint AS total
       FROM mensagens_personalizadas_modelo
-      WHERE categoria_id = ${id}
+      WHERE tenant_id::text = ${tenant}
+        AND (
+          categoria_id = ${id}
          OR assunto_id = ${id}
          OR tipo_comunicacao_id = ${id}
+        )
     `);
         if (Number(uso[0]?.total ?? 0) > 0) {
             throw new AppError("Este cadastro esta vinculado a mensagens existentes.", 409);
@@ -237,11 +263,13 @@ export class MensagensPersonalizadasRepository {
         await prisma.$executeRaw(Prisma.sql `
       DELETE FROM mensagens_personalizadas_taxonomia
       WHERE id = ${id}
+        AND tenant_id::text = ${tenant}
     `);
     }
-    async listarModelos(filtros) {
+    async listarModelos(filtros, tenantId) {
         await this.garantirEstrutura();
-        const clauses = [Prisma.sql `WHERE 1 = 1`];
+        const tenant = requireTenant(tenantId);
+        const clauses = [Prisma.sql `WHERE m.tenant_id::text = ${tenant}`];
         const busca = filtros.busca?.trim();
         if (busca) {
             clauses.push(Prisma.sql `AND (
@@ -302,8 +330,9 @@ export class MensagensPersonalizadasRepository {
       ORDER BY m.mensagem_padrao_sistema DESC, m.atualizado_em DESC, m.titulo ASC
     `);
     }
-    async obterModeloPorId(id) {
+    async obterModeloPorId(id, tenantId) {
         await this.garantirEstrutura();
+        const tenant = requireTenant(tenantId);
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT
         m.id,
@@ -341,12 +370,14 @@ export class MensagensPersonalizadasRepository {
       LEFT JOIN mensagens_personalizadas_taxonomia tipo
         ON tipo.id = m.tipo_comunicacao_id
       WHERE m.id = ${id}
+        AND m.tenant_id::text = ${tenant}
       LIMIT 1
     `);
         return rows[0] ?? null;
     }
-    async obterModeloPorChaveSistema(chaveSistema) {
+    async obterModeloPorChaveSistema(chaveSistema, tenantId) {
         await this.garantirEstrutura();
+        const tenant = requireTenant(tenantId);
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT
         m.id,
@@ -384,17 +415,20 @@ export class MensagensPersonalizadasRepository {
       LEFT JOIN mensagens_personalizadas_taxonomia tipo
         ON tipo.id = m.tipo_comunicacao_id
       WHERE m.chave_sistema = ${chaveSistema}
+        AND m.tenant_id::text = ${tenant}
       LIMIT 1
     `);
         return rows[0] ?? null;
     }
     async criarModelo(input, actor) {
         await this.garantirEstrutura();
+        const tenant = requireTenant(actor?.tenant_id);
         const categoriaId = parseBigIntId(input.categoriaId);
         const assuntoId = parseBigIntId(input.assuntoId);
         const tipoComunicacaoId = parseBigIntId(input.tipoComunicacaoId);
         const rows = await prisma.$queryRaw(Prisma.sql `
       INSERT INTO mensagens_personalizadas_modelo (
+        tenant_id,
         titulo,
         assunto,
         categoria_id,
@@ -417,6 +451,7 @@ export class MensagensPersonalizadasRepository {
         atualizado_por_nome
       )
       VALUES (
+        ${tenant}::uuid,
         ${input.titulo},
         ${input.assunto ?? null},
         ${categoriaId},
@@ -440,11 +475,12 @@ export class MensagensPersonalizadasRepository {
       )
       RETURNING id
     `);
-        return this.obterModeloOuFalhar(rows[0]?.id);
+        return this.obterModeloOuFalhar(rows[0]?.id, tenant);
     }
-    async inserirModeloSeedSeAusente(input) {
+    async inserirModeloSeedSeAusente(input, tenantId) {
         await this.garantirEstrutura();
-        const existente = await this.obterModeloPorChaveSistema(input.chaveSistema);
+        const tenant = requireTenant(tenantId);
+        const existente = await this.obterModeloPorChaveSistema(input.chaveSistema, tenant);
         if (existente)
             return existente;
         const categoriaId = parseBigIntId(input.categoriaId);
@@ -452,6 +488,7 @@ export class MensagensPersonalizadasRepository {
         const tipoComunicacaoId = parseBigIntId(input.tipoComunicacaoId);
         const rows = await prisma.$queryRaw(Prisma.sql `
       INSERT INTO mensagens_personalizadas_modelo (
+        tenant_id,
         titulo,
         assunto,
         categoria_id,
@@ -471,6 +508,7 @@ export class MensagensPersonalizadasRepository {
         chave_sistema
       )
       VALUES (
+        ${tenant}::uuid,
         ${input.titulo},
         ${input.assunto ?? null},
         ${categoriaId},
@@ -489,12 +527,24 @@ export class MensagensPersonalizadasRepository {
         ${input.mensagemSugeridaIa ?? false},
         ${input.chaveSistema}
       )
+      -- A instalação antiga pode ter um índice único global em chave_sistema,
+      -- enquanto as instalações novas usam o índice por tenant. O conflito
+      -- genérico mantém o seed idempotente nos dois formatos.
+      ON CONFLICT DO NOTHING
       RETURNING id
     `);
-        return this.obterModeloOuFalhar(rows[0]?.id);
+        if (rows[0]?.id) {
+            return this.obterModeloOuFalhar(rows[0].id, tenant);
+        }
+        return this.obterModeloPorChaveSistema(input.chaveSistema, tenant);
+        const existenteAposConflito = await this.obterModeloPorChaveSistema(input.chaveSistema, tenant);
+        if (existenteAposConflito)
+            return existenteAposConflito;
+        throw new AppError("Modelo de mensagem ja existe, mas nao foi localizado apos conflito.", 409);
     }
     async atualizarModelo(id, input, actor) {
         await this.garantirEstrutura();
+        const tenant = requireTenant(actor?.tenant_id);
         const categoriaId = parseBigIntId(input.categoriaId);
         const assuntoId = parseBigIntId(input.assuntoId);
         const tipoComunicacaoId = parseBigIntId(input.tipoComunicacaoId);
@@ -520,15 +570,17 @@ export class MensagensPersonalizadasRepository {
         atualizado_por_nome = ${actorName(actor)},
         atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenant}
       RETURNING id
     `);
         if (!rows[0]) {
             throw new AppError("Mensagem nao encontrada.", 404);
         }
-        return this.obterModeloOuFalhar(id);
+        return this.obterModeloOuFalhar(id, tenant);
     }
     async atualizarStatusModelo(id, status, actor) {
         await this.garantirEstrutura();
+        const tenant = requireTenant(actor?.tenant_id);
         const rows = await prisma.$queryRaw(Prisma.sql `
       UPDATE mensagens_personalizadas_modelo
       SET
@@ -537,23 +589,27 @@ export class MensagensPersonalizadasRepository {
         atualizado_por_nome = ${actorName(actor)},
         atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenant}
       RETURNING id
     `);
         if (!rows[0]) {
             throw new AppError("Mensagem nao encontrada.", 404);
         }
-        return this.obterModeloOuFalhar(id);
+        return this.obterModeloOuFalhar(id, tenant);
     }
-    async removerModelo(id) {
+    async removerModelo(id, tenantId) {
         await this.garantirEstrutura();
+        const tenant = requireTenant(tenantId);
         await prisma.$executeRaw(Prisma.sql `
       DELETE FROM mensagens_personalizadas_modelo
       WHERE id = ${id}
+        AND tenant_id::text = ${tenant}
     `);
     }
-    async listarHistorico(filtros) {
+    async listarHistorico(filtros, tenantId) {
         await this.garantirEstrutura();
-        const clauses = [Prisma.sql `WHERE 1 = 1`];
+        const tenant = requireTenant(tenantId);
+        const clauses = [Prisma.sql `WHERE tenant_id::text = ${tenant}`];
         const busca = filtros.busca?.trim();
         if (busca) {
             clauses.push(Prisma.sql `AND (
@@ -605,10 +661,12 @@ export class MensagensPersonalizadasRepository {
       LIMIT 500
     `);
     }
-    async registrarHistorico(input) {
+    async registrarHistorico(input, tenantId) {
         await this.garantirEstrutura();
+        const tenant = requireTenant(tenantId);
         await prisma.$executeRaw(Prisma.sql `
       INSERT INTO mensagens_personalizadas_historico (
+        tenant_id,
         modelo_id,
         nome_mensagem,
         canal,
@@ -628,6 +686,7 @@ export class MensagensPersonalizadasRepository {
         detalhes_json
       )
       VALUES (
+        ${tenant}::uuid,
         ${input.modeloId ?? null},
         ${input.nomeMensagem},
         ${input.canal},
@@ -650,8 +709,10 @@ export class MensagensPersonalizadasRepository {
     }
     async registrarAuditoria(input) {
         await this.garantirEstrutura();
+        const tenant = requireTenant(input.tenantId);
         await prisma.$executeRaw(Prisma.sql `
       INSERT INTO mensagens_personalizadas_auditoria (
+        tenant_id,
         acao,
         modelo_id,
         usuario_id,
@@ -659,6 +720,7 @@ export class MensagensPersonalizadasRepository {
         dados_json
       )
       VALUES (
+        ${tenant}::uuid,
         ${input.acao},
         ${input.modeloId ?? null},
         ${input.usuarioId ?? null},
@@ -667,8 +729,8 @@ export class MensagensPersonalizadasRepository {
       )
     `);
     }
-    async buscarDestinatarios(tipo, termo, somenteAtivos) {
-        const rows = await this.consultarDestinatarios(tipo, termo, somenteAtivos);
+    async buscarDestinatarios(tipo, termo, somenteAtivos, tenantId) {
+        const rows = await this.consultarDestinatarios(tipo, termo, somenteAtivos, undefined, tenantId);
         return rows.map((item) => ({
             tipo,
             id: item.id,
@@ -676,11 +738,25 @@ export class MensagensPersonalizadasRepository {
             documento: item.documento ?? undefined,
             email: item.email ?? undefined,
             telefone: item.telefone ?? undefined,
-            detalhe: item.detalhe ?? undefined
+            detalhe: item.detalhe ?? undefined,
+            aceitaComunicacao: item.aceite_comunicacao !== false
         }));
     }
-    async obterDestinatarioPorId(tipo, id) {
-        const rows = await this.consultarDestinatarios(tipo, undefined, undefined, id);
+    async listarTodosDestinatarios(tipo, tenantId) {
+        const rows = await this.consultarDestinatarios(tipo, undefined, true, undefined, tenantId, undefined);
+        return rows.map((item) => ({
+            tipo,
+            id: item.id,
+            nome: item.nome,
+            documento: item.documento ?? undefined,
+            email: item.email ?? undefined,
+            telefone: item.telefone ?? undefined,
+            detalhe: item.detalhe ?? undefined,
+            aceitaComunicacao: item.aceite_comunicacao !== false
+        }));
+    }
+    async obterDestinatarioPorId(tipo, id, tenantId) {
+        const rows = await this.consultarDestinatarios(tipo, undefined, undefined, id, tenantId);
         const item = rows[0];
         if (!item)
             return null;
@@ -698,14 +774,17 @@ export class MensagensPersonalizadasRepository {
             setor: item.setor ?? undefined,
             cargo: item.cargo ?? undefined,
             dataRegistro: item.data_registro?.toISOString() ?? undefined,
-            observacao: item.observacao ?? undefined
+            observacao: item.observacao ?? undefined,
+            aceitaComunicacao: item.aceite_comunicacao !== false
         };
     }
-    async consultarDestinatarios(tipo, termo, somenteAtivos, idEspecifico) {
+    async consultarDestinatarios(tipo, termo, somenteAtivos, idEspecifico, tenantId, limite = 30) {
         await this.garantirEstrutura();
+        const tenant = requireTenant(tenantId);
         const termoBusca = termo?.trim();
         const idClause = idEspecifico ? Prisma.sql `AND base.id = ${idEspecifico}` : Prisma.empty;
         const likeNome = termoBusca ? `%${termoBusca}%` : undefined;
+        const likeNomeNormalizado = termoBusca ? `%${normalizarTermoBusca(termoBusca)}%` : undefined;
         const digits = termoBusca ? termoBusca.replace(/\D/g, "") : "";
         if (tipo === "BENEFICIARIO") {
             return prisma.$queryRaw(Prisma.sql `
@@ -714,7 +793,9 @@ export class MensagensPersonalizadasRepository {
           SELECT
             b.id::text AS id,
             b.nome_completo AS nome,
-            b.cpf AS documento,
+            b.nome_social AS nome_social,
+            b.apelido AS apelido,
+            cpf_doc.numero_documento AS documento,
             contato.email AS email,
             COALESCE(
               NULLIF(contato.telefone_principal, ''),
@@ -728,24 +809,38 @@ export class MensagensPersonalizadasRepository {
             b.criado_em AS data_registro,
             NULL::text AS observacao,
             COALESCE(b.status, 'ATIVO') AS status_base,
-            COALESCE(contato.aceite_comunicacao_mensagens, true) AS aceite_comunicacao,
-            contato.preferencia_canal_comunicacao AS preferencia_canal
+            true AS aceite_comunicacao,
+            NULL::text AS preferencia_canal
           FROM cadastro_beneficiario b
           LEFT JOIN contato_beneficiario contato ON contato.beneficiario_id = b.id
+          LEFT JOIN LATERAL (
+            SELECT d.numero_documento
+            FROM documentos d
+            WHERE d.beneficiario_id = b.id
+              AND d.tenant_id::text = ${tenant}
+              AND upper(coalesce(d.tipo_documento, '')) = 'CPF'
+            ORDER BY d.id DESC
+            LIMIT 1
+          ) cpf_doc ON TRUE
+          WHERE b.tenant_id::text = ${tenant}
         ) base
         WHERE 1 = 1
           ${idClause}
-          AND base.aceite_comunicacao = true
           ${likeNome
                 ? Prisma.sql `AND (
                   base.nome ILIKE ${likeNome}
+                  OR COALESCE(base.nome_social, '') ILIKE ${likeNome}
+                  OR COALESCE(base.apelido, '') ILIKE ${likeNome}
+                  OR translate(lower(coalesce(base.nome, '')), ${caracteresBusca}, ${substitutosBusca}) ILIKE ${likeNomeNormalizado}
+                  OR translate(lower(coalesce(base.nome_social, '')), ${caracteresBusca}, ${substitutosBusca}) ILIKE ${likeNomeNormalizado}
+                  OR translate(lower(coalesce(base.apelido, '')), ${caracteresBusca}, ${substitutosBusca}) ILIKE ${likeNomeNormalizado}
                   OR COALESCE(base.documento, '') ILIKE ${`%${digits || termoBusca}%`}
                   OR COALESCE(base.detalhe, '') ILIKE ${likeNome}
                 )`
                 : Prisma.empty}
           ${somenteAtivos ? Prisma.sql `AND base.status_base = 'ATIVO'` : Prisma.empty}
         ORDER BY base.nome ASC
-        LIMIT 30
+        ${limite ? Prisma.sql `LIMIT ${limite}` : Prisma.empty}
       `);
         }
         if (tipo === "PROFISSIONAL" || tipo === "COLABORADOR") {
@@ -765,13 +860,13 @@ export class MensagensPersonalizadasRepository {
             p.criado_em AS data_registro,
             p.observacoes AS observacao,
             COALESCE(p.status, 'ATIVO') AS status_base,
-            COALESCE(p.aceite_comunicacao_mensagens, true) AS aceite_comunicacao,
-            p.preferencia_canal_comunicacao AS preferencia_canal
+            true AS aceite_comunicacao,
+            NULL::text AS preferencia_canal
           FROM cadastro_profissionais p
+          WHERE p.tenant_id::text = ${tenant}
         ) base
         WHERE 1 = 1
           ${idClause}
-          AND base.aceite_comunicacao = true
           ${likeNome
                 ? Prisma.sql `AND (
                   base.nome ILIKE ${likeNome}
@@ -781,7 +876,7 @@ export class MensagensPersonalizadasRepository {
                 : Prisma.empty}
           ${somenteAtivos ? Prisma.sql `AND base.status_base = 'ATIVO'` : Prisma.empty}
         ORDER BY base.nome ASC
-        LIMIT 30
+        ${limite ? Prisma.sql `LIMIT ${limite}` : Prisma.empty}
       `);
         }
         if (tipo === "VOLUNTARIO") {
@@ -801,13 +896,13 @@ export class MensagensPersonalizadasRepository {
             v.criado_em AS data_registro,
             v.observacoes AS observacao,
             COALESCE(v.status, 'ATIVO') AS status_base,
-            COALESCE(v.aceite_comunicacao_mensagens, true) AS aceite_comunicacao,
-            v.preferencia_canal_comunicacao AS preferencia_canal
+            true AS aceite_comunicacao,
+            NULL::text AS preferencia_canal
           FROM cadastro_voluntario v
+          WHERE v.tenant_id::text = ${tenant}
         ) base
         WHERE 1 = 1
           ${idClause}
-          AND base.aceite_comunicacao = true
           ${likeNome
                 ? Prisma.sql `AND (
                   base.nome ILIKE ${likeNome}
@@ -817,7 +912,7 @@ export class MensagensPersonalizadasRepository {
                 : Prisma.empty}
           ${somenteAtivos ? Prisma.sql `AND base.status_base = 'ATIVO'` : Prisma.empty}
         ORDER BY base.nome ASC
-        LIMIT 30
+        ${limite ? Prisma.sql `LIMIT ${limite}` : Prisma.empty}
       `);
         }
         if (tipo === "INSTITUICAO") {
@@ -838,6 +933,7 @@ export class MensagensPersonalizadasRepository {
             u.observacoes AS observacao,
             'ATIVO'::text AS status_base
           FROM unidade_assistencial u
+          WHERE u.tenant_id::text = ${tenant}
         ) base
         WHERE 1 = 1
           ${idClause}
@@ -849,7 +945,7 @@ export class MensagensPersonalizadasRepository {
                 )`
                 : Prisma.empty}
         ORDER BY base.nome ASC
-        LIMIT 30
+        ${limite ? Prisma.sql `LIMIT ${limite}` : Prisma.empty}
       `);
         }
         return prisma.$queryRaw(Prisma.sql `
@@ -869,6 +965,7 @@ export class MensagensPersonalizadasRepository {
           d.observacoes AS observacao,
           'ATIVO'::text AS status_base
         FROM doador d
+        WHERE d.tenant_id::text = ${tenant}
       ) base
       WHERE 1 = 1
         ${idClause}
@@ -880,21 +977,21 @@ export class MensagensPersonalizadasRepository {
               )`
             : Prisma.empty}
       ORDER BY base.nome ASC
-      LIMIT 30
+      ${limite ? Prisma.sql `LIMIT ${limite}` : Prisma.empty}
     `);
     }
-    async obterModeloOuFalhar(id) {
+    async obterModeloOuFalhar(id, tenantId) {
         if (!id) {
             throw new AppError("Mensagem nao encontrada.", 404);
         }
-        const row = await this.obterModeloPorId(id);
+        const row = await this.obterModeloPorId(id, requireTenant(tenantId));
         if (!row) {
             throw new AppError("Mensagem nao encontrada.", 404);
         }
         return row;
     }
 }
-export async function ensureMensagensPersonalizadasEstrutura() {
+async function executarGarantiaEstruturaMensagensPersonalizadas() {
     if (!estruturaPromise) {
         estruturaPromise = (async () => {
             for (const comando of estruturaSql) {
@@ -903,4 +1000,116 @@ export async function ensureMensagensPersonalizadasEstrutura() {
         })();
     }
     await estruturaPromise;
+    await prisma.$executeRawUnsafe("ALTER TABLE mensagens_personalizadas_taxonomia ADD COLUMN IF NOT EXISTS tenant_id UUID");
+    await prisma.$executeRawUnsafe("ALTER TABLE mensagens_personalizadas_modelo ADD COLUMN IF NOT EXISTS tenant_id UUID");
+    await prisma.$executeRawUnsafe("ALTER TABLE mensagens_personalizadas_historico ADD COLUMN IF NOT EXISTS tenant_id UUID");
+    await prisma.$executeRawUnsafe("ALTER TABLE mensagens_personalizadas_auditoria ADD COLUMN IF NOT EXISTS tenant_id UUID");
+    await prisma.$executeRawUnsafe(`
+    UPDATE mensagens_personalizadas_taxonomia
+    SET tenant_id = origem.tenant_id
+    FROM (
+      SELECT tenant_id
+      FROM unidade_assistencial
+      WHERE tenant_id IS NOT NULL
+      ORDER BY unidade_principal DESC, atualizado_em DESC, criado_em ASC
+      LIMIT 1
+    ) origem
+    WHERE mensagens_personalizadas_taxonomia.tenant_id IS NULL
+  `);
+    await prisma.$executeRawUnsafe(`
+    UPDATE mensagens_personalizadas_modelo
+    SET tenant_id = taxonomia.tenant_id
+    FROM (
+      SELECT tenant_id
+      FROM mensagens_personalizadas_taxonomia
+      WHERE tenant_id IS NOT NULL
+      ORDER BY atualizado_em DESC, id DESC
+      LIMIT 1
+    ) taxonomia
+    WHERE mensagens_personalizadas_modelo.tenant_id IS NULL
+  `);
+    await prisma.$executeRawUnsafe(`
+    UPDATE mensagens_personalizadas_historico
+    SET tenant_id = modelo.tenant_id
+    FROM mensagens_personalizadas_modelo modelo
+    WHERE mensagens_personalizadas_historico.tenant_id IS NULL
+      AND modelo.id = mensagens_personalizadas_historico.modelo_id
+  `);
+    await prisma.$executeRawUnsafe(`
+    UPDATE mensagens_personalizadas_historico
+    SET tenant_id = origem.tenant_id
+    FROM (
+      SELECT tenant_id
+      FROM mensagens_personalizadas_modelo
+      WHERE tenant_id IS NOT NULL
+      ORDER BY atualizado_em DESC, id DESC
+      LIMIT 1
+    ) origem
+    WHERE mensagens_personalizadas_historico.tenant_id IS NULL
+  `);
+    await prisma.$executeRawUnsafe(`
+    UPDATE mensagens_personalizadas_auditoria
+    SET tenant_id = historico.tenant_id
+    FROM (
+      SELECT tenant_id
+      FROM mensagens_personalizadas_historico
+      WHERE tenant_id IS NOT NULL
+      ORDER BY criado_em DESC, id DESC
+      LIMIT 1
+    ) historico
+    WHERE mensagens_personalizadas_auditoria.tenant_id IS NULL
+  `);
+    await prisma.$executeRawUnsafe(`
+    DELETE FROM mensagens_personalizadas_taxonomia alvo
+    USING (
+      SELECT id
+      FROM (
+        SELECT
+          id,
+          ROW_NUMBER() OVER (
+            PARTITION BY tenant_id, tipo, lower(nome)
+            ORDER BY atualizado_em DESC, id DESC
+          ) AS rn
+        FROM mensagens_personalizadas_taxonomia
+        WHERE tenant_id IS NOT NULL
+      ) duplicadas
+      WHERE duplicadas.rn > 1
+    ) purge
+    WHERE alvo.id = purge.id
+  `);
+    await prisma.$executeRawUnsafe(`
+    DELETE FROM mensagens_personalizadas_modelo alvo
+    USING (
+      SELECT id
+      FROM (
+        SELECT
+          id,
+          ROW_NUMBER() OVER (
+            PARTITION BY tenant_id, chave_sistema
+            ORDER BY atualizado_em DESC, id DESC
+          ) AS rn
+        FROM mensagens_personalizadas_modelo
+        WHERE tenant_id IS NOT NULL
+          AND chave_sistema IS NOT NULL
+      ) duplicadas
+      WHERE duplicadas.rn > 1
+    ) purge
+    WHERE alvo.id = purge.id
+  `);
+    await prisma.$executeRawUnsafe("CREATE UNIQUE INDEX IF NOT EXISTS mensagens_personalizadas_taxonomia_tenant_tipo_nome_udx ON mensagens_personalizadas_taxonomia(tenant_id, tipo, nome)");
+    await prisma.$executeRawUnsafe("CREATE UNIQUE INDEX IF NOT EXISTS mensagens_personalizadas_modelo_tenant_chave_sistema_udx ON mensagens_personalizadas_modelo(tenant_id, chave_sistema) WHERE chave_sistema IS NOT NULL");
+    await prisma.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS mensagens_personalizadas_modelo_tenant_status_idx ON mensagens_personalizadas_modelo(tenant_id, status)");
+    await prisma.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS mensagens_personalizadas_modelo_tenant_titulo_idx ON mensagens_personalizadas_modelo(tenant_id, titulo)");
+    await prisma.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS mensagens_personalizadas_historico_tenant_data_idx ON mensagens_personalizadas_historico(tenant_id, criado_em DESC)");
+    await prisma.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS mensagens_personalizadas_historico_tenant_status_idx ON mensagens_personalizadas_historico(tenant_id, status)");
+    await prisma.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS mensagens_personalizadas_auditoria_tenant_data_idx ON mensagens_personalizadas_auditoria(tenant_id, criado_em DESC)");
+}
+export async function ensureMensagensPersonalizadasEstrutura() {
+    if (!estruturaCompletaPromise) {
+        estruturaCompletaPromise = executarGarantiaEstruturaMensagensPersonalizadas().catch((error) => {
+            estruturaCompletaPromise = null;
+            throw error;
+        });
+    }
+    await estruturaCompletaPromise;
 }

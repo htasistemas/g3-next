@@ -37,6 +37,8 @@ contabilidadeRoutes.get("/conciliacoes", ensureAuthenticated, ensurePermissions(
 contabilidadeRoutes.post("/conciliacoes", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.criarConciliacao.bind(controller)));
 contabilidadeRoutes.patch("/conciliacoes/:id/situacao", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.atualizarSituacaoConciliacao.bind(controller)));
 contabilidadeRoutes.get("/historico", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listarHistorico.bind(controller)));
+contabilidadeRoutes.get("/fechamentos-mensais", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listarFechamentosMensais.bind(controller)));
+contabilidadeRoutes.post("/fechar-mes", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.fecharMes.bind(controller)));
 contabilidadeRoutes.get("/compras-integradas", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listarComprasIntegradas.bind(controller)));
 contabilidadeRoutes.post("/compras-integradas/:id/gerar-obrigacao", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.gerarObrigacaoFinanceiraPorCompra.bind(controller)));
 contabilidadeRoutes.get("/emendas", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listarEmendas.bind(controller)));

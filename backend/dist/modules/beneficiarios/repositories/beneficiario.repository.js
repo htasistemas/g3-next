@@ -1,6 +1,8 @@
+import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
+import { ensureMultiTenantStructure } from "../../multi-tenant/tenant-estrutura.service.js";
 import { joinSemicolonList, normalizeDigits, toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
 function ehConteudoInlineArquivo(valor) {
     const texto = trimOrUndefined(valor);
@@ -40,6 +42,132 @@ const sqlCidadeNormalizadaBusca = Prisma.raw(`translate(lower(trim(coalesce(cida
 const sqlBairroNormalizadoBusca = Prisma.raw(`translate(lower(trim(coalesce(bairro, ''))), '${caracteresAcentuadosNormalizacao}', 'aaaaaeeeeiiiiooooouuuuc')`);
 const sqlNomeCompletoNormalizadoBusca = Prisma.raw(`translate(lower(trim(coalesce(nome_completo, ''))), '${caracteresAcentuadosNormalizacao}', 'aaaaaeeeeiiiiooooouuuuc')`);
 const sqlNomeMaeNormalizadoBusca = Prisma.raw(`translate(lower(trim(coalesce(nome_mae, ''))), '${caracteresAcentuadosNormalizacao}', 'aaaaaeeeeiiiiooooouuuuc')`);
+let estruturaTenantBeneficiarioPromise = null;
+async function ensureBeneficiarioTenantEstrutura() {
+    if (!estruturaTenantBeneficiarioPromise) {
+        estruturaTenantBeneficiarioPromise = (async () => {
+            await ensureMultiTenantStructure(prisma);
+            await prisma.$executeRawUnsafe("ALTER TABLE documentos ADD COLUMN IF NOT EXISTS data_validade DATE");
+            await prisma.$executeRawUnsafe("ALTER TABLE documentos ADD COLUMN IF NOT EXISTS categoria VARCHAR(60)");
+            await prisma.$executeRawUnsafe("ALTER TABLE documentos ADD COLUMN IF NOT EXISTS observacao TEXT");
+            await prisma.$executeRawUnsafe("ALTER TABLE documentos ADD COLUMN IF NOT EXISTS obrigatorio BOOLEAN");
+            await prisma.$executeRawUnsafe("ALTER TABLE documentos ADD COLUMN IF NOT EXISTS content_type VARCHAR(120)");
+            await prisma.$executeRawUnsafe("ALTER TABLE documentos ADD COLUMN IF NOT EXISTS nome_arquivo VARCHAR(200)");
+            await prisma.$executeRawUnsafe("ALTER TABLE documentos ADD COLUMN IF NOT EXISTS caminho_arquivo TEXT");
+            await prisma.$executeRawUnsafe(`
+        DO $$
+        DECLARE
+          tenant_torresoft UUID;
+          total_torresoft INTEGER;
+          total_instituicoes INTEGER;
+          tenant_unico UUID;
+        BEGIN
+          SELECT tenant_id
+            INTO tenant_torresoft
+          FROM instituicoes
+          WHERE regexp_replace(coalesce(cnpj, ''), '\\D', '', 'g') = '32004110000118'
+             OR lower(coalesce(slug, '')) = 'torresoft'
+             OR upper(coalesce(codigo, '')) = 'TORRESOFT'
+          ORDER BY atualizado_em DESC
+          LIMIT 1;
+
+          SELECT COUNT(*)
+            INTO total_instituicoes
+          FROM instituicoes;
+
+          SELECT tenant_id
+            INTO tenant_unico
+          FROM instituicoes
+          ORDER BY criado_em ASC
+          LIMIT 1;
+
+          IF total_instituicoes = 1 AND tenant_unico IS NOT NULL THEN
+            UPDATE cadastro_beneficiario
+               SET tenant_id = tenant_unico
+             WHERE tenant_id IS NULL;
+          END IF;
+
+          IF tenant_torresoft IS NOT NULL THEN
+            SELECT COUNT(*)
+              INTO total_torresoft
+            FROM cadastro_beneficiario
+            WHERE tenant_id = tenant_torresoft;
+
+            IF total_torresoft = 0 THEN
+              UPDATE cadastro_beneficiario
+                 SET tenant_id = tenant_torresoft
+               WHERE tenant_id IS NULL
+                  OR codigo ILIKE 'DEMO-TS-BEN-%'
+                  OR codigo ILIKE 'DEMO-TS-AUTO-BEN-%';
+            ELSE
+              UPDATE cadastro_beneficiario
+                 SET tenant_id = tenant_torresoft
+               WHERE tenant_id IS NULL
+                 AND (
+                   codigo ILIKE 'DEMO-TS-BEN-%'
+                   OR codigo ILIKE 'DEMO-TS-AUTO-BEN-%'
+                 );
+            END IF;
+          END IF;
+
+          UPDATE contato_beneficiario c
+             SET tenant_id = b.tenant_id
+            FROM cadastro_beneficiario b
+           WHERE c.beneficiario_id = b.id
+             AND b.tenant_id IS NOT NULL
+             AND c.tenant_id IS DISTINCT FROM b.tenant_id;
+
+          UPDATE documentos d
+             SET tenant_id = b.tenant_id
+            FROM cadastro_beneficiario b
+           WHERE d.beneficiario_id = b.id
+             AND b.tenant_id IS NOT NULL
+             AND d.tenant_id IS DISTINCT FROM b.tenant_id;
+
+          UPDATE situacao_social s
+             SET tenant_id = b.tenant_id
+            FROM cadastro_beneficiario b
+           WHERE s.beneficiario_id = b.id
+             AND b.tenant_id IS NOT NULL
+             AND s.tenant_id IS DISTINCT FROM b.tenant_id;
+
+          UPDATE escolaridade_beneficiario e
+             SET tenant_id = b.tenant_id
+            FROM cadastro_beneficiario b
+           WHERE e.beneficiario_id = b.id
+             AND b.tenant_id IS NOT NULL
+             AND e.tenant_id IS DISTINCT FROM b.tenant_id;
+
+          UPDATE saude_beneficiario s
+             SET tenant_id = b.tenant_id
+            FROM cadastro_beneficiario b
+           WHERE s.beneficiario_id = b.id
+             AND b.tenant_id IS NOT NULL
+             AND s.tenant_id IS DISTINCT FROM b.tenant_id;
+
+          UPDATE beneficios_beneficiario bb
+             SET tenant_id = b.tenant_id
+            FROM cadastro_beneficiario b
+           WHERE bb.beneficiario_id = b.id
+             AND b.tenant_id IS NOT NULL
+             AND bb.tenant_id IS DISTINCT FROM b.tenant_id;
+
+          UPDATE observacoes_beneficiario o
+             SET tenant_id = b.tenant_id
+            FROM cadastro_beneficiario b
+           WHERE o.beneficiario_id = b.id
+             AND b.tenant_id IS NOT NULL
+             AND o.tenant_id IS DISTINCT FROM b.tenant_id;
+        END
+        $$;
+      `);
+        })().catch((error) => {
+            estruturaTenantBeneficiarioPromise = null;
+            throw error;
+        });
+    }
+    await estruturaTenantBeneficiarioPromise;
+}
 function hasAnyAddressData(input) {
     return !!(trimOrUndefined(input.cep) ||
         trimOrUndefined(input.logradouro) ||
@@ -87,6 +215,36 @@ function buildCodigoVariants(value) {
     variants.delete("NaN");
     return [...variants].filter(Boolean);
 }
+function filtroCpfEhPlaceholder(value) {
+    const cpf = normalizeDigits(value) ?? "";
+    return cpf.length > 0 && /^0+$/.test(cpf);
+}
+function filtroCodigoEhPlaceholderListagem(filters) {
+    const codigo = trimOrUndefined(filters.codigo);
+    if (!codigo)
+        return false;
+    const codigoNormalizado = codigo.replace(/\D/g, "");
+    const semOutrosFiltros = !trimOrUndefined(filters.nome) &&
+        !trimOrUndefined(filters.status) &&
+        !trimOrUndefined(filters.data_nascimento) &&
+        !normalizeDigits(filters.nis);
+    return (filtroCpfEhPlaceholder(filters.cpf) &&
+        semOutrosFiltros &&
+        (codigoNormalizado === "1" || codigoNormalizado === "0001"));
+}
+function normalizarStatusFiltroListagem(value) {
+    const status = trimOrUndefined(value);
+    if (!status)
+        return undefined;
+    const statusNormalizado = status
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toUpperCase();
+    if (["TODOS", "TODAS", "ALL"].includes(statusNormalizado)) {
+        return undefined;
+    }
+    return status;
+}
 async function obterProximoCodigoTransacao(tx) {
     const result = await tx.$queryRaw `
     SELECT MAX(CAST(codigo AS INTEGER)) AS max_code
@@ -97,78 +255,238 @@ async function obterProximoCodigoTransacao(tx) {
     const maxCode = result[0]?.max_code ?? 0;
     return String(maxCode + 1).padStart(4, "0");
 }
+const sqlEstruturaPortalBeneficiario = [
+    `
+    CREATE TABLE IF NOT EXISTS beneficiario_portal_acesso (
+      id BIGSERIAL PRIMARY KEY,
+      beneficiario_id BIGINT NOT NULL UNIQUE REFERENCES cadastro_beneficiario(id) ON DELETE CASCADE,
+      tenant_id UUID,
+      senha_hash VARCHAR(255) NOT NULL,
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+      atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `,
+    "ALTER TABLE beneficiario_portal_acesso ADD COLUMN IF NOT EXISTS tenant_id UUID",
+    "CREATE UNIQUE INDEX IF NOT EXISTS beneficiario_portal_acesso_beneficiario_uidx ON beneficiario_portal_acesso (beneficiario_id)",
+    "CREATE INDEX IF NOT EXISTS beneficiario_portal_acesso_tenant_idx ON beneficiario_portal_acesso (tenant_id, beneficiario_id)"
+];
+let estruturaPortalPromise = null;
+export async function ensureBeneficiarioPortalAcessoEstrutura() {
+    if (!estruturaPortalPromise) {
+        estruturaPortalPromise = (async () => {
+            for (const comando of sqlEstruturaPortalBeneficiario) {
+                await prisma.$executeRawUnsafe(comando);
+            }
+        })();
+    }
+    await estruturaPortalPromise;
+}
+export async function possuiBeneficiarioPortalAcesso(beneficiarioId, tenantId) {
+    await ensureBeneficiarioPortalAcessoEstrutura();
+    const rows = await prisma.$queryRaw(Prisma.sql `
+    SELECT beneficiario_id
+    FROM beneficiario_portal_acesso
+    WHERE beneficiario_id = ${beneficiarioId}
+      AND tenant_id::text = ${tenantId}
+    LIMIT 1
+  `);
+    return rows.length > 0;
+}
+export async function obterBeneficiariosPortalPorCpf(cpf) {
+    await ensureBeneficiarioPortalAcessoEstrutura();
+    const rows = await prisma.$queryRaw(Prisma.sql `
+    SELECT
+      b.id AS beneficiario_id,
+      COALESCE(
+        b.tenant_id::text,
+        acesso.tenant_id::text,
+        vf.tenant_id::text,
+        m.tenant_id::text
+      ) AS tenant_id,
+      i.id::text AS instituicao_id,
+      COALESCE(i.nome_fantasia, i.razao_social) AS instituicao_nome,
+      i.cnpj AS instituicao_cnpj,
+      b.nome_completo,
+      b.codigo,
+      doc.numero_documento AS cpf,
+      acesso.senha_hash,
+      contato.email,
+      contato.telefone_principal AS telefone,
+      vf.id AS familia_id,
+      vf.nome_familia
+    FROM cadastro_beneficiario b
+    LEFT JOIN documentos doc
+      ON doc.beneficiario_id = b.id
+     AND UPPER(COALESCE(doc.tipo_documento, '')) = 'CPF'
+    LEFT JOIN beneficiario_portal_acesso acesso
+      ON acesso.beneficiario_id = b.id
+    LEFT JOIN contato_beneficiario contato
+      ON contato.beneficiario_id = b.id
+    LEFT JOIN vinculo_familiar_membro m
+      ON m.beneficiario_id = b.id
+    LEFT JOIN vinculo_familiar vf
+      ON vf.id = m.vinculo_familiar_id
+    LEFT JOIN instituicoes i
+      ON i.tenant_id = COALESCE(b.tenant_id, acesso.tenant_id, vf.tenant_id, m.tenant_id)
+    WHERE COALESCE(b.status, 'ATIVO') <> 'INATIVO'
+      AND REGEXP_REPLACE(COALESCE(doc.numero_documento, ''), '\\D', '', 'g') = ${cpf}
+    ORDER BY b.atualizado_em DESC, b.id DESC
+  `);
+    return rows;
+}
+export async function obterBeneficiarioPortalPorCpf(cpf) {
+    const rows = await obterBeneficiariosPortalPorCpf(cpf);
+    return rows[0] ?? null;
+}
+async function salvarSenhaPortalTx(tx, beneficiarioId, tenantId, senhaPortal) {
+    const senhaLimpa = trimOrUndefined(senhaPortal);
+    if (!senhaLimpa) {
+        return null;
+    }
+    const senhaNormalizada = senhaLimpa.replace(/\D/g, "");
+    if (senhaNormalizada.length !== 4) {
+        throw new AppError("A senha do portal deve ter 4 digitos.", 422);
+    }
+    const senhaHash = await bcrypt.hash(senhaNormalizada, 10);
+    await tx.$executeRaw(Prisma.sql `
+    INSERT INTO beneficiario_portal_acesso (
+      beneficiario_id,
+      tenant_id,
+      senha_hash,
+      criado_em,
+      atualizado_em
+    ) VALUES (
+      ${beneficiarioId},
+      ${tenantId}::uuid,
+      ${senhaHash},
+      NOW(),
+      NOW()
+    )
+    ON CONFLICT (beneficiario_id)
+    DO UPDATE SET
+      tenant_id = EXCLUDED.tenant_id,
+      senha_hash = EXCLUDED.senha_hash,
+      atualizado_em = NOW()
+  `);
+    return senhaNormalizada;
+}
 export class BeneficiarioRepository {
-    async listar(filters) {
-        const where = {};
-        const andFilters = [];
+    tenantSql(alias, tenantId) {
+        return Prisma.sql `${Prisma.raw(alias)}.tenant_id::text = ${tenantId}`;
+    }
+    async listar(filters, tenantId) {
+        await ensureBeneficiarioTenantEstrutura();
+        const condicoesFiltro = [];
         const nome = trimOrUndefined(filters.nome);
         if (nome) {
-            where.OR = [
-                { nomeCompleto: { contains: nome, mode: "insensitive" } },
-                { nomeSocial: { contains: nome, mode: "insensitive" } },
-                { apelido: { contains: nome, mode: "insensitive" } }
-            ];
+            const like = `%${nome}%`;
+            condicoesFiltro.push(Prisma.sql `
+        (
+          b.nome_completo ILIKE ${like}
+          OR COALESCE(b.nome_social, '') ILIKE ${like}
+          OR COALESCE(b.apelido, '') ILIKE ${like}
+        )
+      `);
         }
-        const status = trimOrUndefined(filters.status);
+        const status = normalizarStatusFiltroListagem(filters.status);
         if (status) {
-            where.status = status;
+            condicoesFiltro.push(Prisma.sql `UPPER(COALESCE(b.status, '')) = ${status.toUpperCase()}`);
         }
-        const codigoVariants = buildCodigoVariants(filters.codigo);
+        const codigoFiltro = filtroCodigoEhPlaceholderListagem(filters) ? undefined : filters.codigo;
+        const codigoVariants = buildCodigoVariants(codigoFiltro);
         if (codigoVariants.length) {
-            andFilters.push({ codigo: { in: codigoVariants } });
+            condicoesFiltro.push(Prisma.sql `b.codigo IN (${Prisma.join(codigoVariants)})`);
         }
-        const cpf = normalizeDigits(filters.cpf);
+        const cpf = filtroCpfEhPlaceholder(filters.cpf) ? "" : normalizeDigits(filters.cpf);
         if (cpf) {
-            andFilters.push({
-                documentos: {
-                    some: {
-                        tipoDocumento: "CPF",
-                        numeroDocumento: { contains: cpf }
-                    }
-                }
-            });
+            condicoesFiltro.push(Prisma.sql `
+        EXISTS (
+          SELECT 1
+          FROM documentos d
+          WHERE d.beneficiario_id = b.id
+            AND upper(coalesce(d.tipo_documento, '')) = 'CPF'
+            AND regexp_replace(coalesce(d.numero_documento, ''), '[^0-9]', '', 'g') LIKE ${`%${cpf}%`}
+        )
+      `);
         }
         const nis = normalizeDigits(filters.nis);
         if (nis) {
-            andFilters.push({
-                documentos: {
-                    some: {
-                        tipoDocumento: "NIS",
-                        numeroDocumento: { contains: nis }
-                    }
-                }
-            });
+            condicoesFiltro.push(Prisma.sql `
+        EXISTS (
+          SELECT 1
+          FROM documentos d
+          WHERE d.beneficiario_id = b.id
+            AND upper(coalesce(d.tipo_documento, '')) = 'NIS'
+            AND regexp_replace(coalesce(d.numero_documento, ''), '[^0-9]', '', 'g') LIKE ${`%${nis}%`}
+        )
+      `);
         }
         const dataNascimento = toOptionalDate(filters.data_nascimento);
         if (dataNascimento) {
-            andFilters.push({ dataNascimento });
+            condicoesFiltro.push(Prisma.sql `b.data_nascimento = ${dataNascimento}`);
         }
-        if (andFilters.length) {
-            where.AND = andFilters;
+        const consultarIds = async (condicoesTenant) => {
+            const condicoes = [...condicoesTenant, ...condicoesFiltro];
+            const where = condicoes.length
+                ? Prisma.sql `WHERE ${Prisma.join(condicoes, " AND ")}`
+                : Prisma.empty;
+            return prisma.$queryRaw(Prisma.sql `
+        SELECT b.id
+        FROM cadastro_beneficiario b
+        ${where}
+        ORDER BY b.nome_completo ASC
+      `);
+        };
+        // O tenant da sessão é obrigatório. Nunca fazer fallback para registros
+        // sem tenant ou para todos os registros: isso transformaria dados legados
+        // em uma possível resposta cross-tenant.
+        const ids = await consultarIds([this.tenantSql("b", tenantId)]);
+        if (!ids.length) {
+            return [];
         }
-        return prisma.cadastroBeneficiario.findMany({
-            where,
+        const encontrados = await prisma.cadastroBeneficiario.findMany({
+            where: { id: { in: ids.map((item) => item.id) } },
             include: beneficiarioInclude,
             orderBy: [{ nomeCompleto: "asc" }]
         });
+        return encontrados;
     }
-    async buscarPorId(id) {
+    async buscarPorId(id, tenantId) {
+        await ensureBeneficiarioTenantEstrutura();
+        const rows = await prisma.$queryRaw(Prisma.sql `
+      SELECT b.id
+      FROM cadastro_beneficiario b
+      WHERE b.id = ${id}
+        AND ${this.tenantSql("b", tenantId)}
+      LIMIT 1
+    `);
+        if (!rows[0])
+            return null;
         return prisma.cadastroBeneficiario.findUnique({
             where: { id },
             include: beneficiarioInclude
         });
     }
-    async buscarPorIdOuFalhar(id) {
-        const beneficiario = await this.buscarPorId(id);
+    async buscarPorIdOuFalhar(id, tenantId) {
+        const beneficiario = await this.buscarPorId(id, tenantId);
         if (!beneficiario) {
             throw new AppError("Beneficiario nao encontrado.", 404);
         }
         return beneficiario;
     }
-    async obterProximoCodigo() {
-        return obterProximoCodigoTransacao(prisma);
+    async obterProximoCodigo(tenantId) {
+        await ensureBeneficiarioTenantEstrutura();
+        const result = await prisma.$queryRaw(Prisma.sql `
+      SELECT MAX(CAST(codigo AS INTEGER)) AS max_code
+      FROM cadastro_beneficiario
+      WHERE codigo IS NOT NULL
+        AND codigo ~ '^[0-9]+$'
+        AND tenant_id::text = ${tenantId}
+    `);
+        const maxCode = result[0]?.max_code ?? 0;
+        return String(maxCode + 1).padStart(4, "0");
     }
-    async buscarDuplicidadeCadastro(input, idIgnorado) {
+    async buscarDuplicidadeCadastro(input, tenantId, idIgnorado) {
         const nomeCompleto = normalizarTextoBusca(input.nome_completo);
         const nomeMae = normalizarTextoBusca(input.nome_mae);
         const dataNascimento = toOptionalDate(input.data_nascimento);
@@ -191,7 +509,8 @@ export class BeneficiarioRepository {
           LIMIT 1
         ) AS cpf
       FROM cadastro_beneficiario b
-      WHERE b.data_nascimento = ${dataNascimento}
+      WHERE ${this.tenantSql("b", tenantId)}
+        AND b.data_nascimento = ${dataNascimento}
         AND ${sqlNomeCompletoNormalizadoBusca} = ${nomeCompleto}
         AND ${sqlNomeMaeNormalizadoBusca} = ${nomeMae}
         ${filtroIdIgnorado}
@@ -210,7 +529,8 @@ export class BeneficiarioRepository {
         b.nome_completo,
         ${cpf} AS cpf
       FROM cadastro_beneficiario b
-      WHERE EXISTS (
+      WHERE ${this.tenantSql("b", tenantId)}
+        AND EXISTS (
         SELECT 1
         FROM documentos d
         WHERE d.beneficiario_id = b.id
@@ -222,7 +542,7 @@ export class BeneficiarioRepository {
     `);
         return duplicadosPorCpf[0] ?? null;
     }
-    async buscarSugestaoEndereco(filters) {
+    async buscarSugestaoEndereco(filters, tenantId) {
         const municipio = normalizarTextoBusca(filters.municipio);
         if (!municipio) {
             return null;
@@ -235,7 +555,9 @@ export class BeneficiarioRepository {
           NULLIF(TRIM(subzona), '') AS subzona,
           COUNT(*)::integer AS total
         FROM endereco
-        WHERE ${sqlCidadeNormalizadaBusca} = ${municipio}
+        INNER JOIN cadastro_beneficiario b ON b.endereco_id = endereco.id
+        WHERE ${this.tenantSql("b", tenantId)}
+          AND ${sqlCidadeNormalizadaBusca} = ${municipio}
           AND (
             COALESCE(TRIM(zona), '') <> ''
             OR COALESCE(TRIM(subzona), '') <> ''
@@ -258,7 +580,7 @@ export class BeneficiarioRepository {
         };
         return (await buscarCombinacao(true)) ?? (await buscarCombinacao(false));
     }
-    async criar(input) {
+    async criar(input, tenantId) {
         return prisma.$transaction(async (tx) => {
             const now = new Date();
             let enderecoId;
@@ -283,7 +605,7 @@ export class BeneficiarioRepository {
                 });
                 enderecoId = endereco.id;
             }
-            const codigo = trimOrUndefined(input.codigo) ?? (await obterProximoCodigoTransacao(tx));
+            const codigo = trimOrUndefined(input.codigo) ?? (await this.obterProximoCodigoTransacaoTenant(tx, tenantId));
             const beneficiario = await tx.cadastroBeneficiario.create({
                 data: {
                     codigo,
@@ -310,14 +632,14 @@ export class BeneficiarioRepository {
                 }
             });
             await this.recriarDadosRelacionados(tx, beneficiario.id, input, now);
+            await this.aplicarTenantDoBeneficiario(tx, beneficiario.id, tenantId);
+            await salvarSenhaPortalTx(tx, beneficiario.id, tenantId, input.senha_portal);
             return this.buscarPorIdTransacao(tx, beneficiario.id);
         });
     }
-    async atualizar(id, input) {
+    async atualizar(id, input, tenantId) {
         return prisma.$transaction(async (tx) => {
-            const existing = await tx.cadastroBeneficiario.findUnique({
-                where: { id }
-            });
+            const existing = await this.buscarPorIdTransacao(tx, id, tenantId);
             if (!existing) {
                 throw new AppError("Beneficiario nao encontrado.", 404);
             }
@@ -397,14 +719,28 @@ export class BeneficiarioRepository {
             });
             await this.limparDadosRelacionados(tx, id);
             await this.recriarDadosRelacionados(tx, id, input, now);
-            return this.buscarPorIdTransacao(tx, id);
+            await this.aplicarTenantDoBeneficiario(tx, id, tenantId);
+            await salvarSenhaPortalTx(tx, id, tenantId, input.senha_portal);
+            return this.buscarPorIdTransacao(tx, id, tenantId);
         });
     }
-    async remover(id) {
-        await this.buscarPorIdOuFalhar(id);
+    async remover(id, tenantId) {
+        await this.buscarPorIdOuFalhar(id, tenantId);
         await prisma.cadastroBeneficiario.delete({ where: { id } });
     }
-    async buscarPorIdTransacao(tx, id) {
+    async buscarPorIdTransacao(tx, id, tenantId) {
+        if (tenantId) {
+            const rows = await tx.$queryRaw(Prisma.sql `
+        SELECT b.id
+        FROM cadastro_beneficiario b
+        WHERE b.id = ${id}
+          AND ${this.tenantSql("b", tenantId)}
+        LIMIT 1
+      `);
+            if (!rows[0]) {
+                throw new AppError("Beneficiario nao encontrado.", 404);
+            }
+        }
         const beneficiario = await tx.cadastroBeneficiario.findUnique({
             where: { id },
             include: beneficiarioInclude
@@ -413,6 +749,32 @@ export class BeneficiarioRepository {
             throw new AppError("Beneficiario nao encontrado.", 404);
         }
         return beneficiario;
+    }
+    async obterProximoCodigoTransacaoTenant(tx, tenantId) {
+        const result = await tx.$queryRaw(Prisma.sql `
+      SELECT MAX(CAST(codigo AS INTEGER)) AS max_code
+      FROM cadastro_beneficiario
+      WHERE codigo IS NOT NULL
+        AND codigo ~ '^[0-9]+$'
+        AND tenant_id::text = ${tenantId}
+    `);
+        const maxCode = result[0]?.max_code ?? 0;
+        return String(maxCode + 1).padStart(4, "0");
+    }
+    async aplicarTenantDoBeneficiario(tx, beneficiarioId, tenantId) {
+        const comandos = [
+            Prisma.sql `UPDATE cadastro_beneficiario SET tenant_id = ${tenantId}::uuid WHERE id = ${beneficiarioId}`,
+            Prisma.sql `UPDATE contato_beneficiario SET tenant_id = ${tenantId}::uuid WHERE beneficiario_id = ${beneficiarioId}`,
+            Prisma.sql `UPDATE documentos SET tenant_id = ${tenantId}::uuid WHERE beneficiario_id = ${beneficiarioId}`,
+            Prisma.sql `UPDATE situacao_social SET tenant_id = ${tenantId}::uuid WHERE beneficiario_id = ${beneficiarioId}`,
+            Prisma.sql `UPDATE escolaridade_beneficiario SET tenant_id = ${tenantId}::uuid WHERE beneficiario_id = ${beneficiarioId}`,
+            Prisma.sql `UPDATE saude_beneficiario SET tenant_id = ${tenantId}::uuid WHERE beneficiario_id = ${beneficiarioId}`,
+            Prisma.sql `UPDATE beneficios_beneficiario SET tenant_id = ${tenantId}::uuid WHERE beneficiario_id = ${beneficiarioId}`,
+            Prisma.sql `UPDATE observacoes_beneficiario SET tenant_id = ${tenantId}::uuid WHERE beneficiario_id = ${beneficiarioId}`
+        ];
+        for (const comando of comandos) {
+            await tx.$executeRaw(comando);
+        }
     }
     async limparDadosRelacionados(tx, id) {
         await tx.contatoBeneficiario.deleteMany({ where: { beneficiarioId: id } });
@@ -601,6 +963,12 @@ export class BeneficiarioRepository {
                 nomeArquivo,
                 caminhoArquivo,
                 contentType,
+                dataEmissao: toOptionalDate(doc.dataEmissao),
+                dataValidade: toOptionalDate(doc.dataValidade),
+                orgaoEmissor: trimOrUndefined(doc.orgaoEmissor),
+                ufEmissor: trimOrUndefined(doc.ufEmissor),
+                categoria: trimOrUndefined(doc.categoria),
+                observacao: trimOrUndefined(doc.observacao),
                 obrigatorio: doc.ignorado ? false : (doc.obrigatorio ?? true),
                 criadoEm: now,
                 atualizadoEm: now

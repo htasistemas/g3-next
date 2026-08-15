@@ -58,17 +58,6 @@ export const authGoogleSchema = z.object({
     .transform((value) => normalizarCnpj(value) ?? undefined),
   slug: z.string().trim().optional(),
   codigoInstituicao: z.string().trim().optional()
-}).superRefine((value, ctx) => {
-  const possuiInstituicao =
-    Boolean(value.cnpj?.trim()) || Boolean(value.codigoInstituicao?.trim()) || Boolean(value.slug?.trim());
-
-  if (!possuiInstituicao) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["cnpj"],
-      message: "Informe o CNPJ, codigo ou slug da instituicao."
-    });
-  }
 });
 
 export const authEsqueciSenhaSchema = z.object({
@@ -80,18 +69,6 @@ export const authEsqueciSenhaSchema = z.object({
     .transform((value) => normalizarCnpj(value) ?? undefined),
   codigoInstituicao: z.string().trim().optional(),
   slug: z.string().trim().optional()
-}).superRefine((value, ctx) => {
-  const possuiInstituicao =
-    Boolean(value.cnpj?.trim()) || Boolean(value.codigoInstituicao?.trim()) || Boolean(value.slug?.trim());
-  const dispensarInstituicao = ehEmailMasterSemTenant(value.email);
-
-  if (!possuiInstituicao && !dispensarInstituicao) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["cnpj"],
-      message: "Informe o CNPJ, codigo ou slug da instituicao."
-    });
-  }
 });
 
 export const authMfaVerificarSchema = z.object({
@@ -115,18 +92,6 @@ export const authPasskeyLoginOptionsSchema = z.object({
   email: z.string().trim().email("Informe um email valido."),
   origin: z.string().trim().url("Origem invalida."),
   host: z.string().trim().optional()
-}).superRefine((value, ctx) => {
-  const possuiInstituicao =
-    Boolean(value.cnpj?.trim()) || Boolean(value.codigoInstituicao?.trim()) || Boolean(value.slug?.trim());
-  const dispensarInstituicao = ehEmailMasterSemTenant(value.email);
-
-  if (!possuiInstituicao && !dispensarInstituicao) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["cnpj"],
-      message: "Informe o CNPJ, codigo ou slug da instituicao."
-    });
-  }
 });
 
 export const authPasskeyLoginVerifySchema = z.object({

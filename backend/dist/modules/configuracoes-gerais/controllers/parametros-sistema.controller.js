@@ -1,40 +1,61 @@
 import { ParametrosSistemaService } from "../services/parametros-sistema.service.js";
 const service = new ParametrosSistemaService();
 export class ParametrosSistemaController {
-    async obterPersonalizacao(_request, response) {
-        const resultado = await service.obterPersonalizacao();
+    async obterPersonalizacao(request, response) {
+        const resultado = await service.obterPersonalizacao(request.authUser?.tenant_id);
         return response.json(resultado);
     }
     async atualizarPersonalizacao(request, response) {
         const usuario = request.authUser?.nomeUsuario ?? "sistema";
-        const resultado = await service.atualizarPersonalizacao(request.body, usuario);
+        const resultado = await service.atualizarPersonalizacao(request.body, usuario, request.authUser?.tenant_id ?? "");
         return response.json(resultado);
     }
-    async obterCarenciaDoacaoRealizada(_request, response) {
-        const resultado = await service.obterCarenciaDoacaoRealizada();
+    async obterCarenciaDoacaoRealizada(request, response) {
+        const resultado = await service.obterCarenciaDoacaoRealizada(request.authUser?.tenant_id);
         return response.json(resultado);
     }
     async atualizarCarenciaDoacaoRealizada(request, response) {
         const usuario = request.authUser?.nomeUsuario ?? "sistema";
-        const resultado = await service.atualizarCarenciaDoacaoRealizada(request.body, usuario);
+        const resultado = await service.atualizarCarenciaDoacaoRealizada(request.body, usuario, request.authUser?.tenant_id ?? "");
         return response.json(resultado);
     }
-    async obterObrigatoriedadeDocumentosBeneficiario(_request, response) {
-        const resultado = await service.obterObrigatoriedadeDocumentosBeneficiario();
+    async obterObrigatoriedadeDocumentosBeneficiario(request, response) {
+        const resultado = await service.obterObrigatoriedadeDocumentosBeneficiario(request.authUser?.tenant_id);
         return response.json(resultado);
     }
     async atualizarObrigatoriedadeDocumentosBeneficiario(request, response) {
         const usuario = request.authUser?.nomeUsuario ?? "sistema";
-        const resultado = await service.atualizarObrigatoriedadeDocumentosBeneficiario(request.body, usuario);
+        const resultado = await service.atualizarObrigatoriedadeDocumentosBeneficiario(request.body, usuario, request.authUser?.tenant_id ?? "");
         return response.json(resultado);
     }
-    async obterAlertasCentralAtendimentos(_request, response) {
-        const resultado = await service.obterAlertasCentralAtendimentos();
+    async obterAlertasCentralAtendimentos(request, response) {
+        const resultado = await service.obterAlertasCentralAtendimentos(request.authUser?.tenant_id);
         return response.json(resultado);
     }
     async atualizarAlertasCentralAtendimentos(request, response) {
         const usuario = request.authUser?.nomeUsuario ?? "sistema";
-        const resultado = await service.atualizarAlertasCentralAtendimentos(request.body, usuario);
+        const resultado = await service.atualizarAlertasCentralAtendimentos(request.body, usuario, request.authUser?.tenant_id ?? "");
+        return response.json(resultado);
+    }
+    async obterConfiguracaoCadastroBeneficiario(request, response) {
+        const resultado = await service.obterConfiguracaoCadastroBeneficiario(request.authUser?.tenant_id);
+        return response.json(resultado);
+    }
+    async atualizarConfiguracaoCadastroBeneficiario(request, response) {
+        const usuario = request.authUser?.nomeUsuario ?? "sistema";
+        const resultado = await service.atualizarConfiguracaoCadastroBeneficiario(request.body, usuario, request.authUser?.tenant_id ?? "");
+        return response.json(resultado);
+    }
+    async listarIntegracoes(request, response) {
+        const resultado = await service.listarIntegracoes(request.authUser?.tenant_id);
+        return response.json(resultado);
+    }
+    async salvarIntegracao(request, response) {
+        const resultado = await service.salvarIntegracao(request.body, request.authUser?.id, request.authUser?.tenant_id ?? "");
+        return response.json(resultado);
+    }
+    async testarIntegracao(request, response) {
+        const resultado = await service.testarIntegracao(request.body, request.authUser?.id, request.authUser?.tenant_id ?? "");
         return response.json(resultado);
     }
 }

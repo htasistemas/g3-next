@@ -1,14 +1,17 @@
 import { AppError } from "../../../shared/errors/app-error.js";
+import bcrypt from "bcryptjs";
 import { mapaCamposTextoMatricula } from "../../../utils/text-format-config.js";
 import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
 import { toIsoDate, toStringId } from "../../../utils/string-utils.js";
 import { mapBeneficiarioCatalogoToResponse, mapCursoToResponse, mapProfissionalCatalogoToResponse, mapSalaCatalogoToResponse } from "../matricula.mapper.js";
 import { storageService } from "../../arquivos/services/storage-instance.js";
-import { matriculaFiltersSchema, matriculaInputSchema, matriculaPresencaDataCreateSchema, matriculaPresencaDataUpdateSchema, matriculaPresencaSalvarSchema } from "../matricula.schema.js";
+import { matriculaFiltersSchema, matriculaInputSchema, matriculaPresencaDataCreateSchema, matriculaPresencaDataUpdateSchema, matriculaPresencaSenhaSchema, matriculaPresencaSalvarSchema } from "../matricula.schema.js";
 import { MatriculaRepository } from "../repositories/matricula.repository.js";
+import { AuthRepository } from "../../auth/repositories/auth.repository.js";
 export class MatriculaService {
     repository = new MatriculaRepository();
-    async listar(rawFilters) {
+    authRepository = new AuthRepository();
+    async listar(rawFilters, rawTenantId) {
         const filtersNormalizados = rawFilters && typeof rawFilters === "object"
             ? normalizarObjetoTexto(rawFilters, {
                 nome: "instituicao",
@@ -19,24 +22,33 @@ export class MatriculaService {
             })
             : rawFilters;
         const filters = matriculaFiltersSchema.parse(filtersNormalizados);
-        const registros = await this.repository.listar(filters);
-        return registros.map((curso) => mapCursoToResponse(curso, [], []));
+        const tenantId = this.parseTenant(rawTenantId);
+        const registros = await this.repository.listar(filters, tenantId);
+        const registrosDetalhados = await Promise.all(registros.map(async (curso) => {
+            const detalhes = await this.repository.buscarPorId(curso.id, tenantId);
+            return detalhes
+                ? mapCursoToResponse(detalhes.curso, detalhes.matriculas, detalhes.filaEspera)
+                : mapCursoToResponse(curso, [], []);
+        }));
+        return registrosDetalhados;
     }
-    async obterResumoCatalogo() {
-        return this.repository.obterResumoCatalogo();
+    async obterResumoCatalogo(rawTenantId) {
+        return this.repository.obterResumoCatalogo(this.parseTenant(rawTenantId));
     }
-    async buscarPorId(rawId) {
+    async buscarPorId(rawId, rawTenantId) {
         const id = this.parseId(rawId);
-        const registro = await this.repository.buscarPorIdOuFalhar(id);
+        const tenantId = this.parseTenant(rawTenantId);
+        const registro = await this.repository.buscarPorIdOuFalhar(id, tenantId);
         return mapCursoToResponse(registro.curso, registro.matriculas, registro.filaEspera);
     }
-    async criar(rawInput, rawUsuarioId) {
+    async criar(rawInput, rawUsuarioId, rawTenantId) {
         const inputNormalizado = this.normalizarPayload(rawInput);
         const input = matriculaInputSchema.parse(inputNormalizado);
         const usuarioId = this.parseUsuarioId(rawUsuarioId);
+        const tenantId = this.parseTenant(rawTenantId);
         const imagem = await this.prepararImagem(input.imagem, input.nome, usuarioId);
         try {
-            const registro = await this.repository.criar({ ...input, imagem: imagem.caminhoArquivo });
+            const registro = await this.repository.criar({ ...input, imagem: imagem.caminhoArquivo }, tenantId);
             if (imagem.novoCaminho) {
                 await storageService.vincularEntidade(imagem.novoCaminho, registro.curso.id);
             }
@@ -47,15 +59,16 @@ export class MatriculaService {
             throw error;
         }
     }
-    async atualizar(rawId, rawInput, rawUsuarioId) {
+    async atualizar(rawId, rawInput, rawUsuarioId, rawTenantId) {
         const id = this.parseId(rawId);
         const inputNormalizado = this.normalizarPayload(rawInput);
         const input = matriculaInputSchema.parse(inputNormalizado);
         const usuarioId = this.parseUsuarioId(rawUsuarioId);
-        const existente = await this.repository.buscarPorIdOuFalhar(id);
+        const tenantId = this.parseTenant(rawTenantId);
+        const existente = await this.repository.buscarPorIdOuFalhar(id, tenantId);
         const imagem = await this.prepararImagem(input.imagem, input.nome, usuarioId, id);
         try {
-            const registro = await this.repository.atualizar(id, { ...input, imagem: imagem.caminhoArquivo });
+            const registro = await this.repository.atualizar(id, { ...input, imagem: imagem.caminhoArquivo }, tenantId);
             if (imagem.novoCaminho) {
                 await storageService.vincularEntidade(imagem.novoCaminho, id);
             }
@@ -69,36 +82,38 @@ export class MatriculaService {
             throw error;
         }
     }
-    async remover(rawId, rawUsuarioId) {
+    async remover(rawId, rawUsuarioId, rawTenantId) {
         const id = this.parseId(rawId);
         const usuarioId = this.parseUsuarioId(rawUsuarioId);
-        const existente = await this.repository.buscarPorIdOuFalhar(id);
-        await this.repository.remover(id);
+        const tenantId = this.parseTenant(rawTenantId);
+        const existente = await this.repository.buscarPorIdOuFalhar(id, tenantId);
+        await this.repository.remover(id, tenantId);
         if (this.isManagedStoragePath(existente.curso.imagem)) {
             await storageService.desativarPorCaminho(existente.curso.imagem, usuarioId);
         }
     }
-    async listarBeneficiarios(rawTermo) {
+    async listarBeneficiarios(rawTermo, rawTenantId) {
         const termo = typeof rawTermo === "string" ? rawTermo : undefined;
-        const registros = await this.repository.listarBeneficiarios(termo);
+        const registros = await this.repository.listarBeneficiarios(termo, this.parseTenant(rawTenantId));
         return registros.map(mapBeneficiarioCatalogoToResponse);
     }
-    async listarProfissionais(rawTermo) {
+    async listarProfissionais(rawTermo, rawTenantId) {
         const termo = typeof rawTermo === "string" ? rawTermo : undefined;
-        const registros = await this.repository.listarProfissionais(termo);
+        const registros = await this.repository.listarProfissionais(termo, this.parseTenant(rawTenantId));
         return registros.map(mapProfissionalCatalogoToResponse);
     }
-    async listarSalas() {
-        const registros = await this.repository.listarSalas();
+    async listarSalas(rawTenantId) {
+        const registros = await this.repository.listarSalas(this.parseTenant(rawTenantId));
         return registros.map(mapSalaCatalogoToResponse);
     }
-    async listarPresencaDatas(rawCursoId, rawPendentes) {
+    async listarPresencaDatas(rawCursoId, rawPendentes, rawTenantId) {
         const cursoId = this.parseId(rawCursoId);
+        const tenantId = this.parseTenant(rawTenantId);
         const somentePendentes = rawPendentes === true ||
             rawPendentes === "true" ||
             rawPendentes === "1" ||
             rawPendentes === 1;
-        const registros = await this.repository.listarPresencaDatas(cursoId, somentePendentes);
+        const registros = await this.repository.listarPresencaDatas(cursoId, tenantId, somentePendentes);
         return registros.map((item) => ({
             id: toStringId(item.id),
             data_aula: toIsoDate(item.data_aula) ?? "",
@@ -110,10 +125,10 @@ export class MatriculaService {
             atualizado_em: item.atualizado_em.toISOString()
         }));
     }
-    async criarPresencaData(rawCursoId, rawInput) {
+    async criarPresencaData(rawCursoId, rawInput, rawTenantId) {
         const cursoId = this.parseId(rawCursoId);
         const input = matriculaPresencaDataCreateSchema.parse(rawInput);
-        const data = await this.repository.criarPresencaData(cursoId, input);
+        const data = await this.repository.criarPresencaData(cursoId, input, this.parseTenant(rawTenantId));
         return {
             id: toStringId(data.id),
             data_aula: toIsoDate(data.data_aula) ?? "",
@@ -125,11 +140,11 @@ export class MatriculaService {
             atualizado_em: data.atualizado_em.toISOString()
         };
     }
-    async atualizarPresencaData(rawCursoId, rawPresencaDataId, rawInput) {
+    async atualizarPresencaData(rawCursoId, rawPresencaDataId, rawInput, rawTenantId) {
         const cursoId = this.parseId(rawCursoId);
         const presencaDataId = this.parseId(rawPresencaDataId);
         const input = matriculaPresencaDataUpdateSchema.parse(rawInput);
-        const data = await this.repository.atualizarPresencaData(cursoId, presencaDataId, input);
+        const data = await this.repository.atualizarPresencaData(cursoId, presencaDataId, input, this.parseTenant(rawTenantId));
         return {
             id: toStringId(data.id),
             data_aula: toIsoDate(data.data_aula) ?? "",
@@ -141,10 +156,10 @@ export class MatriculaService {
             atualizado_em: data.atualizado_em.toISOString()
         };
     }
-    async cancelarPresencaData(rawCursoId, rawPresencaDataId) {
+    async cancelarPresencaData(rawCursoId, rawPresencaDataId, rawTenantId) {
         const cursoId = this.parseId(rawCursoId);
         const presencaDataId = this.parseId(rawPresencaDataId);
-        const data = await this.repository.cancelarPresencaData(cursoId, presencaDataId);
+        const data = await this.repository.cancelarPresencaData(cursoId, presencaDataId, this.parseTenant(rawTenantId));
         return {
             id: toStringId(data.id),
             data_aula: toIsoDate(data.data_aula) ?? "",
@@ -156,39 +171,63 @@ export class MatriculaService {
             atualizado_em: data.atualizado_em.toISOString()
         };
     }
-    async removerPresencaData(rawCursoId, rawPresencaDataId) {
+    async removerPresencaData(rawCursoId, rawPresencaDataId, rawTenantId, rawUsuario) {
         const cursoId = this.parseId(rawCursoId);
         const presencaDataId = this.parseId(rawPresencaDataId);
-        await this.repository.removerPresencaData(cursoId, presencaDataId);
+        await this.repository.removerPresencaData(cursoId, presencaDataId, this.parseTenant(rawTenantId), this.parseUsuario(rawUsuario));
     }
-    async listarPresencasPorData(rawCursoId, rawPresencaDataId) {
+    async listarPresencasPorData(rawCursoId, rawPresencaDataId, rawTenantId) {
         const cursoId = this.parseId(rawCursoId);
         const presencaDataId = this.parseId(rawPresencaDataId);
-        const resultado = await this.repository.listarPresencasPorData(cursoId, presencaDataId);
+        const resultado = await this.repository.listarPresencasPorData(cursoId, presencaDataId, this.parseTenant(rawTenantId));
         return {
             data_aula: toIsoDate(resultado.data_aula) ?? "",
             presencas: resultado.itens.map((item) => ({
                 matricula_id: toStringId(item.matricula_id),
                 beneficiario_nome: item.beneficiario_nome,
                 cpf: item.cpf ?? undefined,
-                status: item.status === "PRESENTE" ? "PRESENTE" : "AUSENTE"
+                status: this.normalizarStatusPresenca(item.status),
+                observacao: item.observacao ?? undefined
             }))
         };
     }
-    async salvarPresencasPorData(rawCursoId, rawPresencaDataId, rawInput) {
+    async salvarPresencasPorData(rawCursoId, rawPresencaDataId, rawInput, rawTenantId, rawUsuario) {
         const cursoId = this.parseId(rawCursoId);
         const presencaDataId = this.parseId(rawPresencaDataId);
         const input = matriculaPresencaSalvarSchema.parse(rawInput);
-        const resultado = await this.repository.salvarPresencasPorData(cursoId, presencaDataId, input);
+        const usuario = this.parseUsuario(rawUsuario);
+        if (input.senha_confirmacao) {
+            if (!usuario?.id) {
+                throw new AppError("Usuario autenticado invalido para confirmar a alteracao.", 401);
+            }
+            const usuarioAtual = await this.authRepository.buscarUsuarioPorId(usuario.id, this.parseTenant(rawTenantId));
+            if (!usuarioAtual?.senhaHash || !(await bcrypt.compare(input.senha_confirmacao, usuarioAtual.senhaHash))) {
+                throw new AppError("Senha invalida para alterar a presenca ou ausencia.", 401);
+            }
+        }
+        const resultado = await this.repository.salvarPresencasPorData(cursoId, presencaDataId, input, this.parseTenant(rawTenantId), usuario);
         return {
             data_aula: toIsoDate(resultado.data_aula) ?? "",
             presencas: resultado.itens.map((item) => ({
                 matricula_id: toStringId(item.matricula_id),
                 beneficiario_nome: item.beneficiario_nome,
                 cpf: item.cpf ?? undefined,
-                status: item.status === "PRESENTE" ? "PRESENTE" : "AUSENTE"
+                status: this.normalizarStatusPresenca(item.status),
+                observacao: item.observacao ?? undefined
             }))
         };
+    }
+    async validarSenhaPresenca(rawInput, rawTenantId, rawUsuario) {
+        const input = matriculaPresencaSenhaSchema.parse(rawInput);
+        const usuario = this.parseUsuario(rawUsuario);
+        if (!usuario?.id) {
+            throw new AppError("Usuario autenticado invalido para confirmar a alteracao.", 401);
+        }
+        const usuarioAtual = await this.authRepository.buscarUsuarioPorId(usuario.id, this.parseTenant(rawTenantId));
+        if (!usuarioAtual?.senhaHash || !(await bcrypt.compare(input.senha, usuarioAtual.senhaHash))) {
+            throw new AppError("Senha invalida para alterar a presenca ou ausencia.", 401);
+        }
+        return { valido: true };
     }
     parseId(rawId) {
         const id = Number(rawId);
@@ -232,5 +271,31 @@ export class MatriculaService {
             return undefined;
         }
         return BigInt(parsed);
+    }
+    parseTenant(rawTenantId) {
+        const tenantId = rawTenantId?.trim();
+        if (!tenantId) {
+            throw new AppError("Tenant da sessao nao identificado.", 401);
+        }
+        return tenantId;
+    }
+    parseUsuario(rawUsuario) {
+        if (!rawUsuario?.id)
+            return undefined;
+        const id = Number(rawUsuario.id);
+        if (!Number.isInteger(id) || id <= 0) {
+            return undefined;
+        }
+        return {
+            id: BigInt(id),
+            nome: rawUsuario.nome?.trim() || undefined
+        };
+    }
+    normalizarStatusPresenca(status) {
+        const valor = String(status ?? "").trim().toUpperCase();
+        if (valor === "PRESENTE" || valor === "AUSENTE" || valor === "JUSTIFICADO" || valor === "NAO_INFORMADO") {
+            return valor;
+        }
+        return "NAO_INFORMADO";
     }
 }

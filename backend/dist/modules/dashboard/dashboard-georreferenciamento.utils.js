@@ -32,7 +32,8 @@ export function resolverFaixaEtaria(idade) {
     return "idoso";
 }
 export function resolverEstrategiaConsulta(modo, zoom) {
-    if (modo === "agregado" || zoom <= 11) {
+    void zoom;
+    if (modo === "agregado") {
         return "agregada";
     }
     return "individual";

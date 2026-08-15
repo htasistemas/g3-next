@@ -44,6 +44,7 @@ import { termosFomentoRoutes } from "../modules/termos-fomento/routes/termos-fom
 import { autorizacaoComprasRoutes } from "../modules/autorizacao-compras/routes/autorizacao-compras.routes.js";
 import { contabilidadeRoutes } from "../modules/contabilidade/routes/contabilidade.routes.js";
 import { transparenciasRoutes } from "../modules/transparencias/routes/transparencias.routes.js";
+import { termosParceriaRoutes } from "../modules/termos-parceria/routes/termos-parceria.routes.js";
 import { rhContratacaoRoutes } from "../modules/rh-contratacao/routes/rh-contratacao.routes.js";
 import { mensagensPersonalizadasRoutes } from "../modules/mensagens-personalizadas/routes/mensagens-personalizadas.routes.js";
 import { arquivosRoutes } from "../modules/arquivos/routes/arquivos.routes.js";
@@ -127,6 +128,7 @@ appRoutes.use("/api/planos-trabalho", planosTrabalhoRoutes);
 appRoutes.use("/api/juridico/planos-trabalho", planosTrabalhoRoutes);
 appRoutes.use("/api/termos-fomento", termosFomentoRoutes);
 appRoutes.use("/api/juridico/termos-fomento", termosFomentoRoutes);
+appRoutes.use("/api/juridico/termos-parceria", termosParceriaRoutes);
 appRoutes.use("/api/autorizacao-compras", autorizacaoComprasRoutes);
 appRoutes.use("/api/financeiro/autorizacao-compras", autorizacaoComprasRoutes);
 appRoutes.use("/api/contabilidade", contabilidadeRoutes);

@@ -12,6 +12,7 @@ export function mapPatrimonioToResponse(patrimonio, movimentos) {
         valorAquisicao: patrimonio.valor_aquisicao ?? undefined,
         origem: patrimonio.origem ?? undefined,
         responsavel: patrimonio.responsavel ?? undefined,
+        unidadeId: patrimonio.unidade_id ? toStringId(patrimonio.unidade_id) : undefined,
         unidade: patrimonio.unidade ?? undefined,
         sala: patrimonio.sala ?? undefined,
         taxaDepreciacao: patrimonio.taxa_depreciacao ?? undefined,
@@ -28,5 +29,19 @@ export function mapPatrimonioToResponse(patrimonio, movimentos) {
             observacao: movimento.observacao ?? undefined,
             dataMovimento: toIsoDate(movimento.data_movimento) ?? ""
         }))
+    };
+}
+export function mapPatrimonioCategoriaToResponse(categoria) {
+    const subcategorias = Array.isArray(categoria.subcategorias)
+        ? categoria.subcategorias.map((item) => String(item)).filter(Boolean)
+        : [];
+    return {
+        id: toStringId(categoria.id),
+        nome: categoria.nome,
+        taxaDepreciacao: categoria.taxa_depreciacao ?? undefined,
+        subcategorias,
+        ativo: categoria.ativo,
+        dataCadastro: categoria.criado_em.toISOString(),
+        dataAtualizacao: categoria.atualizado_em.toISOString()
     };
 }

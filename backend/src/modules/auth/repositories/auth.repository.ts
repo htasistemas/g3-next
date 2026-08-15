@@ -162,6 +162,93 @@ function ehEmailAdminPadrao(email?: string | null) {
 }
 
 export class AuthRepository {
+  async buscarCandidatosGlobaisPorEmail(email: string) {
+    await this.ensureEstrutura();
+    return prisma.$queryRawUnsafe<Array<{
+      acesso_id: bigint; identidade_id: bigint; usuario_id: bigint; senha_hash: string;
+      instituicao_id: string; tenant_id: string; instituicao_nome: string; cnpj: string | null;
+      unidade_nome: string | null; perfil: string | null; escopo: string;
+    }>>(`
+      SELECT a.id AS acesso_id, a.identidade_id, a.usuario_id, u.senha_hash,
+             i.id::text AS instituicao_id, i.tenant_id::text AS tenant_id,
+             COALESCE(i.nome_fantasia, i.razao_social) AS instituicao_nome,
+             i.cnpj, uo.nome AS unidade_nome, u.perfil_acesso AS perfil, a.escopo
+      FROM usuario_acesso a
+      JOIN usuario_identidade ui ON ui.id = a.identidade_id AND lower(ui.email) = lower($1)
+      JOIN usuarios u ON u.id = a.usuario_id AND u.deletado_em IS NULL
+      JOIN instituicoes i ON i.id = a.instituicao_id
+      LEFT JOIN unidades_organizacionais uo ON uo.id = a.unidade_organizacional_id
+      WHERE a.ativo = TRUE AND upper(coalesce(ui.status, 'ATIVO')) = 'ATIVO'
+        AND upper(coalesce(i.status, 'ATIVO')) = 'ATIVO'
+      ORDER BY i.nome_fantasia NULLS LAST, i.razao_social, a.id
+    `, email.trim().toLowerCase());
+  }
+
+  async buscarAcessoGlobal(acessoId: string, identidadeId: string) {
+    await this.ensureEstrutura();
+    const rows = await prisma.$queryRawUnsafe<Array<{ usuario_id: bigint; tenant_id: string }>>(`
+      SELECT usuario_id, tenant_id::text FROM usuario_acesso
+      WHERE id = $1::bigint AND identidade_id = $2::bigint AND ativo = TRUE
+      LIMIT 1
+    `, acessoId, identidadeId);
+    return rows[0] ?? null;
+  }
+
+  async listarAcessosPorUsuario(usuarioId: string) {
+    await this.ensureEstrutura();
+    return prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(`
+      SELECT a.id::text AS acesso_id, i.id::text AS instituicao_id, i.tenant_id::text AS tenant_id,
+             COALESCE(i.nome_fantasia, i.razao_social) AS nome_instituicao, i.cnpj,
+             uo.nome AS unidade_nome, u.perfil_acesso AS perfil, a.ativo
+      FROM usuario_acesso a JOIN instituicoes i ON i.id = a.instituicao_id
+      LEFT JOIN usuarios u ON u.id = a.usuario_id
+      LEFT JOIN unidades_organizacionais uo ON uo.id = a.unidade_organizacional_id
+      WHERE a.usuario_id = $1::bigint AND a.ativo = TRUE ORDER BY nome_instituicao
+    `, usuarioId);
+  }
+
+  async buscarAcessoPorUsuario(acessoId: string, usuarioId: string) {
+    await this.ensureEstrutura();
+    const rows = await prisma.$queryRawUnsafe<Array<{ usuario_id: bigint; tenant_id: string }>>(`
+      SELECT usuario_id, tenant_id::text FROM usuario_acesso WHERE id = $1::bigint AND usuario_id = $2::bigint AND ativo = TRUE LIMIT 1
+    `, acessoId, usuarioId);
+    return rows[0] ?? null;
+  }
+
+  async listarOpcoesContexto(usuarioId: string, tenantId: string) {
+    await this.ensureEstrutura();
+    const unidades = await prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(`
+      SELECT DISTINCT uo.id::text AS id, uo.nome
+      FROM usuario_acesso a JOIN unidades_organizacionais uo ON uo.instituicao_id = a.instituicao_id
+      WHERE a.usuario_id = $1::bigint AND a.tenant_id::text = $2 AND a.ativo = TRUE
+        AND (a.escopo = 'INSTITUICAO' OR a.unidade_organizacional_id = uo.id OR a.entidade_juridica_id = uo.entidade_juridica_id)
+      ORDER BY uo.nome
+    `, usuarioId, tenantId);
+    const projetos = await prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(`
+      SELECT DISTINCT p.id::text AS id, p.nome, p.unidade_organizacional_id::text AS unidade_id
+      FROM usuario_acesso a JOIN projetos p ON p.instituicao_id = a.instituicao_id
+      WHERE a.usuario_id = $1::bigint AND a.tenant_id::text = $2 AND a.ativo = TRUE
+        AND (a.escopo = 'INSTITUICAO' OR a.projeto_id = p.id OR a.unidade_organizacional_id = p.unidade_organizacional_id OR a.entidade_juridica_id = p.entidade_juridica_id)
+      ORDER BY p.nome
+    `, usuarioId, tenantId).catch(() => []);
+    return { unidades, projetos };
+  }
+
+  async contextoPermitido(usuarioId: string, tenantId: string, unidadeId?: string | null, projetoId?: string | null) {
+    await this.ensureEstrutura();
+    const rows = await prisma.$queryRawUnsafe<Array<{ ok: boolean }>>(`
+      SELECT EXISTS (
+        SELECT 1 FROM usuario_acesso a
+        WHERE a.usuario_id = $1::bigint AND a.tenant_id::text = $2 AND a.ativo = TRUE
+          AND (a.escopo = 'INSTITUICAO'
+            OR (a.escopo = 'UNIDADE' AND a.unidade_organizacional_id = NULLIF($3, '')::bigint)
+            OR (a.escopo = 'PROJETO' AND a.projeto_id = NULLIF($4, '')::bigint)
+            OR (a.escopo = 'ENTIDADE_JURIDICA' AND (a.entidade_juridica_id = (SELECT entidade_juridica_id FROM unidades_organizacionais WHERE id = NULLIF($3, '')::bigint) OR a.entidade_juridica_id = (SELECT entidade_juridica_id FROM projetos WHERE id = NULLIF($4, '')::bigint)))
+          )
+      ) AS ok
+    `, usuarioId, tenantId, unidadeId ?? "", projetoId ?? "");
+    return Boolean(rows[0]?.ok);
+  }
   async restaurarAcessoMaster(senhaHash: string) {
     await this.ensureEstrutura();
     const rows = await prisma.$queryRawUnsafe<Array<{ id: bigint }>>(

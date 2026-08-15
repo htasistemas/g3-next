@@ -27,9 +27,36 @@ test("beneficiarioInputSchema normaliza e-mail informado", () => {
     });
     assert.equal(resultado.email, "pessoa@exemplo.com.br");
 });
+test("beneficiarioInputSchema aceita senha do portal com 4 digitos", () => {
+    const resultado = beneficiarioInputSchema.parse({
+        ...criarPayloadValido(),
+        senha_portal: " 12 34 "
+    });
+    assert.equal(resultado.senha_portal, "1234");
+});
+test("beneficiarioInputSchema rejeita senha do portal invalida", () => {
+    assert.throws(() => beneficiarioInputSchema.parse({
+        ...criarPayloadValido(),
+        senha_portal: "12"
+    }));
+});
 test("beneficiarioInputSchema rejeita e-mail inválido quando informado", () => {
     assert.throws(() => beneficiarioInputSchema.parse({
         ...criarPayloadValido(),
         email: "email-invalido"
+    }));
+});
+test("beneficiarioInputSchema rejeita data de nascimento inexistente", () => {
+    assert.throws(() => beneficiarioInputSchema.parse({
+        ...criarPayloadValido(),
+        data_nascimento: "2026-02-31"
+    }));
+});
+test("beneficiarioInputSchema rejeita data de nascimento futura", () => {
+    const dataFutura = new Date();
+    dataFutura.setFullYear(dataFutura.getFullYear() + 1);
+    assert.throws(() => beneficiarioInputSchema.parse({
+        ...criarPayloadValido(),
+        data_nascimento: dataFutura.toISOString().slice(0, 10)
     }));
 });

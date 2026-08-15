@@ -26,6 +26,15 @@ usuarioRoutes.get(
   asyncHandler(controller.listar.bind(controller))
 );
 
+// Deve ficar antes de /:id para que "catalogo-acessos" não seja interpretado
+// como identificador de usuário.
+usuarioRoutes.get(
+  "/catalogo-acessos",
+  ensureAuthenticated,
+  ensurePermissions(permissoesAdministracaoUsuarios),
+  asyncHandler(controller.listarCatalogoAcessos.bind(controller))
+);
+
 usuarioRoutes.get(
   "/:id",
   ensureAuthenticated,
@@ -38,6 +47,20 @@ usuarioRoutes.get(
   ensureAuthenticated,
   ensurePermissions(permissoesAdministracaoUsuarios),
   asyncHandler(controller.buscarFace.bind(controller))
+);
+
+usuarioRoutes.get(
+  "/:id/acessos",
+  ensureAuthenticated,
+  ensurePermissions(permissoesAdministracaoUsuarios),
+  asyncHandler(controller.listarAcessos.bind(controller))
+);
+
+usuarioRoutes.put(
+  "/:id/acessos",
+  ensureAuthenticated,
+  ensurePermissions(permissoesAdministracaoUsuarios),
+  asyncHandler(controller.substituirAcessos.bind(controller))
 );
 
 usuarioRoutes.post(

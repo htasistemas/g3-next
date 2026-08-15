@@ -1,9 +1,10 @@
 import { Router } from "express";
+import { readFileSync } from "node:fs";
 import { authRoutes } from "../modules/auth/routes/auth.routes.js";
 import { beneficiarioRoutes } from "../modules/beneficiarios/routes/beneficiario.routes.js";
 import { familiaRoutes } from "../modules/familias/routes/familia.routes.js";
 import { emailRoutes } from "../modules/email/routes/email.routes.js";
-import { ensureAuthenticated, ensurePermissions } from "../modules/auth/middlewares/auth.middleware.js";
+import { ensureAuthenticated, ensurePermissions, ensureSuperadmin } from "../modules/auth/middlewares/auth.middleware.js";
 import { reportsRoutes } from "../modules/reports/routes/reports.routes.js";
 import { unidadeAssistencialRoutes } from "../modules/unidades-assistenciais/routes/unidade-assistencial.routes.js";
 import { parametrosSistemaRoutes } from "../modules/configuracoes-gerais/routes/parametros-sistema.routes.js";
@@ -12,12 +13,14 @@ import { profissionalRoutes } from "../modules/profissionais/routes/profissional
 import { voluntarioRoutes } from "../modules/voluntarios/routes/voluntario.routes.js";
 import { usuarioRoutes } from "../modules/usuarios/routes/usuario.routes.js";
 import { matriculaRoutes } from "../modules/matriculas/routes/matricula.routes.js";
+import { prontuarioRoutes } from "../modules/prontuario/routes/prontuario.routes.js";
 import { registroDoacaoRoutes } from "../modules/registro-doacao/routes/registro-doacao.routes.js";
 import { doacaoRealizadaRoutes } from "../modules/doacoes-realizadas/routes/doacao-realizada.routes.js";
 import { doacaoPlanejadaRoutes } from "../modules/doacoes-planejadas/routes/doacao-planejada.routes.js";
 import { registroPontoRoutes } from "../modules/registro-ponto/routes/registro-ponto.routes.js";
 import { almoxarifadoRoutes } from "../modules/almoxarifado/routes/almoxarifado.routes.js";
 import { controleVeiculosRoutes } from "../modules/controle-veiculos/routes/controle-veiculos.routes.js";
+import { disponibilidadeVeiculosRoutes } from "../modules/controle-veiculos/routes/disponibilidade-veiculos.routes.js";
 import { tarefaAdministrativaRoutes } from "../modules/tarefas-administrativas/routes/tarefa-administrativa.routes.js";
 import { lembreteDiarioRoutes } from "../modules/lembretes-diarios/routes/lembrete-diario.routes.js";
 import { checklistDiarioRoutes } from "../modules/checklist-diario/routes/checklist-diario.routes.js";
@@ -37,11 +40,13 @@ import { termosFomentoRoutes } from "../modules/termos-fomento/routes/termos-fom
 import { autorizacaoComprasRoutes } from "../modules/autorizacao-compras/routes/autorizacao-compras.routes.js";
 import { contabilidadeRoutes } from "../modules/contabilidade/routes/contabilidade.routes.js";
 import { transparenciasRoutes } from "../modules/transparencias/routes/transparencias.routes.js";
+import { termosParceriaRoutes } from "../modules/termos-parceria/routes/termos-parceria.routes.js";
 import { rhContratacaoRoutes } from "../modules/rh-contratacao/routes/rh-contratacao.routes.js";
 import { mensagensPersonalizadasRoutes } from "../modules/mensagens-personalizadas/routes/mensagens-personalizadas.routes.js";
 import { arquivosRoutes } from "../modules/arquivos/routes/arquivos.routes.js";
 import { chamadoTecnicoRoutes } from "../modules/chamados-tecnicos/routes/chamado-tecnico.routes.js";
 import { atualizacaoSistemaRoutes } from "../modules/atualizacao-sistema/routes/atualizacao-sistema.routes.js";
+import { backupSistemaRoutes } from "../modules/backup-sistema/routes/backup-sistema.routes.js";
 import { datasComemorativasRoutes } from "../modules/datas-comemorativas/routes/datas-comemorativas.routes.js";
 import { captacaoRecursosRoutes } from "../modules/captacao-recursos/routes/captacao-recursos.routes.js";
 import { aiRoutes } from "../modules/ai/routes/ai.routes.js";
@@ -51,11 +56,30 @@ import { licencaUsoRoutes } from "../modules/licenca-uso/routes/licenca-uso.rout
 import { vendaRoutes } from "../modules/vendas/routes/venda.routes.js";
 import { carteiraEventoRoutes } from "../modules/carteira-evento/routes/carteira-evento.routes.js";
 import { agendamentosRoutes } from "../modules/agendamentos/routes/agendamentos.routes.js";
+import { instituicoesRoutes } from "../modules/instituicoes/routes/instituicoes.routes.js";
+import { projetoRoutes } from "../modules/projetos/routes/projeto.routes.js";
+import { portaisExternosRoutes } from "../modules/portais-externos/routes/portais-externos.routes.js";
+import { educacionalRoutes } from "../modules/educacional/routes/educacional.routes.js";
+import { parceriasPublicasRoutes } from "../modules/educacional/parcerias-publicas.routes.js";
+import { importacaoDadosRoutes } from "../modules/importacao-dados/importacao-dados.routes.js";
+import { obterAtualizacaoSistemaPaths } from "../modules/atualizacao-sistema/services/atualizacao-sistema.paths.js";
 export const appRoutes = Router();
+function obterVersaoSaude() {
+    try {
+        const conteudo = readFileSync(obterAtualizacaoSistemaPaths().arquivoVersaoInstalada, "utf-8");
+        const versao = conteudo.trim();
+        return versao || "0.0.0";
+    }
+    catch {
+        return "0.0.0";
+    }
+}
 appRoutes.get("/health", (_request, response) => {
-    response.json({ status: "ok", service: "g3n-backend-node" });
+    response.json({ status: "ok", service: "g3n-backend-node", version: obterVersaoSaude() });
 });
 appRoutes.use("/api/auth", authRoutes);
+appRoutes.use("/api/master/instituicoes", ensureAuthenticated, ensureSuperadmin, instituicoesRoutes);
+appRoutes.use("/api/master/importacao-dados", importacaoDadosRoutes);
 appRoutes.use("/api/ai", ensureAuthenticated, aiRoutes);
 appRoutes.use("/api/semente", ensureAuthenticated, sementeRoutes);
 appRoutes.use("/api/central-atendimentos", centralAtendimentosRoutes);
@@ -63,17 +87,24 @@ appRoutes.use("/api/agendamentos", agendamentosRoutes);
 appRoutes.use("/api/beneficiarios", beneficiarioRoutes);
 appRoutes.use("/api/familias", familiaRoutes);
 appRoutes.use("/api/unidades-assistenciais", unidadeAssistencialRoutes);
+// Alias compatível com a nomenclatura atual; a rota antiga permanece ativa para não quebrar integrações.
+appRoutes.use("/api/unidades-atendimento", unidadeAssistencialRoutes);
 appRoutes.use("/api/profissionais", profissionalRoutes);
 appRoutes.use("/api/voluntarios", voluntarioRoutes);
 appRoutes.use("/api/matriculas", matriculaRoutes);
+appRoutes.use("/api/prontuario", prontuarioRoutes);
+appRoutes.use("/api/educacional/parcerias-publicas", parceriasPublicasRoutes);
+appRoutes.use("/api/educacional", educacionalRoutes);
 appRoutes.use("/api/registro-doacao", registroDoacaoRoutes);
 appRoutes.use("/api/doacoes-realizadas", doacaoRealizadaRoutes);
 appRoutes.use("/api/doacoes-planejadas", doacaoPlanejadaRoutes);
 appRoutes.use("/api/registro-ponto", registroPontoRoutes);
 appRoutes.use("/api/almoxarifado", almoxarifadoRoutes);
 appRoutes.use("/api/controle-veiculos", controleVeiculosRoutes);
+appRoutes.use("/api/controle-veiculos/disponibilidade", disponibilidadeVeiculosRoutes);
 appRoutes.use("/api/patrimonios", patrimonioRoutes);
 appRoutes.use("/api/administrativo/tarefas", tarefaAdministrativaRoutes);
+appRoutes.use("/api/administrativo/projetos", projetoRoutes);
 appRoutes.use("/api/administrativo/checklist-diario", checklistDiarioRoutes);
 appRoutes.use("/api/lembretes-diarios", lembreteDiarioRoutes);
 appRoutes.use("/api/emprestimos-eventos", emprestimosEventosRoutes);
@@ -90,6 +121,7 @@ appRoutes.use("/api/planos-trabalho", planosTrabalhoRoutes);
 appRoutes.use("/api/juridico/planos-trabalho", planosTrabalhoRoutes);
 appRoutes.use("/api/termos-fomento", termosFomentoRoutes);
 appRoutes.use("/api/juridico/termos-fomento", termosFomentoRoutes);
+appRoutes.use("/api/juridico/termos-parceria", termosParceriaRoutes);
 appRoutes.use("/api/autorizacao-compras", autorizacaoComprasRoutes);
 appRoutes.use("/api/financeiro/autorizacao-compras", autorizacaoComprasRoutes);
 appRoutes.use("/api/contabilidade", contabilidadeRoutes);
@@ -102,7 +134,9 @@ appRoutes.use("/api/dashboard", dashboardRoutes);
 appRoutes.use("/api/chamados-tecnicos", chamadoTecnicoRoutes);
 appRoutes.use("/api/datas-comemorativas", datasComemorativasRoutes);
 appRoutes.use("/api/captacao-recursos", captacaoRecursosRoutes);
+appRoutes.use("/api/portais-externos", portaisExternosRoutes);
 appRoutes.use("/api/configuracoes/parametros", parametrosSistemaRoutes);
+appRoutes.use("/api/configuracoes/backup", backupSistemaRoutes);
 appRoutes.use("/api/configuracoes/licenca-uso", licencaUsoRoutes);
 appRoutes.use("/api/vendas", vendaRoutes);
 appRoutes.use("/api/carteira-evento", carteiraEventoRoutes);

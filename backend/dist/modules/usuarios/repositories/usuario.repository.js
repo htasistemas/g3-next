@@ -5,9 +5,9 @@ import { normalizeDigits, trimOrUndefined } from "../../../utils/string-utils.js
 import { mapAuditoriaRowParaResponse, mapUsuarioRowParaResponse } from "../usuario.mapper.js";
 import { ensureUsuariosGestaoEstrutura } from "./usuario-estrutura.repository.js";
 export class UsuarioRepository {
-    async listar(filters) {
+    async listar(filters, tenantId) {
         await ensureUsuariosGestaoEstrutura(prisma);
-        const where = this.buildWhereClause(filters);
+        const where = this.buildWhereClause(filters, tenantId);
         const limite = Math.min(Math.max(filters.tamanho_pagina, 1), 100);
         const offset = (Math.max(filters.pagina, 1) - 1) * limite;
         const rows = await prisma.$queryRaw(Prisma.sql `
@@ -25,6 +25,9 @@ export class UsuarioRepository {
         u.cargo,
         u.status,
         u.exigir_troca_senha,
+        u.exigir_autenticacao_segura,
+        u.permitir_biometria_facial_login,
+        u.exigir_biometria_facial_login,
         u.tentativas_login_invalidas,
         u.ultimo_login_invalido_em,
         u.ultimo_acesso_em,
@@ -55,6 +58,9 @@ export class UsuarioRepository {
         u.cargo,
         u.status,
         u.exigir_troca_senha,
+        u.exigir_autenticacao_segura,
+        u.permitir_biometria_facial_login,
+        u.exigir_biometria_facial_login,
         u.tentativas_login_invalidas,
         u.ultimo_login_invalido_em,
         u.ultimo_acesso_em,
@@ -86,13 +92,13 @@ export class UsuarioRepository {
             }
         };
     }
-    async buscarPorId(id) {
+    async buscarPorId(id, tenantId) {
         await ensureUsuariosGestaoEstrutura(prisma);
-        const usuario = await this.buscarUsuarioRowPorId(id);
+        const usuario = await this.buscarUsuarioRowPorId(id, tenantId);
         if (!usuario) {
             throw new AppError("Usuario nao encontrado.", 404);
         }
-        const auditoria = await this.buscarAuditoriaPorUsuarioId(id);
+        const auditoria = await this.buscarAuditoriaPorUsuarioId(id, tenantId);
         return {
             usuario: mapUsuarioRowParaResponse(usuario),
             auditoria
@@ -108,6 +114,76 @@ export class UsuarioRepository {
             .map((item) => item.nome.trim().toUpperCase())
             .filter(Boolean);
     }
+    async buscarFacePorId(id, tenantId) {
+        await ensureUsuariosGestaoEstrutura(prisma);
+        const usuario = await this.buscarUsuarioFaceRowPorId(id, tenantId);
+        if (!usuario) {
+            throw new AppError("Usuario nao encontrado.", 404);
+        }
+        return this.mapFaceStatus(usuario);
+    }
+    async salvarFacePorId(id, faceHash, caminhoArquivo, ator) {
+        await ensureUsuariosGestaoEstrutura(prisma);
+        const usuarioAtual = await this.buscarUsuarioFaceRowPorId(id, ator.tenant_id);
+        if (!usuarioAtual) {
+            throw new AppError("Usuario nao encontrado.", 404);
+        }
+        await prisma.$transaction(async (tx) => {
+            await tx.$executeRaw `
+        UPDATE usuarios
+           SET face_hash = ${faceHash},
+               face_foto_url = ${caminhoArquivo},
+               face_cadastrada_em = NOW(),
+               atualizado_em = NOW()
+         WHERE id = ${id}
+           AND tenant_id::text = ${ator.tenant_id}
+      `;
+            await this.registrarAuditoriaTx(tx, {
+                ator_id: ator.id,
+                acao: usuarioAtual.face_hash ? "UPDATE_FACE" : "CREATE_FACE",
+                entidade_id: id.toString(),
+                tenant_id: ator.tenant_id
+            }, {
+                face_cadastrada: true,
+                caminho_arquivo: caminhoArquivo
+            });
+        });
+        return {
+            status: await this.buscarFacePorId(id, ator.tenant_id),
+            caminhoAnterior: usuarioAtual.face_foto_url
+        };
+    }
+    async removerFacePorId(id, ator) {
+        await ensureUsuariosGestaoEstrutura(prisma);
+        const usuarioAtual = await this.buscarUsuarioFaceRowPorId(id, ator.tenant_id);
+        if (!usuarioAtual) {
+            throw new AppError("Usuario nao encontrado.", 404);
+        }
+        await prisma.$transaction(async (tx) => {
+            await tx.$executeRaw `
+        UPDATE usuarios
+           SET face_hash = NULL,
+               face_foto_url = NULL,
+               face_cadastrada_em = NULL,
+               exigir_biometria_facial_login = FALSE,
+               atualizado_em = NOW()
+         WHERE id = ${id}
+           AND tenant_id::text = ${ator.tenant_id}
+      `;
+            await this.registrarAuditoriaTx(tx, {
+                ator_id: ator.id,
+                acao: "DELETE_FACE",
+                entidade_id: id.toString(),
+                tenant_id: ator.tenant_id
+            }, {
+                face_cadastrada: false
+            });
+        });
+        return {
+            status: await this.buscarFacePorId(id, ator.tenant_id),
+            caminhoAnterior: usuarioAtual.face_foto_url
+        };
+    }
     async criar(input, senhaHash, ator) {
         await ensureUsuariosGestaoEstrutura(prisma);
         const nomeUsuario = input.nome_usuario.trim();
@@ -118,7 +194,8 @@ export class UsuarioRepository {
             email,
             cpf,
             origem_tipo: input.origem_tipo,
-            origem_id: trimOrUndefined(input.origem_id)
+            origem_id: trimOrUndefined(input.origem_id),
+            tenant_id: ator.tenant_id
         });
         const permissoesNormalizadas = this.normalizarPermissoes(input.permissoes, input.perfil_acesso);
         const usuarioId = await prisma.$transaction(async (tx) => {
@@ -136,27 +213,31 @@ export class UsuarioRepository {
             await this.atualizarCamposComplementaresTx(tx, usuario.id, {
                 ...input,
                 email
-            }, ator.nome_usuario);
+            }, ator);
             await this.sincronizarPermissoesTx(tx, usuario.id, permissoesNormalizadas);
             await this.registrarAuditoriaTx(tx, {
                 ator_id: ator.id,
                 acao: "CREATE",
-                entidade_id: usuario.id.toString()
+                entidade_id: usuario.id.toString(),
+                tenant_id: ator.tenant_id
             }, {
                 nome_usuario: nomeUsuario,
                 email,
                 status: input.status ?? "ATIVO",
+                exigir_autenticacao_segura: !!input.exigir_autenticacao_segura,
+                permitir_biometria_facial_login: !!input.permitir_biometria_facial_login,
+                exigir_biometria_facial_login: !!input.exigir_biometria_facial_login,
                 permissoes: permissoesNormalizadas,
                 origem_tipo: input.origem_tipo ?? null,
                 origem_id: trimOrUndefined(input.origem_id) ?? null
             });
             return usuario.id;
         });
-        return this.buscarPorId(usuarioId);
+        return this.buscarPorId(usuarioId, ator.tenant_id);
     }
     async atualizar(id, input, ator) {
         await ensureUsuariosGestaoEstrutura(prisma);
-        const existente = await this.buscarUsuarioRowPorId(id);
+        const existente = await this.buscarUsuarioRowPorId(id, ator.tenant_id);
         if (!existente) {
             throw new AppError("Usuario nao encontrado.", 404);
         }
@@ -169,44 +250,49 @@ export class UsuarioRepository {
             cpf,
             ignorar_id: id,
             origem_tipo: input.origem_tipo,
-            origem_id: trimOrUndefined(input.origem_id)
+            origem_id: trimOrUndefined(input.origem_id),
+            tenant_id: ator.tenant_id
         });
         await prisma.$transaction(async (tx) => {
-            await tx.usuario.update({
-                where: { id },
-                data: {
-                    nomeUsuario,
-                    nome: input.nome_completo.trim(),
-                    email,
-                    atualizadoEm: new Date()
-                }
-            });
+            await tx.$executeRawUnsafe(`
+          UPDATE usuarios
+          SET nome_usuario = $2,
+              nome = $3,
+              email = $4,
+              atualizado_em = NOW()
+          WHERE id = $1
+            AND tenant_id::text = $5
+        `, id, nomeUsuario, input.nome_completo.trim(), email, ator.tenant_id);
             const permissoesAtuais = await this.listarPermissoesUsuarioTx(tx, id);
             const permissoesNormalizadas = this.normalizarPermissoes(input.permissoes, input.perfil_acesso, permissoesAtuais);
             await this.atualizarCamposComplementaresTx(tx, id, {
                 ...input,
                 email,
                 status: input.status ?? this.mapStatusPersistido(existente.status)
-            }, ator.nome_usuario);
+            }, ator);
             await this.sincronizarPermissoesTx(tx, id, permissoesNormalizadas);
             await this.registrarAuditoriaTx(tx, {
                 ator_id: ator.id,
                 acao: "UPDATE",
-                entidade_id: id.toString()
+                entidade_id: id.toString(),
+                tenant_id: ator.tenant_id
             }, {
                 nome_usuario: nomeUsuario,
                 email,
                 status: input.status ?? this.mapStatusPersistido(existente.status),
+                exigir_autenticacao_segura: !!input.exigir_autenticacao_segura,
+                permitir_biometria_facial_login: !!input.permitir_biometria_facial_login,
+                exigir_biometria_facial_login: !!input.exigir_biometria_facial_login,
                 permissoes: permissoesNormalizadas,
                 origem_tipo: input.origem_tipo ?? null,
                 origem_id: trimOrUndefined(input.origem_id) ?? null
             });
         });
-        return this.buscarPorId(id);
+        return this.buscarPorId(id, ator.tenant_id);
     }
     async atualizarStatus(id, status, ator) {
         await ensureUsuariosGestaoEstrutura(prisma);
-        const usuario = await this.buscarUsuarioRowPorId(id);
+        const usuario = await this.buscarUsuarioRowPorId(id, ator.tenant_id);
         if (!usuario) {
             throw new AppError("Usuario nao encontrado.", 404);
         }
@@ -217,32 +303,34 @@ export class UsuarioRepository {
               atualizado_em = NOW(),
               atualizado_por = $3
           WHERE id = $1
-        `, id, status, ator.nome_usuario);
+            AND tenant_id::text = $4
+        `, id, status, ator.nome_usuario, ator.tenant_id);
             await this.registrarAuditoriaTx(tx, {
                 ator_id: ator.id,
                 acao: "STATUS_CHANGE",
-                entidade_id: id.toString()
+                entidade_id: id.toString(),
+                tenant_id: ator.tenant_id
             }, {
                 status_anterior: this.mapStatusPersistido(usuario.status),
                 status_novo: status
             });
         });
-        return this.buscarPorId(id);
+        return this.buscarPorId(id, ator.tenant_id);
     }
     async resetarSenha(id, novaSenhaHash, exigirTrocaSenha, ator) {
         await ensureUsuariosGestaoEstrutura(prisma);
-        const usuario = await this.buscarUsuarioRowPorId(id);
+        const usuario = await this.buscarUsuarioRowPorId(id, ator.tenant_id);
         if (!usuario) {
             throw new AppError("Usuario nao encontrado.", 404);
         }
         await prisma.$transaction(async (tx) => {
-            await tx.usuario.update({
-                where: { id },
-                data: {
-                    senhaHash: novaSenhaHash,
-                    atualizadoEm: new Date()
-                }
-            });
+            await tx.$executeRawUnsafe(`
+          UPDATE usuarios
+          SET senha_hash = $2,
+              atualizado_em = NOW()
+          WHERE id = $1
+            AND tenant_id::text = $3
+        `, id, novaSenhaHash, ator.tenant_id);
             await tx.$executeRawUnsafe(`
           UPDATE usuarios
           SET exigir_troca_senha = $2,
@@ -251,20 +339,22 @@ export class UsuarioRepository {
               atualizado_em = NOW(),
               atualizado_por = $3
           WHERE id = $1
-        `, id, exigirTrocaSenha, ator.nome_usuario);
+            AND tenant_id::text = $4
+        `, id, exigirTrocaSenha, ator.nome_usuario, ator.tenant_id);
             await this.registrarAuditoriaTx(tx, {
                 ator_id: ator.id,
                 acao: "RESET_PASSWORD",
-                entidade_id: id.toString()
+                entidade_id: id.toString(),
+                tenant_id: ator.tenant_id
             }, {
                 exigir_troca_senha: exigirTrocaSenha
             });
         });
-        return this.buscarPorId(id);
+        return this.buscarPorId(id, ator.tenant_id);
     }
     async remover(id, ator) {
         await ensureUsuariosGestaoEstrutura(prisma);
-        const usuario = await this.buscarUsuarioRowPorId(id);
+        const usuario = await this.buscarUsuarioRowPorId(id, ator.tenant_id);
         if (!usuario) {
             throw new AppError("Usuario nao encontrado.", 404);
         }
@@ -277,11 +367,13 @@ export class UsuarioRepository {
               atualizado_em = NOW(),
               atualizado_por = $3
           WHERE id = $1
-        `, id, removidoEm, ator.nome_usuario);
+            AND tenant_id::text = $4
+        `, id, removidoEm, ator.nome_usuario, ator.tenant_id);
             await this.registrarAuditoriaTx(tx, {
                 ator_id: ator.id,
                 acao: "DELETE",
-                entidade_id: id.toString()
+                entidade_id: id.toString(),
+                tenant_id: ator.tenant_id
             }, {
                 status_anterior: this.mapStatusPersistido(usuario.status),
                 removido_em: removidoEm.toISOString(),
@@ -293,7 +385,7 @@ export class UsuarioRepository {
             removido_em: removidoEm.toISOString()
         };
     }
-    async buscarUsuarioRowPorId(id) {
+    async buscarUsuarioRowPorId(id, tenantId) {
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT
         u.id,
@@ -309,6 +401,9 @@ export class UsuarioRepository {
         u.cargo,
         u.status,
         u.exigir_troca_senha,
+        u.exigir_autenticacao_segura,
+        u.permitir_biometria_facial_login,
+        u.exigir_biometria_facial_login,
         u.tentativas_login_invalidas,
         u.ultimo_login_invalido_em,
         u.ultimo_acesso_em,
@@ -325,6 +420,7 @@ export class UsuarioRepository {
       LEFT JOIN usuario_permissao up ON up.usuario_id = u.id
       LEFT JOIN permissao p ON p.id = up.permissao_id
       WHERE u.id = ${id}
+        AND u.tenant_id::text = ${tenantId}
         AND u.deletado_em IS NULL
       GROUP BY
         u.id,
@@ -340,6 +436,9 @@ export class UsuarioRepository {
         u.cargo,
         u.status,
         u.exigir_troca_senha,
+        u.exigir_autenticacao_segura,
+        u.permitir_biometria_facial_login,
+        u.exigir_biometria_facial_login,
         u.tentativas_login_invalidas,
         u.ultimo_login_invalido_em,
         u.ultimo_acesso_em,
@@ -352,7 +451,29 @@ export class UsuarioRepository {
     `);
         return rows[0] ?? null;
     }
-    async buscarAuditoriaPorUsuarioId(id, limite = 100) {
+    async buscarUsuarioFaceRowPorId(id, tenantId) {
+        const rows = await prisma.$queryRaw(Prisma.sql `
+      SELECT
+        id,
+        face_hash,
+        face_foto_url,
+        face_cadastrada_em
+      FROM usuarios
+      WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
+        AND deletado_em IS NULL
+      LIMIT 1
+    `);
+        return rows[0] ?? null;
+    }
+    mapFaceStatus(usuario) {
+        return {
+            face_cadastrada: Boolean(usuario.face_hash && usuario.face_foto_url),
+            face_url: usuario.face_foto_url ?? undefined,
+            face_cadastrada_em: usuario.face_cadastrada_em?.toISOString()
+        };
+    }
+    async buscarAuditoriaPorUsuarioId(id, tenantId, limite = 100) {
         try {
             const rows = await prisma.$queryRaw(Prisma.sql `
         SELECT
@@ -366,6 +487,7 @@ export class UsuarioRepository {
         LEFT JOIN usuarios ator ON ator.id = a.usuario_id
         WHERE a.entidade = 'USUARIO'
           AND a.entidade_id = ${id.toString()}
+          AND a.tenant_id::text = ${tenantId}
         ORDER BY a.criado_em DESC
         LIMIT ${limite}
       `);
@@ -376,8 +498,11 @@ export class UsuarioRepository {
             return [];
         }
     }
-    buildWhereClause(filters) {
-        const conditions = [Prisma.sql `u.deletado_em IS NULL`];
+    buildWhereClause(filters, tenantId) {
+        const conditions = [
+            Prisma.sql `u.deletado_em IS NULL`,
+            Prisma.sql `u.tenant_id::text = ${tenantId}`
+        ];
         if (filters.nome) {
             const termo = `%${filters.nome.trim()}%`;
             conditions.push(Prisma.sql `(
@@ -425,7 +550,7 @@ export class UsuarioRepository {
         }
         return Prisma.sql `WHERE ${Prisma.join(conditions, " AND ")}`;
     }
-    async atualizarCamposComplementaresTx(tx, usuarioId, input, usuarioAtualizacao) {
+    async atualizarCamposComplementaresTx(tx, usuarioId, input, ator) {
         await tx.$executeRawUnsafe(`
         UPDATE usuarios
         SET
@@ -438,13 +563,19 @@ export class UsuarioRepository {
           cargo = $8,
           status = $9,
           exigir_troca_senha = $10,
-          origem_tipo = $11,
-          origem_id = $12,
-          origem_nome = $13,
+          exigir_autenticacao_segura = $11,
+          permitir_biometria_facial_login = $12,
+          exigir_biometria_facial_login = $13,
+          origem_tipo = $14,
+          origem_id = $15,
+          origem_nome = $16,
+          tenant_id = $17::uuid,
+          instituicao_id = $18::uuid,
           atualizado_em = NOW(),
-          atualizado_por = $14
+          atualizado_por = $19
         WHERE id = $1
-      `, usuarioId, trimOrUndefined(input.nome_exibicao) ?? null, normalizeDigits(input.telefone) ?? null, normalizeDigits(input.cpf) ?? null, trimOrUndefined(input.matricula) ?? null, trimOrUndefined(input.setor) ?? null, trimOrUndefined(input.unidade) ?? null, trimOrUndefined(input.cargo) ?? null, input.status ?? "ATIVO", !!input.exigir_troca_senha, trimOrUndefined(input.origem_tipo) ?? null, trimOrUndefined(input.origem_id) ?? null, trimOrUndefined(input.origem_nome) ?? null, usuarioAtualizacao);
+          AND (tenant_id::text = $20 OR tenant_id IS NULL)
+      `, usuarioId, trimOrUndefined(input.nome_exibicao) ?? null, normalizeDigits(input.telefone) ?? null, normalizeDigits(input.cpf) ?? null, trimOrUndefined(input.matricula) ?? null, trimOrUndefined(input.setor) ?? null, trimOrUndefined(input.unidade) ?? null, trimOrUndefined(input.cargo) ?? null, input.status ?? "ATIVO", !!input.exigir_troca_senha, !!input.exigir_autenticacao_segura, !!input.permitir_biometria_facial_login, !!input.permitir_biometria_facial_login && !!input.exigir_biometria_facial_login, trimOrUndefined(input.origem_tipo) ?? null, trimOrUndefined(input.origem_id) ?? null, trimOrUndefined(input.origem_nome) ?? null, ator.tenant_id, ator.instituicao_id, ator.nome_usuario, ator.tenant_id);
     }
     async sincronizarPermissoesTx(tx, usuarioId, permissoes) {
         const nomes = [...new Set(permissoes.map((item) => item.trim().toUpperCase()).filter(Boolean))];
@@ -499,6 +630,7 @@ export class UsuarioRepository {
       FROM usuarios u
       WHERE (${Prisma.join(condicoes, " OR ")})
         AND u.deletado_em IS NULL
+        AND u.tenant_id::text = ${input.tenant_id}
       ${ignorarSql}
       LIMIT 10
     `);
@@ -550,9 +682,9 @@ export class UsuarioRepository {
     async registrarAuditoriaTx(tx, payload, dados) {
         try {
             await tx.$executeRawUnsafe(`
-          INSERT INTO auditoria_evento (usuario_id, acao, entidade, entidade_id, dados_json, criado_em)
-          VALUES ($1, $2, 'USUARIO', $3, $4::jsonb, NOW())
-        `, payload.ator_id ?? null, payload.acao, payload.entidade_id, JSON.stringify(dados));
+          INSERT INTO auditoria_evento (usuario_id, acao, entidade, entidade_id, tenant_id, dados_json, criado_em)
+          VALUES ($1, $2, 'USUARIO', $3, $4::uuid, $5::jsonb, NOW())
+        `, payload.ator_id ?? null, payload.acao, payload.entidade_id, payload.tenant_id, JSON.stringify(dados));
         }
         catch (error) {
             console.warn("[usuarios] nao foi possivel registrar auditoria:", error);

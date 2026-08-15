@@ -1,17 +1,17 @@
 import { LicencaUsoService } from "../services/licenca-uso.service.js";
 const service = new LicencaUsoService();
 export class LicencaUsoController {
-    async obterConfiguracao(_request, response) {
-        const resultado = await service.obterConfiguracao();
+    async obterConfiguracao(request, response) {
+        const resultado = await service.obterConfiguracao(request.authUser?.tenant_id);
         return response.json(resultado);
     }
     async atualizarConfiguracao(request, response) {
         const usuario = request.authUser?.nomeUsuario ?? "sistema";
-        const resultado = await service.atualizarConfiguracao(request.body, usuario);
+        const resultado = await service.atualizarConfiguracao(request.body, usuario, request.authUser?.tenant_id);
         return response.json(resultado);
     }
-    async gerarCheckout(_request, response) {
-        const resultado = await service.gerarCheckoutLink();
+    async gerarCheckout(request, response) {
+        const resultado = await service.gerarCheckoutLink(request.authUser?.tenant_id);
         return response.json(resultado);
     }
     async confirmarRetorno(request, response) {

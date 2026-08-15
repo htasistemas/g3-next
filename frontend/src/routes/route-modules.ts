@@ -144,6 +144,10 @@ const routeModules: RouteModuleDefinition[] = [
     loader: () => import("@/pages/setor-juridico/termo-fomento-page")
   },
   {
+    path: "/setor-juridico/termos-parceria",
+    loader: () => import("@/pages/setor-juridico/termos-parceria-page-padrao")
+  },
+  {
     path: "/setor-financeiro/autorizacao-compras",
     loader: () => import("@/pages/setor-financeiro/autorizacao-compras-page")
   },

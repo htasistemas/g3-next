@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { normalizeDigits, trimOrUndefined } from "../../../utils/string-utils.js";
+import type { ContextoOrganizacional } from "../../auth/auth.types.js";
 import type {
   DiretoriaUnidadeInput,
   SalaUnidadeInput,
@@ -97,7 +98,7 @@ function normalizarSalas(salas?: SalaUnidadeInput[]): SalaNormalizada[] {
 }
 
 export class UnidadeAssistencialRepository {
-  async listar(filters: UnidadeAssistencialFilters, tenantId?: string) {
+  async listar(filters: UnidadeAssistencialFilters, tenantId?: string, contexto?: ContextoOrganizacional) {
     await this.garantirColunaSalaAtivo();
     if (!tenantId) {
       const where: Prisma.UnidadeAssistencialWhereInput = {};
@@ -139,7 +140,7 @@ export class UnidadeAssistencialRepository {
       return this.anexarStatusSalas(unidades);
     }
 
-    const ids = await this.listarIdsPorTenant(filters, tenantId);
+    const ids = await this.listarIdsPorTenant(filters, tenantId, contexto);
     if (!ids.length) return [];
 
     const unidades = await prisma.unidadeAssistencial.findMany({
@@ -178,15 +179,15 @@ export class UnidadeAssistencialRepository {
     });
   }
 
-  async buscarPorIdOuFalhar(id: bigint, tenantId?: string) {
+  async buscarPorIdOuFalhar(id: bigint, tenantId?: string, contexto?: ContextoOrganizacional) {
     const unidade = await this.buscarPorIdDoTenant(id, tenantId);
-    if (!unidade) {
+    if (!unidade || (tenantId && contexto && !(await this.unidadePermitidaNoContexto(id, tenantId, contexto)))) {
       throw new AppError("Unidade assistencial nao encontrada.", 404);
     }
     return unidade;
   }
 
-  async buscarAtual(tenantId?: string) {
+  async buscarAtual(tenantId?: string, contexto?: ContextoOrganizacional) {
     if (!tenantId) {
       const unidadePrincipal = await prisma.unidadeAssistencial.findFirst({
         where: { unidadePrincipal: true },
@@ -215,6 +216,8 @@ export class UnidadeAssistencialRepository {
 
     const unidadeId = rows[0]?.id;
     if (!unidadeId) return null;
+
+    if (contexto && !(await this.unidadePermitidaNoContexto(unidadeId, tenantId, contexto))) return null;
 
     return prisma.unidadeAssistencial.findUnique({
       where: { id: unidadeId },
@@ -662,9 +665,20 @@ export class UnidadeAssistencialRepository {
     return Number(rows[0]?.total ?? 0);
   }
 
-  private async listarIdsPorTenant(filters: UnidadeAssistencialFilters, tenantId: string) {
+  private async listarIdsPorTenant(filters: UnidadeAssistencialFilters, tenantId: string, contexto?: ContextoOrganizacional) {
     const params: unknown[] = [tenantId];
     const condicoes = ["ua.tenant_id::text = $1"];
+
+    if (contexto?.unidade_id) {
+      params.push(contexto.unidade_id);
+      condicoes.push(`EXISTS (SELECT 1 FROM unidades_organizacionais uo WHERE uo.id = $${params.length}::bigint AND uo.unidade_assistencial_id = ua.id)`);
+    } else if (contexto?.projeto_id) {
+      params.push(contexto.projeto_id);
+      condicoes.push(`EXISTS (SELECT 1 FROM projetos p JOIN unidades_organizacionais uo ON uo.id = p.unidade_organizacional_id WHERE p.id = $${params.length}::bigint AND uo.unidade_assistencial_id = ua.id)`);
+    } else if (contexto?.entidade_juridica_id) {
+      params.push(contexto.entidade_juridica_id);
+      condicoes.push(`ua.entidade_juridica_id = $${params.length}::bigint`);
+    }
 
     const nome = trimOrUndefined(filters.nome_fantasia);
     if (nome) {
@@ -728,5 +742,30 @@ export class UnidadeAssistencialRepository {
     );
 
     return !!rows[0];
+  }
+
+  private async unidadePermitidaNoContexto(id: bigint, tenantId: string, contexto: ContextoOrganizacional) {
+    if (contexto.unidade_id) {
+      const rows = await prisma.$queryRawUnsafe<IdRow[]>(
+        `SELECT ua.id FROM unidade_assistencial ua JOIN unidades_organizacionais uo ON uo.unidade_assistencial_id = ua.id
+         WHERE ua.id = $1 AND ua.tenant_id::text = $2 AND uo.id = $3::bigint LIMIT 1`, id, tenantId, contexto.unidade_id
+      );
+      return !!rows[0];
+    }
+    if (contexto.projeto_id) {
+      const rows = await prisma.$queryRawUnsafe<IdRow[]>(
+        `SELECT ua.id FROM unidade_assistencial ua JOIN unidades_organizacionais uo ON uo.unidade_assistencial_id = ua.id
+         JOIN projetos p ON p.unidade_organizacional_id = uo.id
+         WHERE ua.id = $1 AND ua.tenant_id::text = $2 AND p.id = $3::bigint LIMIT 1`, id, tenantId, contexto.projeto_id
+      );
+      return !!rows[0];
+    }
+    if (contexto.entidade_juridica_id) {
+      const rows = await prisma.$queryRawUnsafe<IdRow[]>(
+        `SELECT id FROM unidade_assistencial WHERE id = $1 AND tenant_id::text = $2 AND entidade_juridica_id = $3::bigint LIMIT 1`, id, tenantId, contexto.entidade_juridica_id
+      );
+      return !!rows[0];
+    }
+    return true;
   }
 }

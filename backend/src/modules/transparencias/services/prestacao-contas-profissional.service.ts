@@ -20,7 +20,7 @@ const optionalNumber = z.preprocess((value) => {
   if (value == null || value === "") return undefined;
   if (typeof value === "number") return value;
   if (typeof value === "string") {
-    const parsed = Number(value.replace(",", "."));
+    const parsed = Number(value.includes(",") ? value.replace(/\./g, "").replace(",", ".") : value);
     return Number.isFinite(parsed) ? parsed : value;
   }
   return value;

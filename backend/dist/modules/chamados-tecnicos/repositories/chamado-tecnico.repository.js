@@ -25,6 +25,7 @@ const estruturaSql = [
     `
   CREATE TABLE IF NOT EXISTS g3n_chamado_tecnico (
     id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID,
     codigo VARCHAR(30) NOT NULL UNIQUE,
     solicitante VARCHAR(160) NOT NULL,
     interessado VARCHAR(160),
@@ -69,9 +70,11 @@ const estruturaSql = [
     ativo BOOLEAN NOT NULL DEFAULT TRUE
   )
   `,
+    "ALTER TABLE IF EXISTS g3n_chamado_tecnico ADD COLUMN IF NOT EXISTS tenant_id UUID",
     `
   CREATE TABLE IF NOT EXISTS g3n_chamado_tecnico_comentario (
     id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID,
     chamado_id BIGINT NOT NULL REFERENCES g3n_chamado_tecnico(id) ON DELETE CASCADE,
     comentario TEXT NOT NULL,
     interno BOOLEAN NOT NULL DEFAULT FALSE,
@@ -82,9 +85,11 @@ const estruturaSql = [
     atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
   )
   `,
+    "ALTER TABLE IF EXISTS g3n_chamado_tecnico_comentario ADD COLUMN IF NOT EXISTS tenant_id UUID",
     `
   CREATE TABLE IF NOT EXISTS g3n_chamado_tecnico_historico (
     id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID,
     chamado_id BIGINT NOT NULL REFERENCES g3n_chamado_tecnico(id) ON DELETE CASCADE,
     tipo_evento VARCHAR(60) NOT NULL,
     campo VARCHAR(120),
@@ -95,9 +100,11 @@ const estruturaSql = [
     criado_em TIMESTAMP NOT NULL DEFAULT NOW()
   )
   `,
+    "ALTER TABLE IF EXISTS g3n_chamado_tecnico_historico ADD COLUMN IF NOT EXISTS tenant_id UUID",
     `
   CREATE TABLE IF NOT EXISTS g3n_chamado_tecnico_vinculo (
     id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID,
     chamado_id BIGINT NOT NULL REFERENCES g3n_chamado_tecnico(id) ON DELETE CASCADE,
     tipo_vinculo VARCHAR(80) NOT NULL,
     referencia_id VARCHAR(120),
@@ -106,9 +113,11 @@ const estruturaSql = [
     criado_em TIMESTAMP NOT NULL DEFAULT NOW()
   )
   `,
+    "ALTER TABLE IF EXISTS g3n_chamado_tecnico_vinculo ADD COLUMN IF NOT EXISTS tenant_id UUID",
     `
   CREATE TABLE IF NOT EXISTS g3n_chamado_tecnico_filtro_salvo (
     id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID,
     usuario_id BIGINT NOT NULL,
     nome VARCHAR(120) NOT NULL,
     filtro_json JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -117,16 +126,25 @@ const estruturaSql = [
     atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
   )
   `,
+    "ALTER TABLE IF EXISTS g3n_chamado_tecnico_filtro_salvo ADD COLUMN IF NOT EXISTS tenant_id UUID",
     `
   CREATE TABLE IF NOT EXISTS g3n_chamado_tecnico_usuario_estado (
     chamado_id BIGINT NOT NULL REFERENCES g3n_chamado_tecnico(id) ON DELETE CASCADE,
+    tenant_id UUID NOT NULL,
     usuario_id BIGINT NOT NULL,
     ultimo_acesso_em TIMESTAMP,
     ultimo_comentario_lido_em TIMESTAMP,
     PRIMARY KEY (chamado_id, usuario_id)
   )
   `,
+    "ALTER TABLE IF EXISTS g3n_chamado_tecnico_usuario_estado ADD COLUMN IF NOT EXISTS tenant_id UUID",
     "CREATE INDEX IF NOT EXISTS g3n_chamado_tecnico_codigo_idx ON g3n_chamado_tecnico(codigo)",
+    "CREATE INDEX IF NOT EXISTS g3n_chamado_tecnico_tenant_idx ON g3n_chamado_tecnico(tenant_id, ultima_atualizacao DESC)",
+    "CREATE INDEX IF NOT EXISTS g3n_chamado_tecnico_comentario_tenant_idx ON g3n_chamado_tecnico_comentario(tenant_id, chamado_id)",
+    "CREATE INDEX IF NOT EXISTS g3n_chamado_tecnico_historico_tenant_idx ON g3n_chamado_tecnico_historico(tenant_id, chamado_id)",
+    "CREATE INDEX IF NOT EXISTS g3n_chamado_tecnico_vinculo_tenant_idx ON g3n_chamado_tecnico_vinculo(tenant_id, chamado_id)",
+    "CREATE INDEX IF NOT EXISTS g3n_chamado_tecnico_filtro_salvo_tenant_idx ON g3n_chamado_tecnico_filtro_salvo(tenant_id, usuario_id)",
+    "CREATE INDEX IF NOT EXISTS g3n_chamado_tecnico_usuario_estado_tenant_idx ON g3n_chamado_tecnico_usuario_estado(tenant_id, chamado_id, usuario_id)",
     "CREATE INDEX IF NOT EXISTS g3n_chamado_tecnico_situacao_idx ON g3n_chamado_tecnico(situacao_id)",
     "CREATE INDEX IF NOT EXISTS g3n_chamado_tecnico_prioridade_idx ON g3n_chamado_tecnico(prioridade_id)",
     "CREATE INDEX IF NOT EXISTS g3n_chamado_tecnico_responsavel_idx ON g3n_chamado_tecnico(responsavel_usuario_id)",
@@ -141,8 +159,11 @@ function parseDate(value) {
     const parsed = new Date(`${value}T00:00:00.000Z`);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
-function buildWhereClauses(filters) {
-    const clauses = [Prisma.sql `c.ativo = TRUE`];
+function buildWhereClauses(filters, tenantId) {
+    const clauses = [
+        Prisma.sql `c.ativo = TRUE`,
+        Prisma.sql `c.tenant_id::text = ${tenantId}`
+    ];
     if (filters.codigo)
         clauses.push(Prisma.sql `c.codigo ILIKE ${`%${filters.codigo}%`}`);
     if (filters.resumo)
@@ -218,6 +239,54 @@ export async function ensureChamadoTecnicoEstrutura() {
             for (const comando of estruturaSql) {
                 await prisma.$executeRawUnsafe(comando);
             }
+            await prisma.$executeRawUnsafe(`
+        UPDATE g3n_chamado_tecnico c
+        SET tenant_id = u.tenant_id
+        FROM usuarios u
+        WHERE c.tenant_id IS NULL
+          AND u.id = c.criador_usuario_id
+          AND u.tenant_id IS NOT NULL
+      `);
+            await prisma.$executeRawUnsafe(`
+        UPDATE g3n_chamado_tecnico_comentario cc
+        SET tenant_id = c.tenant_id
+        FROM g3n_chamado_tecnico c
+        WHERE cc.tenant_id IS NULL
+          AND c.id = cc.chamado_id
+          AND c.tenant_id IS NOT NULL
+      `);
+            await prisma.$executeRawUnsafe(`
+        UPDATE g3n_chamado_tecnico_historico h
+        SET tenant_id = c.tenant_id
+        FROM g3n_chamado_tecnico c
+        WHERE h.tenant_id IS NULL
+          AND c.id = h.chamado_id
+          AND c.tenant_id IS NOT NULL
+      `);
+            await prisma.$executeRawUnsafe(`
+        UPDATE g3n_chamado_tecnico_vinculo v
+        SET tenant_id = c.tenant_id
+        FROM g3n_chamado_tecnico c
+        WHERE v.tenant_id IS NULL
+          AND c.id = v.chamado_id
+          AND c.tenant_id IS NOT NULL
+      `);
+            await prisma.$executeRawUnsafe(`
+        UPDATE g3n_chamado_tecnico_usuario_estado ue
+        SET tenant_id = c.tenant_id
+        FROM g3n_chamado_tecnico c
+        WHERE ue.tenant_id IS NULL
+          AND c.id = ue.chamado_id
+          AND c.tenant_id IS NOT NULL
+      `);
+            await prisma.$executeRawUnsafe(`
+        UPDATE g3n_chamado_tecnico_filtro_salvo fs
+        SET tenant_id = u.tenant_id
+        FROM usuarios u
+        WHERE fs.tenant_id IS NULL
+          AND u.id = fs.usuario_id
+          AND u.tenant_id IS NOT NULL
+      `);
         })();
     }
     await estruturaPromise;
@@ -277,7 +346,7 @@ export class ChamadoTecnicoRepository {
       ORDER BY tipo ASC, ordem ASC, nome ASC
     `);
     }
-    async buscarParametroPorId(id) {
+    async buscarParametroPorId(id, _tenantId) {
         await this.garantirEstrutura();
         await this.garantirParametrosIniciais();
         const rows = await prisma.$queryRaw(Prisma.sql `
@@ -288,7 +357,7 @@ export class ChamadoTecnicoRepository {
     `);
         return rows[0] ?? null;
     }
-    async buscarParametroPorChave(tipo, chave) {
+    async buscarParametroPorChave(tipo, chave, _tenantId) {
         await this.garantirEstrutura();
         await this.garantirParametrosIniciais();
         const rows = await prisma.$queryRaw(Prisma.sql `
@@ -300,15 +369,16 @@ export class ChamadoTecnicoRepository {
     `);
         return rows[0] ?? null;
     }
-    async listarUsuariosCatalogo() {
+    async listarUsuariosCatalogo(tenantId) {
         await this.garantirEstrutura();
         return prisma.$queryRaw(Prisma.sql `
       SELECT id, nome_usuario, nome AS nome_completo, nome_exibicao, email, status
       FROM usuarios
+      WHERE tenant_id::text = ${tenantId}
       ORDER BY COALESCE(nome_exibicao, nome, nome_usuario) ASC
     `);
     }
-    async salvarParametro(input, id) {
+    async salvarParametro(input, _tenantId, id) {
         await this.garantirEstrutura();
         if (input.padrao) {
             const filtroExclusaoId = id
@@ -339,7 +409,7 @@ export class ChamadoTecnicoRepository {
           atualizado_em = NOW()
         WHERE id = ${id}
       `);
-            const atualizado = await this.buscarParametroPorId(id);
+            const atualizado = await this.buscarParametroPorId(id, _tenantId);
             if (!atualizado)
                 throw new AppError("Parametro nao encontrado.", 404);
             return atualizado;
@@ -359,9 +429,9 @@ export class ChamadoTecnicoRepository {
             throw new AppError("Nao foi possivel criar o parametro.", 500);
         return parametro;
     }
-    async listar(filters, usuarioId) {
+    async listar(filters, usuarioId, tenantId) {
         await this.garantirEstrutura();
-        const clauses = buildWhereClauses(filters);
+        const clauses = buildWhereClauses(filters, tenantId);
         const whereSql = Prisma.sql `WHERE ${Prisma.join(clauses, " AND ")}`;
         const orderBySql = buildOrderBy(filters.ordenacao, filters.direcao);
         const limite = Math.max(1, Math.min(filters.limite ?? 20, 100));
@@ -388,7 +458,8 @@ export class ChamadoTecnicoRepository {
         SELECT COUNT(*) AS nao_lidos
         FROM g3n_chamado_tecnico_comentario cc
         LEFT JOIN g3n_chamado_tecnico_usuario_estado ue
-          ON ue.chamado_id = c.id
+         ON ue.chamado_id = c.id
+         AND ue.tenant_id::text = ${tenantId}
          AND ue.usuario_id = ${usuarioId}
         WHERE cc.chamado_id = c.id
           AND (cc.criado_por_usuario_id IS NULL OR cc.criado_por_usuario_id <> ${usuarioId})
@@ -436,9 +507,9 @@ export class ChamadoTecnicoRepository {
             }
         };
     }
-    async listarExportacao(filters, usuarioId) {
+    async listarExportacao(filters, usuarioId, tenantId) {
         await this.garantirEstrutura();
-        const clauses = buildWhereClauses(filters);
+        const clauses = buildWhereClauses(filters, tenantId);
         const whereSql = Prisma.sql `WHERE ${Prisma.join(clauses, " AND ")}`;
         const orderBySql = buildOrderBy(filters.ordenacao, filters.direcao);
         return prisma.$queryRaw(Prisma.sql `
@@ -462,7 +533,8 @@ export class ChamadoTecnicoRepository {
         SELECT COUNT(*) AS nao_lidos
         FROM g3n_chamado_tecnico_comentario cc
         LEFT JOIN g3n_chamado_tecnico_usuario_estado ue
-          ON ue.chamado_id = c.id
+         ON ue.chamado_id = c.id
+         AND ue.tenant_id::text = ${tenantId}
          AND ue.usuario_id = ${usuarioId}
         WHERE cc.chamado_id = c.id
           AND (cc.criado_por_usuario_id IS NULL OR cc.criado_por_usuario_id <> ${usuarioId})
@@ -473,28 +545,30 @@ export class ChamadoTecnicoRepository {
       LIMIT 5000
     `);
     }
-    async buscarPorId(id) {
+    async buscarPorId(id, tenantId) {
         await this.garantirEstrutura();
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT *
       FROM g3n_chamado_tecnico
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
         AND ativo = TRUE
       LIMIT 1
     `);
         return rows[0] ?? null;
     }
-    async buscarPorIdOuFalhar(id) {
-        const chamado = await this.buscarPorId(id);
+    async buscarPorIdOuFalhar(id, tenantId) {
+        const chamado = await this.buscarPorId(id, tenantId);
         if (!chamado) {
             throw new AppError("Chamado tecnico nao encontrado.", 404);
         }
         return chamado;
     }
-    async criar(input, criadorUsuarioId, situacaoId) {
+    async criar(input, criadorUsuarioId, situacaoId, tenantId) {
         await this.garantirEstrutura();
         const rows = await prisma.$queryRaw(Prisma.sql `
       INSERT INTO g3n_chamado_tecnico (
+        tenant_id,
         codigo, solicitante, interessado, cliente, sistema_id, projeto_id, sprint_id, tipo_id, categoria_id, prioridade_id,
         situacao_id, criador_usuario_id, responsavel_usuario_id, origem_id, motivo_reabertura_id, chamado_relacionado_id,
         sla_prazo_horas, sla_vencimento_em, resumo, descricao, passos_reproduzir, resultado_esperado, resultado_obtido,
@@ -502,6 +576,7 @@ export class ChamadoTecnicoRepository {
         versao_sistema, numero_release, resolucao, justificativa_reabertura, tags_texto, data_criacao, ultima_atualizacao,
         criado_em, atualizado_em, ativo
       ) VALUES (
+        ${tenantId},
         'PENDENTE', ${input.solicitante}, ${input.interessado ?? null}, ${input.cliente ?? null}, ${BigInt(input.sistema_id)},
         ${input.projeto_id ? BigInt(input.projeto_id) : null}, ${input.sprint_id ? BigInt(input.sprint_id) : null},
         ${BigInt(input.tipo_id)}, ${input.categoria_id ? BigInt(input.categoria_id) : null}, ${BigInt(input.prioridade_id)}, ${situacaoId},
@@ -526,10 +601,10 @@ export class ChamadoTecnicoRepository {
       SET codigo = ${`CT-${String(id).padStart(6, "0")}`}, atualizado_em = NOW()
       WHERE id = ${id}
     `);
-        return this.buscarPorIdOuFalhar(id);
+        return this.buscarPorIdOuFalhar(id, tenantId);
     }
-    async atualizar(id, input, situacaoId) {
-        await this.buscarPorIdOuFalhar(id);
+    async atualizar(id, input, tenantId, situacaoId) {
+        await this.buscarPorIdOuFalhar(id, tenantId);
         await prisma.$executeRaw(Prisma.sql `
       UPDATE g3n_chamado_tecnico
       SET
@@ -568,11 +643,12 @@ export class ChamadoTecnicoRepository {
         ultima_atualizacao = NOW(),
         atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
-        return this.buscarPorIdOuFalhar(id);
+        return this.buscarPorIdOuFalhar(id, tenantId);
     }
-    async registrarResolucao(id, situacaoId, options) {
-        await this.buscarPorIdOuFalhar(id);
+    async registrarResolucao(id, tenantId, situacaoId, options) {
+        await this.buscarPorIdOuFalhar(id, tenantId);
         await prisma.$executeRaw(Prisma.sql `
       UPDATE g3n_chamado_tecnico
       SET
@@ -587,24 +663,26 @@ export class ChamadoTecnicoRepository {
         ultima_atualizacao = NOW(),
         atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
-        return this.buscarPorIdOuFalhar(id);
+        return this.buscarPorIdOuFalhar(id, tenantId);
     }
-    async desativar(id) {
-        await this.buscarPorIdOuFalhar(id);
+    async desativar(id, tenantId) {
+        await this.buscarPorIdOuFalhar(id, tenantId);
         await prisma.$executeRaw(Prisma.sql `
       UPDATE g3n_chamado_tecnico
       SET ativo = FALSE, ultima_atualizacao = NOW(), atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
     }
-    async salvarComentario(chamadoId, input, usuarioId) {
-        await this.buscarPorIdOuFalhar(chamadoId);
+    async salvarComentario(chamadoId, tenantId, input, usuarioId) {
+        await this.buscarPorIdOuFalhar(chamadoId, tenantId);
         const rows = await prisma.$queryRaw(Prisma.sql `
       INSERT INTO g3n_chamado_tecnico_comentario (
-        chamado_id, comentario, interno, visivel_solicitante, mencao_usuario_id, criado_por_usuario_id, criado_em, atualizado_em
+        tenant_id, chamado_id, comentario, interno, visivel_solicitante, mencao_usuario_id, criado_por_usuario_id, criado_em, atualizado_em
       ) VALUES (
-        ${chamadoId}, ${input.comentario}, ${input.interno ?? false}, ${input.visivel_solicitante ?? true},
+        ${tenantId}, ${chamadoId}, ${input.comentario}, ${input.interno ?? false}, ${input.visivel_solicitante ?? true},
         ${input.mencao_usuario_id ? BigInt(input.mencao_usuario_id) : null}, ${usuarioId}, NOW(), NOW()
       )
       RETURNING *
@@ -613,49 +691,52 @@ export class ChamadoTecnicoRepository {
       UPDATE g3n_chamado_tecnico
       SET ultima_atualizacao = NOW(), atualizado_em = NOW()
       WHERE id = ${chamadoId}
+        AND tenant_id::text = ${tenantId}
     `);
-        await this.marcarComentariosComoLidos(chamadoId, usuarioId);
+        await this.marcarComentariosComoLidos(chamadoId, usuarioId, tenantId);
         const comentario = rows[0];
         if (!comentario)
             throw new AppError("Nao foi possivel registrar o comentario.", 500);
         return comentario;
     }
-    async listarComentarios(chamadoId) {
-        await this.buscarPorIdOuFalhar(chamadoId);
+    async listarComentarios(chamadoId, tenantId) {
+        await this.buscarPorIdOuFalhar(chamadoId, tenantId);
         return prisma.$queryRaw(Prisma.sql `
       SELECT *
       FROM g3n_chamado_tecnico_comentario
       WHERE chamado_id = ${chamadoId}
+        AND tenant_id::text = ${tenantId}
       ORDER BY criado_em ASC, id ASC
     `);
     }
     async registrarHistorico(chamadoId, payload) {
-        await this.buscarPorIdOuFalhar(chamadoId);
+        await this.buscarPorIdOuFalhar(chamadoId, payload.tenantId);
         await prisma.$executeRaw(Prisma.sql `
       INSERT INTO g3n_chamado_tecnico_historico (
-        chamado_id, tipo_evento, campo, descricao, valor_anterior, valor_novo, usuario_id, criado_em
+        tenant_id, chamado_id, tipo_evento, campo, descricao, valor_anterior, valor_novo, usuario_id, criado_em
       ) VALUES (
-        ${chamadoId}, ${payload.tipo_evento}, ${payload.campo ?? null}, ${payload.descricao},
+        ${payload.tenantId}, ${chamadoId}, ${payload.tipo_evento}, ${payload.campo ?? null}, ${payload.descricao},
         ${payload.valor_anterior ?? null}, ${payload.valor_novo ?? null}, ${payload.usuario_id ?? null}, NOW()
       )
     `);
     }
-    async listarHistorico(chamadoId) {
-        await this.buscarPorIdOuFalhar(chamadoId);
+    async listarHistorico(chamadoId, tenantId) {
+        await this.buscarPorIdOuFalhar(chamadoId, tenantId);
         return prisma.$queryRaw(Prisma.sql `
       SELECT *
       FROM g3n_chamado_tecnico_historico
       WHERE chamado_id = ${chamadoId}
+        AND tenant_id::text = ${tenantId}
       ORDER BY criado_em DESC, id DESC
     `);
     }
-    async salvarVinculo(chamadoId, input, usuarioId) {
-        await this.buscarPorIdOuFalhar(chamadoId);
+    async salvarVinculo(chamadoId, tenantId, input, usuarioId) {
+        await this.buscarPorIdOuFalhar(chamadoId, tenantId);
         const rows = await prisma.$queryRaw(Prisma.sql `
       INSERT INTO g3n_chamado_tecnico_vinculo (
-        chamado_id, tipo_vinculo, referencia_id, referencia_descricao, criado_por_usuario_id, criado_em
+        tenant_id, chamado_id, tipo_vinculo, referencia_id, referencia_descricao, criado_por_usuario_id, criado_em
       ) VALUES (
-        ${chamadoId}, ${input.tipo_vinculo}, ${input.referencia_id ?? null}, ${input.referencia_descricao}, ${usuarioId}, NOW()
+        ${tenantId}, ${chamadoId}, ${input.tipo_vinculo}, ${input.referencia_id ?? null}, ${input.referencia_descricao}, ${usuarioId}, NOW()
       )
       RETURNING *
     `);
@@ -664,36 +745,44 @@ export class ChamadoTecnicoRepository {
             throw new AppError("Nao foi possivel salvar o vinculo do chamado.", 500);
         return vinculo;
     }
-    async listarVinculos(chamadoId) {
-        await this.buscarPorIdOuFalhar(chamadoId);
+    async listarVinculos(chamadoId, tenantId) {
+        await this.buscarPorIdOuFalhar(chamadoId, tenantId);
         return prisma.$queryRaw(Prisma.sql `
       SELECT *
       FROM g3n_chamado_tecnico_vinculo
       WHERE chamado_id = ${chamadoId}
+        AND tenant_id::text = ${tenantId}
       ORDER BY criado_em DESC, id DESC
     `);
     }
-    async removerVinculo(chamadoId, vinculoId) {
-        await this.buscarPorIdOuFalhar(chamadoId);
+    async removerVinculo(chamadoId, tenantId, vinculoId) {
+        await this.buscarPorIdOuFalhar(chamadoId, tenantId);
         await prisma.$executeRaw(Prisma.sql `
       DELETE FROM g3n_chamado_tecnico_vinculo
       WHERE id = ${vinculoId}
         AND chamado_id = ${chamadoId}
+        AND tenant_id::text = ${tenantId}
     `);
     }
-    async listarAnexos(chamadoId) {
-        await this.buscarPorIdOuFalhar(chamadoId);
+    async listarAnexos(chamadoId, tenantId) {
+        await this.buscarPorIdOuFalhar(chamadoId, tenantId);
         return prisma.$queryRaw(Prisma.sql `
       SELECT id, nome_original, nome_arquivo, caminho_arquivo, thumbnail_caminho, mime_type, tamanho_bytes, data_upload, usuario_upload_id
       FROM arquivos
       WHERE entidade_tipo = 'chamado_tecnico'
         AND entidade_id = ${chamadoId}
         AND ativo = TRUE
+        AND EXISTS (
+          SELECT 1
+          FROM g3n_chamado_tecnico c
+          WHERE c.id = ${chamadoId}
+            AND c.tenant_id::text = ${tenantId}
+        )
       ORDER BY data_upload DESC, id DESC
     `);
     }
-    async buscarAnexoPorId(chamadoId, arquivoId) {
-        await this.buscarPorIdOuFalhar(chamadoId);
+    async buscarAnexoPorId(chamadoId, tenantId, arquivoId) {
+        await this.buscarPorIdOuFalhar(chamadoId, tenantId);
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT id, caminho_arquivo
       FROM arquivos
@@ -701,20 +790,27 @@ export class ChamadoTecnicoRepository {
         AND entidade_tipo = 'chamado_tecnico'
         AND entidade_id = ${chamadoId}
         AND ativo = TRUE
+        AND EXISTS (
+          SELECT 1
+          FROM g3n_chamado_tecnico c
+          WHERE c.id = ${chamadoId}
+            AND c.tenant_id::text = ${tenantId}
+        )
       LIMIT 1
     `);
         return rows[0] ?? null;
     }
-    async listarFiltrosSalvos(usuarioId) {
+    async listarFiltrosSalvos(usuarioId, tenantId) {
         await this.garantirEstrutura();
         return prisma.$queryRaw(Prisma.sql `
       SELECT *
       FROM g3n_chamado_tecnico_filtro_salvo
       WHERE usuario_id = ${usuarioId}
+        AND tenant_id::text = ${tenantId}
       ORDER BY padrao DESC, nome ASC
     `);
     }
-    async salvarFiltroSalvo(usuarioId, input, id) {
+    async salvarFiltroSalvo(usuarioId, tenantId, input, id) {
         await this.garantirEstrutura();
         if (input.padrao) {
             const filtroExclusaoId = id
@@ -726,6 +822,7 @@ export class ChamadoTecnicoRepository {
         UPDATE g3n_chamado_tecnico_filtro_salvo
         SET padrao = FALSE, atualizado_em = NOW()
         WHERE usuario_id = ${usuarioId}
+          AND tenant_id::text = ${tenantId}
         ${filtroExclusaoId}
       `);
         }
@@ -735,12 +832,13 @@ export class ChamadoTecnicoRepository {
         SET nome = ${input.nome}, filtro_json = ${JSON.stringify(input.filtros)}::jsonb, padrao = ${input.padrao ?? false}, atualizado_em = NOW()
         WHERE id = ${id}
           AND usuario_id = ${usuarioId}
+          AND tenant_id::text = ${tenantId}
       `);
-            return (await this.listarFiltrosSalvos(usuarioId)).find((item) => item.id === id) ?? null;
+            return (await this.listarFiltrosSalvos(usuarioId, tenantId)).find((item) => item.id === id) ?? null;
         }
         const rows = await prisma.$queryRaw(Prisma.sql `
-      INSERT INTO g3n_chamado_tecnico_filtro_salvo (usuario_id, nome, filtro_json, padrao, criado_em, atualizado_em)
-      VALUES (${usuarioId}, ${input.nome}, ${JSON.stringify(input.filtros)}::jsonb, ${input.padrao ?? false}, NOW(), NOW())
+      INSERT INTO g3n_chamado_tecnico_filtro_salvo (tenant_id, usuario_id, nome, filtro_json, padrao, criado_em, atualizado_em)
+      VALUES (${tenantId}, ${usuarioId}, ${input.nome}, ${JSON.stringify(input.filtros)}::jsonb, ${input.padrao ?? false}, NOW(), NOW())
       RETURNING *
     `);
         const filtro = rows[0];
@@ -748,24 +846,25 @@ export class ChamadoTecnicoRepository {
             throw new AppError("Nao foi possivel salvar o filtro.", 500);
         return filtro;
     }
-    async removerFiltroSalvo(usuarioId, id) {
+    async removerFiltroSalvo(usuarioId, tenantId, id) {
         await this.garantirEstrutura();
         await prisma.$executeRaw(Prisma.sql `
       DELETE FROM g3n_chamado_tecnico_filtro_salvo
       WHERE id = ${id}
         AND usuario_id = ${usuarioId}
+        AND tenant_id::text = ${tenantId}
     `);
     }
-    async marcarAcesso(chamadoId, usuarioId) {
-        await this.buscarPorIdOuFalhar(chamadoId);
+    async marcarAcesso(chamadoId, usuarioId, tenantId) {
+        await this.buscarPorIdOuFalhar(chamadoId, tenantId);
         await prisma.$executeRaw(Prisma.sql `
-      INSERT INTO g3n_chamado_tecnico_usuario_estado (chamado_id, usuario_id, ultimo_acesso_em, ultimo_comentario_lido_em)
-      VALUES (${chamadoId}, ${usuarioId}, NOW(), NOW())
+      INSERT INTO g3n_chamado_tecnico_usuario_estado (chamado_id, tenant_id, usuario_id, ultimo_acesso_em, ultimo_comentario_lido_em)
+      VALUES (${chamadoId}, ${tenantId}, ${usuarioId}, NOW(), NOW())
       ON CONFLICT (chamado_id, usuario_id)
-      DO UPDATE SET ultimo_acesso_em = NOW(), ultimo_comentario_lido_em = NOW()
+      DO UPDATE SET tenant_id = EXCLUDED.tenant_id, ultimo_acesso_em = NOW(), ultimo_comentario_lido_em = NOW()
     `);
     }
-    async marcarComentariosComoLidos(chamadoId, usuarioId) {
-        await this.marcarAcesso(chamadoId, usuarioId);
+    async marcarComentariosComoLidos(chamadoId, usuarioId, tenantId) {
+        await this.marcarAcesso(chamadoId, usuarioId, tenantId);
     }
 }

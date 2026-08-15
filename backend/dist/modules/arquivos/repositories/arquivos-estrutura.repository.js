@@ -2,6 +2,7 @@ const sqlEstruturaArquivos = [
     `
   CREATE TABLE IF NOT EXISTS arquivos (
     id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID,
     entidade_tipo VARCHAR(120) NOT NULL,
     entidade_id BIGINT,
     categoria VARCHAR(80) NOT NULL,
@@ -22,6 +23,25 @@ const sqlEstruturaArquivos = [
     excluido_em TIMESTAMP
   )
   `,
+    "ALTER TABLE arquivos ADD COLUMN IF NOT EXISTS tenant_id UUID",
+    `
+  UPDATE arquivos a
+  SET tenant_id = b.tenant_id
+  FROM cadastro_beneficiario b
+  WHERE a.tenant_id IS NULL
+    AND a.entidade_tipo = 'beneficiario'
+    AND a.entidade_id = b.id
+    AND b.tenant_id IS NOT NULL
+  `,
+    `
+  UPDATE arquivos a
+  SET tenant_id = u.tenant_id
+  FROM unidade_assistencial u
+  WHERE a.tenant_id IS NULL
+    AND a.entidade_tipo IN ('instituicao', 'unidade_assistencial')
+    AND a.entidade_id = u.id
+    AND u.tenant_id IS NOT NULL
+  `,
     "ALTER TABLE arquivos ADD COLUMN IF NOT EXISTS thumbnail_caminho TEXT",
     "ALTER TABLE arquivos ADD COLUMN IF NOT EXISTS usuario_upload_id BIGINT",
     "ALTER TABLE arquivos ADD COLUMN IF NOT EXISTS ativo BOOLEAN NOT NULL DEFAULT TRUE",
@@ -31,6 +51,7 @@ const sqlEstruturaArquivos = [
     "ALTER TABLE arquivos ADD COLUMN IF NOT EXISTS atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()",
     "ALTER TABLE arquivos ADD COLUMN IF NOT EXISTS excluido_em TIMESTAMP",
     "CREATE UNIQUE INDEX IF NOT EXISTS arquivos_caminho_arquivo_uidx ON arquivos(caminho_arquivo)",
+    "CREATE INDEX IF NOT EXISTS arquivos_tenant_idx ON arquivos(tenant_id, entidade_tipo, entidade_id)",
     "CREATE INDEX IF NOT EXISTS arquivos_entidade_idx ON arquivos(entidade_tipo, entidade_id, categoria)",
     "CREATE INDEX IF NOT EXISTS arquivos_ativo_idx ON arquivos(ativo)",
     "CREATE INDEX IF NOT EXISTS arquivos_data_upload_idx ON arquivos(data_upload DESC)"

@@ -11,26 +11,28 @@ import { BancoEmpregosRepository } from "../repositories/banco-empregos.reposito
 export class BancoEmpregosService {
     repository = new BancoEmpregosRepository();
     reportsRepository = new ReportsRepository();
-    async listarDashboard(rawFilters) {
+    async listarDashboard(rawFilters, rawTenantId) {
         const filters = bancoEmpregosDashboardFiltersSchema.parse(rawFilters);
-        return this.repository.obterDashboard(filters);
+        return this.repository.obterDashboard(filters, this.parseTenantId(rawTenantId));
     }
-    async listar(rawFilters) {
+    async listar(rawFilters, rawTenantId) {
         const filters = bancoEmpregosVagaFiltersSchema.parse(rawFilters);
-        const resultado = await this.repository.listarVagas(filters);
+        const tenantId = this.parseTenantId(rawTenantId);
+        const resultado = await this.repository.listarVagas(filters, tenantId);
         return {
             ...resultado,
             vagas: resultado.rows.map(mapBancoEmpregosVaga)
         };
     }
-    async obter(rawId) {
+    async obter(rawId, rawTenantId) {
         const id = this.parseId(rawId);
-        const vaga = await this.repository.buscarVagaOuFalhar(id);
-        const processos = await this.repository.listarProcessos({ vagaId: rawId, limite: 200, pagina: 1 });
+        const tenantId = this.parseTenantId(rawTenantId);
+        const vaga = await this.repository.buscarVagaOuFalhar(id, tenantId);
+        const processos = await this.repository.listarProcessos({ vagaId: rawId, limite: 200, pagina: 1 }, tenantId);
         return {
             vaga: mapBancoEmpregosVaga(vaga),
             processos: await Promise.all(processos.rows.map(async (item) => {
-                const avaliacao = await this.repository.buscarAvaliacaoPorProcesso(item.id);
+                const avaliacao = await this.repository.buscarAvaliacaoPorProcesso(item.id, tenantId);
                 return mapBancoEmpregosProcesso(item, avaliacao);
             }))
         };
@@ -38,7 +40,8 @@ export class BancoEmpregosService {
     async criar(rawInput, authUser) {
         const input = bancoEmpregosVagaInputSchema.parse(this.normalizarPayload(rawInput));
         this.validarVaga(input);
-        const vagaId = await this.repository.salvarVaga(undefined, input);
+        const tenantId = this.parseTenantId(authUser?.tenant_id);
+        const vagaId = await this.repository.salvarVaga(undefined, input, tenantId);
         await this.repository.registrarHistorico({
             entidadeTipo: "VAGA",
             entidadeId: vagaId,
@@ -46,16 +49,18 @@ export class BancoEmpregosService {
             usuarioId: this.parseOptionalId(authUser?.id),
             usuarioNome: authUser?.nomeUsuario ?? null,
             acao: "CRIACAO_VAGA",
-            observacao: `Vaga ${input.titulo} cadastrada.`
+            observacao: `Vaga ${input.titulo} cadastrada.`,
+            tenantId
         });
-        return this.obter(vagaId.toString());
+        return this.obter(vagaId.toString(), tenantId);
     }
     async atualizar(rawId, rawInput, authUser) {
         const id = this.parseId(rawId);
+        const tenantId = this.parseTenantId(authUser?.tenant_id);
         const input = bancoEmpregosVagaInputSchema.parse(this.normalizarPayload(rawInput));
         this.validarVaga(input);
-        await this.repository.buscarVagaOuFalhar(id);
-        const vagaId = await this.repository.salvarVaga(id, input);
+        await this.repository.buscarVagaOuFalhar(id, tenantId);
+        const vagaId = await this.repository.salvarVaga(id, input, tenantId);
         await this.repository.registrarHistorico({
             entidadeTipo: "VAGA",
             entidadeId: vagaId,
@@ -63,13 +68,15 @@ export class BancoEmpregosService {
             usuarioId: this.parseOptionalId(authUser?.id),
             usuarioNome: authUser?.nomeUsuario ?? null,
             acao: "EDICAO_VAGA",
-            observacao: `Vaga ${input.titulo} atualizada.`
+            observacao: `Vaga ${input.titulo} atualizada.`,
+            tenantId
         });
-        return this.obter(vagaId.toString());
+        return this.obter(vagaId.toString(), tenantId);
     }
     async remover(rawId, authUser) {
         const id = this.parseId(rawId);
-        await this.repository.removerVaga(id);
+        const tenantId = this.parseTenantId(authUser?.tenant_id);
+        await this.repository.removerVaga(id, tenantId);
         await this.repository.registrarHistorico({
             entidadeTipo: "VAGA",
             entidadeId: id,
@@ -77,27 +84,29 @@ export class BancoEmpregosService {
             usuarioId: this.parseOptionalId(authUser?.id),
             usuarioNome: authUser?.nomeUsuario ?? null,
             acao: "INATIVACAO_VAGA",
-            observacao: "Vaga inativada."
+            observacao: "Vaga inativada.",
+            tenantId
         });
     }
-    async listarCandidatos(rawFilters) {
+    async listarCandidatos(rawFilters, rawTenantId) {
         const filters = bancoEmpregosCandidatoFiltersSchema.parse(rawFilters);
-        const resultado = await this.repository.listarCandidatos(filters);
+        const resultado = await this.repository.listarCandidatos(filters, this.parseTenantId(rawTenantId));
         return {
             ...resultado,
             candidatos: resultado.rows.map(mapBancoEmpregosCandidato)
         };
     }
-    async buscarCandidato(rawId) {
+    async buscarCandidato(rawId, rawTenantId) {
         const id = this.parseId(rawId);
-        const candidato = await this.repository.buscarCandidatoOuFalhar(id);
-        const documentos = await this.repository.listarDocumentos(id);
-        const processos = await this.repository.listarProcessos({ candidatoId: rawId, limite: 200, pagina: 1 });
+        const tenantId = this.parseTenantId(rawTenantId);
+        const candidato = await this.repository.buscarCandidatoOuFalhar(id, tenantId);
+        const documentos = await this.repository.listarDocumentos(id, tenantId);
+        const processos = await this.repository.listarProcessos({ candidatoId: rawId, limite: 200, pagina: 1 }, tenantId);
         return {
             candidato: mapBancoEmpregosCandidato(candidato),
             documentos: documentos.map(mapBancoEmpregosDocumento),
             processos: await Promise.all(processos.rows.map(async (item) => {
-                const avaliacao = await this.repository.buscarAvaliacaoPorProcesso(item.id);
+                const avaliacao = await this.repository.buscarAvaliacaoPorProcesso(item.id, tenantId);
                 return mapBancoEmpregosProcesso(item, avaliacao);
             }))
         };
@@ -105,7 +114,8 @@ export class BancoEmpregosService {
     async criarCandidato(rawInput, authUser) {
         const input = bancoEmpregosCandidatoInputSchema.parse(this.normalizarPayload(rawInput));
         this.validarCandidato(input);
-        const candidatoId = await this.repository.salvarCandidato(undefined, input);
+        const tenantId = this.parseTenantId(authUser?.tenant_id);
+        const candidatoId = await this.repository.salvarCandidato(undefined, input, tenantId);
         await this.repository.registrarHistorico({
             entidadeTipo: "CANDIDATO",
             entidadeId: candidatoId,
@@ -113,16 +123,18 @@ export class BancoEmpregosService {
             usuarioId: this.parseOptionalId(authUser?.id),
             usuarioNome: authUser?.nomeUsuario ?? null,
             acao: "CRIACAO_CANDIDATO",
-            observacao: `Candidato ${input.nomeCompleto} cadastrado.`
+            observacao: `Candidato ${input.nomeCompleto} cadastrado.`,
+            tenantId
         });
-        return this.buscarCandidato(candidatoId.toString());
+        return this.buscarCandidato(candidatoId.toString(), tenantId);
     }
     async atualizarCandidato(rawId, rawInput, authUser) {
         const id = this.parseId(rawId);
+        const tenantId = this.parseTenantId(authUser?.tenant_id);
         const input = bancoEmpregosCandidatoInputSchema.parse(this.normalizarPayload(rawInput));
         this.validarCandidato(input);
-        await this.repository.buscarCandidatoOuFalhar(id);
-        const candidatoId = await this.repository.salvarCandidato(id, input);
+        await this.repository.buscarCandidatoOuFalhar(id, tenantId);
+        const candidatoId = await this.repository.salvarCandidato(id, input, tenantId);
         await this.repository.registrarHistorico({
             entidadeTipo: "CANDIDATO",
             entidadeId: candidatoId,
@@ -130,13 +142,15 @@ export class BancoEmpregosService {
             usuarioId: this.parseOptionalId(authUser?.id),
             usuarioNome: authUser?.nomeUsuario ?? null,
             acao: "EDICAO_CANDIDATO",
-            observacao: `Cadastro de ${input.nomeCompleto} atualizado.`
+            observacao: `Cadastro de ${input.nomeCompleto} atualizado.`,
+            tenantId
         });
-        return this.buscarCandidato(candidatoId.toString());
+        return this.buscarCandidato(candidatoId.toString(), tenantId);
     }
     async inativarCandidato(rawId, authUser) {
         const id = this.parseId(rawId);
-        await this.repository.inativarCandidato(id);
+        const tenantId = this.parseTenantId(authUser?.tenant_id);
+        await this.repository.inativarCandidato(id, tenantId);
         await this.repository.registrarHistorico({
             entidadeTipo: "CANDIDATO",
             entidadeId: id,
@@ -144,33 +158,37 @@ export class BancoEmpregosService {
             usuarioId: this.parseOptionalId(authUser?.id),
             usuarioNome: authUser?.nomeUsuario ?? null,
             acao: "INATIVACAO_CANDIDATO",
-            observacao: "Candidato inativado sem perda de histórico."
+            observacao: "Candidato inativado sem perda de historico.",
+            tenantId
         });
     }
-    async listarProcessos(rawFilters) {
+    async listarProcessos(rawFilters, rawTenantId) {
         const filters = bancoEmpregosProcessoFiltersSchema.parse(rawFilters);
-        const resultado = await this.repository.listarProcessos(filters);
+        const tenantId = this.parseTenantId(rawTenantId);
+        const resultado = await this.repository.listarProcessos(filters, tenantId);
         return {
             ...resultado,
             processos: await Promise.all(resultado.rows.map(async (item) => {
-                const avaliacao = await this.repository.buscarAvaliacaoPorProcesso(item.id);
+                const avaliacao = await this.repository.buscarAvaliacaoPorProcesso(item.id, tenantId);
                 return mapBancoEmpregosProcesso(item, avaliacao);
             }))
         };
     }
-    async buscarProcesso(rawId) {
+    async buscarProcesso(rawId, rawTenantId) {
         const id = this.parseId(rawId);
-        const processo = await this.repository.buscarProcessoOuFalhar(id);
-        const avaliacao = await this.repository.buscarAvaliacaoPorProcesso(id);
+        const tenantId = this.parseTenantId(rawTenantId);
+        const processo = await this.repository.buscarProcessoOuFalhar(id, tenantId);
+        const avaliacao = await this.repository.buscarAvaliacaoPorProcesso(id, tenantId);
         return mapBancoEmpregosProcesso(processo, avaliacao);
     }
     async vincularCandidato(rawInput, authUser) {
+        const tenantId = this.parseTenantId(authUser?.tenant_id);
         const input = bancoEmpregosProcessoInputSchema.parse(this.normalizarPayload(rawInput));
-        const processoExistenteId = await this.repository.buscarProcessoPorVagaECandidato(BigInt(input.vagaId), BigInt(input.candidatoId));
+        const processoExistenteId = await this.repository.buscarProcessoPorVagaECandidato(BigInt(input.vagaId), BigInt(input.candidatoId), tenantId);
         if (processoExistenteId) {
-            throw new AppError("Este candidato já está vinculado à vaga selecionada.", 422);
+            throw new AppError("Este candidato ja esta vinculado a vaga selecionada.", 422);
         }
-        const processoId = await this.repository.salvarProcesso(undefined, input, this.parseOptionalId(authUser?.id));
+        const processoId = await this.repository.salvarProcesso(undefined, input, this.parseOptionalId(authUser?.id), tenantId);
         await this.repository.registrarHistorico({
             entidadeTipo: "PROCESSO",
             entidadeId: processoId,
@@ -180,14 +198,16 @@ export class BancoEmpregosService {
             usuarioId: this.parseOptionalId(authUser?.id),
             usuarioNome: authUser?.nomeUsuario ?? null,
             acao: "CRIACAO_PROCESSO",
-            observacao: "Candidato vinculado à vaga."
+            observacao: "Candidato vinculado a vaga.",
+            tenantId
         });
-        return this.buscarProcesso(processoId.toString());
+        return this.buscarProcesso(processoId.toString(), tenantId);
     }
     async atualizarProcesso(rawId, rawInput, authUser) {
+        const tenantId = this.parseTenantId(authUser?.tenant_id);
         const id = this.parseId(rawId);
         const input = bancoEmpregosProcessoInputSchema.parse(this.normalizarPayload(rawInput));
-        const processoId = await this.repository.salvarProcesso(id, input, this.parseOptionalId(authUser?.id));
+        const processoId = await this.repository.salvarProcesso(id, input, this.parseOptionalId(authUser?.id), tenantId);
         await this.repository.registrarHistorico({
             entidadeTipo: "PROCESSO",
             entidadeId: processoId,
@@ -197,15 +217,17 @@ export class BancoEmpregosService {
             usuarioId: this.parseOptionalId(authUser?.id),
             usuarioNome: authUser?.nomeUsuario ?? null,
             acao: "MOVIMENTACAO_PROCESSO",
-            observacao: `Etapa ${input.etapa ?? "TRIAGEM_INICIAL"} e status ${input.status ?? "EM_ANALISE"} atualizados.`
+            observacao: `Etapa ${input.etapa ?? "TRIAGEM_INICIAL"} e status ${input.status ?? "EM_ANALISE"} atualizados.`,
+            tenantId
         });
-        return this.buscarProcesso(processoId.toString());
+        return this.buscarProcesso(processoId.toString(), tenantId);
     }
     async salvarAvaliacao(rawProcessoId, rawInput, authUser) {
+        const tenantId = this.parseTenantId(authUser?.tenant_id);
         const processoId = this.parseId(rawProcessoId);
         const input = bancoEmpregosAvaliacaoInputSchema.parse(this.normalizarPayload(rawInput));
-        const avaliacao = await this.repository.salvarAvaliacao(processoId, input, this.parseOptionalId(authUser?.id), authUser?.nomeUsuario ?? null);
-        const processo = await this.repository.buscarProcessoOuFalhar(processoId);
+        const avaliacao = await this.repository.salvarAvaliacao(processoId, input, this.parseOptionalId(authUser?.id), authUser?.nomeUsuario ?? null, tenantId);
+        const processo = await this.repository.buscarProcessoOuFalhar(processoId, tenantId);
         await this.repository.registrarHistorico({
             entidadeTipo: "PROCESSO",
             entidadeId: processoId,
@@ -215,19 +237,21 @@ export class BancoEmpregosService {
             usuarioId: this.parseOptionalId(authUser?.id),
             usuarioNome: authUser?.nomeUsuario ?? null,
             acao: "AVALIACAO_PROCESSO",
-            observacao: `Avaliação registrada com aderência de ${avaliacao.aderencia_percentual}%.`
+            observacao: `Avaliacao registrada com aderencia de ${avaliacao.aderencia_percentual}%.`,
+            tenantId
         });
         return mapBancoEmpregosAvaliacao(avaliacao);
     }
-    async listarDocumentos(rawCandidatoId) {
+    async listarDocumentos(rawCandidatoId, rawTenantId) {
         const candidatoId = this.parseId(rawCandidatoId);
-        const documentos = await this.repository.listarDocumentos(candidatoId);
+        const documentos = await this.repository.listarDocumentos(candidatoId, this.parseTenantId(rawTenantId));
         return documentos.map(mapBancoEmpregosDocumento);
     }
     async adicionarDocumento(rawCandidatoId, rawInput, file, authUser) {
         if (!file) {
-            throw new AppError("Arquivo não informado.", 400);
+            throw new AppError("Arquivo nao informado.", 400);
         }
+        const tenantId = this.parseTenantId(authUser?.tenant_id);
         const candidatoId = this.parseId(rawCandidatoId);
         const payload = bancoEmpregosDocumentoUploadSchema.parse(this.normalizarPayload(rawInput));
         const extraido = this.extrairSugestoesCurriculo(payload.textoExtraido, file.originalname);
@@ -243,7 +267,7 @@ export class BancoEmpregosService {
                 categoria: payload.categoria,
                 descricao: payload.descricao,
                 extraido
-            });
+            }, tenantId);
             await this.repository.registrarHistorico({
                 entidadeTipo: "DOCUMENTO",
                 entidadeId: documento.id,
@@ -251,7 +275,8 @@ export class BancoEmpregosService {
                 usuarioId: this.parseOptionalId(authUser?.id),
                 usuarioNome: authUser?.nomeUsuario ?? null,
                 acao: "UPLOAD_DOCUMENTO",
-                observacao: `${payload.categoria} enviado: ${file.originalname}.`
+                observacao: `${payload.categoria} enviado: ${file.originalname}.`,
+                tenantId
             });
             return mapBancoEmpregosDocumento(documento);
         }
@@ -261,9 +286,10 @@ export class BancoEmpregosService {
         }
     }
     async removerDocumento(rawDocumentoId, authUser) {
+        const tenantId = this.parseTenantId(authUser?.tenant_id);
         const documentoId = this.parseId(rawDocumentoId);
-        const documento = await this.repository.buscarDocumentoOuFalhar(documentoId);
-        await this.repository.desativarDocumento(documentoId);
+        const documento = await this.repository.buscarDocumentoOuFalhar(documentoId, tenantId);
+        await this.repository.desativarDocumento(documentoId, tenantId);
         await storageService.excluirLogico(documento.arquivo_id.toString(), this.parseOptionalId(authUser?.id));
         await this.repository.registrarHistorico({
             entidadeTipo: "DOCUMENTO",
@@ -272,21 +298,23 @@ export class BancoEmpregosService {
             usuarioId: this.parseOptionalId(authUser?.id),
             usuarioNome: authUser?.nomeUsuario ?? null,
             acao: "EXCLUSAO_DOCUMENTO",
-            observacao: `Documento ${documento.nome_original} removido.`
+            observacao: `Documento ${documento.nome_original} removido.`,
+            tenantId
         });
     }
-    async listarHistorico(rawFilters) {
+    async listarHistorico(rawFilters, rawTenantId) {
         const filters = bancoEmpregosHistoricoFiltersSchema.parse(rawFilters);
-        const resultado = await this.repository.listarHistorico(filters);
+        const resultado = await this.repository.listarHistorico(filters, this.parseTenantId(rawTenantId));
         return {
             ...resultado,
             historico: resultado.rows.map(mapBancoEmpregosHistorico)
         };
     }
-    async exportar(rawQuery, tipo, formato) {
+    async exportar(rawQuery, tipo, formato, rawTenantId) {
+        const tenantId = this.parseTenantId(rawTenantId);
         if (tipo === "candidatos") {
             const filtros = bancoEmpregosCandidatoFiltersSchema.parse(rawQuery);
-            const resultado = await this.repository.listarCandidatos({ ...filtros, pagina: 1, limite: 2000 });
+            const resultado = await this.repository.listarCandidatos({ ...filtros, pagina: 1, limite: 2000 }, tenantId);
             const candidatos = resultado.rows.map(mapBancoEmpregosCandidato);
             if (formato === "csv") {
                 return this.gerarCsvExportacao("banco-empregos-candidatos", [
@@ -296,10 +324,10 @@ export class BancoEmpregosService {
                     "Cidade",
                     "Bairro",
                     "Escolaridade",
-                    "Área de interesse",
+                    "Area de interesse",
                     "Cargo pretendido",
-                    "Situação",
-                    "Currículos",
+                    "Situacao",
+                    "Curriculos",
                     "Certificados"
                 ], candidatos.map((item) => [
                     item.nomeCompleto,
@@ -315,22 +343,22 @@ export class BancoEmpregosService {
                     String(item.totalCertificados ?? 0)
                 ]));
             }
-            return this.gerarPdfListagem("Relatório de candidatos", candidatos.map((item) => ({
+            return this.gerarPdfListagem("Relatorio de candidatos", candidatos.map((item) => ({
                 titulo: item.nomeCompleto,
                 detalhes: [
-                    `Situação: ${item.situacao}`,
-                    `Cidade: ${item.cidade ?? "Não informada"}`,
-                    `Área: ${item.areaInteresse ?? "Não informada"}`,
-                    `Cargo pretendido: ${item.cargoPretendido ?? "Não informado"}`
+                    `Situacao: ${item.situacao}`,
+                    `Cidade: ${item.cidade ?? "Nao informada"}`,
+                    `Area: ${item.areaInteresse ?? "Nao informada"}`,
+                    `Cargo pretendido: ${item.cargoPretendido ?? "Nao informado"}`
                 ]
-            })));
+            })), tenantId);
         }
         if (tipo === "vagas") {
             const filtros = bancoEmpregosVagaFiltersSchema.parse(rawQuery);
-            const resultado = await this.repository.listarVagas({ ...filtros, pagina: 1, limite: 2000 });
+            const resultado = await this.repository.listarVagas({ ...filtros, pagina: 1, limite: 2000 }, tenantId);
             const vagas = resultado.rows.map(mapBancoEmpregosVaga);
             if (formato === "csv") {
-                return this.gerarCsvExportacao("banco-empregos-vagas", ["Título", "Empresa", "Área", "Cidade", "Situação", "Abertura", "Total de processos"], vagas.map((item) => [
+                return this.gerarCsvExportacao("banco-empregos-vagas", ["Titulo", "Empresa", "Area", "Cidade", "Situacao", "Abertura", "Total de processos"], vagas.map((item) => [
                     item.titulo,
                     item.empresaNome,
                     item.area ?? "",
@@ -340,24 +368,24 @@ export class BancoEmpregosService {
                     String(item.totalProcessos ?? 0)
                 ]));
             }
-            return this.gerarPdfListagem("Relatório de vagas", vagas.map((item) => ({
+            return this.gerarPdfListagem("Relatorio de vagas", vagas.map((item) => ({
                 titulo: `${item.titulo} - ${item.empresaNome}`,
                 detalhes: [
-                    `Situação: ${item.situacao}`,
-                    `Cidade: ${item.cidade ?? "Não informada"}`,
+                    `Situacao: ${item.situacao}`,
+                    `Cidade: ${item.cidade ?? "Nao informada"}`,
                     `Quantidade: ${item.quantidadeVagas}`,
                     `Processos: ${item.totalProcessos ?? 0}`
                 ]
-            })));
+            })), tenantId);
         }
         const filtros = bancoEmpregosProcessoFiltersSchema.parse(rawQuery);
-        const resultado = await this.repository.listarProcessos({ ...filtros, pagina: 1, limite: 2000 });
+        const resultado = await this.repository.listarProcessos({ ...filtros, pagina: 1, limite: 2000 }, tenantId);
         const processos = await Promise.all(resultado.rows.map(async (item) => {
-            const avaliacao = await this.repository.buscarAvaliacaoPorProcesso(item.id);
+            const avaliacao = await this.repository.buscarAvaliacaoPorProcesso(item.id, tenantId);
             return mapBancoEmpregosProcesso(item, avaliacao);
         }));
         if (formato === "csv") {
-            return this.gerarCsvExportacao("banco-empregos-triagem", ["Vaga", "Empresa", "Candidato", "Etapa", "Status", "Aderência", "Nota final", "Selecionado"], processos.map((item) => [
+            return this.gerarCsvExportacao("banco-empregos-triagem", ["Vaga", "Empresa", "Candidato", "Etapa", "Status", "Aderencia", "Nota final", "Selecionado"], processos.map((item) => [
                 item.vagaTitulo ?? "",
                 item.empresaNome ?? "",
                 item.candidatoNome ?? "",
@@ -365,28 +393,29 @@ export class BancoEmpregosService {
                 item.status,
                 String(item.aderenciaPercentual ?? ""),
                 String(item.notaFinal ?? ""),
-                item.selecionado ? "Sim" : "Não"
+                item.selecionado ? "Sim" : "Nao"
             ]));
         }
-        return this.gerarPdfListagem("Relatório de triagem", processos.map((item) => ({
+        return this.gerarPdfListagem("Relatorio de triagem", processos.map((item) => ({
             titulo: `${item.candidatoNome ?? "Candidato"} - ${item.vagaTitulo ?? "Vaga"}`,
             detalhes: [
                 `Status: ${item.status}`,
                 `Etapa: ${item.etapa}`,
-                `Aderência: ${item.aderenciaPercentual ?? 0}%`,
+                `Aderencia: ${item.aderenciaPercentual ?? 0}%`,
                 `Nota final: ${item.notaFinal ?? 0}`
             ]
-        })));
+        })), tenantId);
     }
     async gerarCarta(rawProcessoId, tipo, authUser) {
-        const processo = await this.repository.buscarProcessoOuFalhar(this.parseId(rawProcessoId));
-        const candidato = await this.repository.buscarCandidatoOuFalhar(processo.candidato_id);
-        const vaga = await this.repository.buscarVagaOuFalhar(processo.vaga_id);
-        const instituicao = await this.reportsRepository.obterInstituicaoRelatorio();
+        const tenantId = this.parseTenantId(authUser?.tenant_id);
+        const processo = await this.repository.buscarProcessoOuFalhar(this.parseId(rawProcessoId), tenantId);
+        const candidato = await this.repository.buscarCandidatoOuFalhar(processo.candidato_id, tenantId);
+        const vaga = await this.repository.buscarVagaOuFalhar(processo.vaga_id, tenantId);
+        const instituicao = await this.reportsRepository.obterInstituicaoRelatorio(tenantId);
         const titulo = tipo === "encaminhamento"
             ? "Carta de encaminhamento"
             : tipo === "recomendacao"
-                ? "Carta de recomendação"
+                ? "Carta de recomendacao"
                 : tipo === "comprovante"
                     ? "Comprovante de encaminhamento"
                     : "Ficha resumida do candidato";
@@ -394,7 +423,7 @@ export class BancoEmpregosService {
             `Candidato: ${candidato.nome_completo}`,
             `Vaga: ${vaga.titulo}`,
             `Empresa: ${vaga.empresa_nome}`,
-            `Situação do processo: ${processo.status}`,
+            `Situacao do processo: ${processo.status}`,
             `Emitido por: ${authUser?.nomeUsuario ?? "Sistema G3N"}`
         ];
         if (tipo !== "ficha") {
@@ -402,17 +431,17 @@ export class BancoEmpregosService {
         }
         const blocoPrincipal = tipo === "ficha"
             ? [
-                `CPF: ${candidato.cpf ?? "Não informado"}`,
-                `Telefone: ${candidato.telefone ?? "Não informado"}`,
-                `Cidade/Bairro: ${candidato.cidade ?? "Não informada"} / ${candidato.bairro ?? "Não informado"}`,
-                `Escolaridade: ${candidato.escolaridade ?? "Não informada"}`,
-                `Área de interesse: ${candidato.area_interesse ?? "Não informada"}`,
-                `Resumo profissional: ${candidato.resumo_profissional ?? "Não informado"}`
+                `CPF: ${candidato.cpf ?? "Nao informado"}`,
+                `Telefone: ${candidato.telefone ?? "Nao informado"}`,
+                `Cidade/Bairro: ${candidato.cidade ?? "Nao informada"} / ${candidato.bairro ?? "Nao informado"}`,
+                `Escolaridade: ${candidato.escolaridade ?? "Nao informada"}`,
+                `Area de interesse: ${candidato.area_interesse ?? "Nao informada"}`,
+                `Resumo profissional: ${candidato.resumo_profissional ?? "Nao informado"}`
             ]
             : [
-                `Encaminhamos ${candidato.nome_completo} para a oportunidade ${vaga.titulo}, vinculada à empresa/instituição ${vaga.empresa_nome}.`,
-                `O candidato apresenta interesse em ${candidato.area_interesse ?? "área não informada"} e disponibilidade ${candidato.disponibilidade ?? "não informada"}.`,
-                `Solicitamos avaliação e retorno do processo seletivo para atualização do histórico institucional.`
+                `Encaminhamos ${candidato.nome_completo} para a oportunidade ${vaga.titulo}, vinculada a empresa/instituicao ${vaga.empresa_nome}.`,
+                `O candidato apresenta interesse em ${candidato.area_interesse ?? "area nao informada"} e disponibilidade ${candidato.disponibilidade ?? "nao informada"}.`,
+                "Solicitamos avaliacao e retorno do processo seletivo para atualizacao do historico institucional."
             ];
         const buffer = await this.gerarPdfDocumentoInstitucional({
             titulo,
@@ -429,7 +458,8 @@ export class BancoEmpregosService {
             usuarioId: this.parseOptionalId(authUser?.id),
             usuarioNome: authUser?.nomeUsuario ?? null,
             acao: `CARTA_${tipo.toUpperCase()}`,
-            observacao: `${titulo} gerada para ${candidato.nome_completo}.`
+            observacao: `${titulo} gerada para ${candidato.nome_completo}.`,
+            tenantId
         });
         return {
             filename: `banco-empregos-${tipo}-${processo.id.toString()}.pdf`,
@@ -468,35 +498,35 @@ export class BancoEmpregosService {
     }
     validarCandidato(input) {
         if (input.cpf && !validarCpf(input.cpf)) {
-            throw new AppError("CPF inválido para o candidato.", 422);
+            throw new AppError("CPF invalido para o candidato.", 422);
         }
         if (input.email && !validarEmail(input.email)) {
-            throw new AppError("E-mail inválido para o candidato.", 422);
+            throw new AppError("E-mail invalido para o candidato.", 422);
         }
         if (input.cep && input.cep.replace(/\D/g, "").length !== 8) {
-            throw new AppError("CEP inválido para o candidato.", 422);
+            throw new AppError("CEP invalido para o candidato.", 422);
         }
         if (input.telefone && ![10, 11].includes(input.telefone.replace(/\D/g, "").length)) {
-            throw new AppError("Telefone do candidato deve ter 10 ou 11 dígitos.", 422);
+            throw new AppError("Telefone do candidato deve ter 10 ou 11 digitos.", 422);
         }
         if (input.whatsapp && ![10, 11].includes(input.whatsapp.replace(/\D/g, "").length)) {
-            throw new AppError("WhatsApp do candidato deve ter 10 ou 11 dígitos.", 422);
+            throw new AppError("WhatsApp do candidato deve ter 10 ou 11 digitos.", 422);
         }
     }
     validarVaga(input) {
         if (input.dataAbertura && input.dataLimite && input.dataLimite < input.dataAbertura) {
-            throw new AppError("A data limite não pode ser anterior à data de abertura.", 422);
+            throw new AppError("A data limite nao pode ser anterior a data de abertura.", 422);
         }
     }
     extrairSugestoesCurriculo(textoExtraido, nomeArquivo) {
         const texto = textoExtraido?.trim() || "";
         const email = texto.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0];
         const telefone = texto.match(/(?:\+55\s?)?(?:\(?\d{2}\)?\s?)?\d{4,5}-?\d{4}/)?.[0];
-        const escolaridade = ["superior completo", "superior incompleto", "ensino médio", "ensino fundamental", "técnico"]
+        const escolaridade = ["superior completo", "superior incompleto", "ensino medio", "ensino fundamental", "tecnico"]
             .find((item) => texto.toLowerCase().includes(item)) ?? undefined;
         const cursos = texto
             .split(/\r?\n/)
-            .filter((linha) => /curso|certificado|capacitação/i.test(linha))
+            .filter((linha) => /curso|certificado|capacitacao/i.test(linha))
             .slice(0, 5);
         const experiencias = texto
             .split(/\r?\n/)
@@ -521,8 +551,8 @@ export class BancoEmpregosService {
             buffer: Buffer.from(`\uFEFF${csv}`, "utf8")
         };
     }
-    async gerarPdfListagem(titulo, itens) {
-        const instituicao = await this.reportsRepository.obterInstituicaoRelatorio();
+    async gerarPdfListagem(titulo, itens, tenantId) {
+        const instituicao = await this.reportsRepository.obterInstituicaoRelatorio(tenantId);
         const linhas = itens.flatMap((item) => [item.titulo, ...item.detalhes, ""]);
         const buffer = await this.gerarPdfDocumentoInstitucional({
             titulo,
@@ -562,14 +592,14 @@ export class BancoEmpregosService {
         });
         doc.moveDown(2);
         doc.text("______________________________________________", { align: "center" });
-        doc.text("Assinatura / responsável", { align: "center" });
+        doc.text("Assinatura / responsavel", { align: "center" });
         doc.end();
         return finalizado;
     }
     parseId(rawId) {
         const parsed = Number(rawId);
         if (!Number.isInteger(parsed) || parsed <= 0) {
-            throw new AppError("Identificador inválido.", 400);
+            throw new AppError("Identificador invalido.", 400);
         }
         return BigInt(parsed);
     }
@@ -581,5 +611,12 @@ export class BancoEmpregosService {
             return undefined;
         }
         return BigInt(parsed);
+    }
+    parseTenantId(rawTenantId) {
+        const tenantId = rawTenantId?.trim();
+        if (!tenantId) {
+            throw new AppError("Tenant nao identificado.", 401);
+        }
+        return tenantId;
     }
 }

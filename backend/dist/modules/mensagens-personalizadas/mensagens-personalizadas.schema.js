@@ -55,11 +55,16 @@ export const mensagemEnvioInputSchema = z.object({
     modeloId: optionalTrimmedString.nullable().optional(),
     canal: z.enum(mensagemCanalEnvioValues),
     destinatarioTipo: z.enum(mensagemDestinatarioValues),
-    destinatarioIds: z.array(z.string().trim().min(1)).min(1, "Selecione ao menos um destinatário."),
+    destinatarioIds: z.array(z.string().trim().min(1)).default([]),
+    destinatariosTodos: z.boolean().optional(),
     tipoEnvio: z.enum(mensagemTipoEnvioValues),
     assuntoEditado: optionalTrimmedString.nullable().optional(),
     mensagemEditada: optionalTrimmedString.nullable().optional(),
     contextoExtra: z.record(z.unknown()).optional()
+}).superRefine((value, context) => {
+    if (!value.destinatariosTodos && value.destinatarioIds.length === 0) {
+        context.addIssue({ code: z.ZodIssueCode.custom, path: ["destinatarioIds"], message: "Selecione ao menos um destinatário." });
+    }
 });
 export const mensagemModeloFiltrosSchema = z.object({
     busca: optionalTrimmedString.optional(),

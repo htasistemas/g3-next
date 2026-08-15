@@ -1,11 +1,99 @@
 import { z } from "zod";
+import { normalizarCnpj } from "../../utils/br-utils.js";
+const EMAIL_MASTER_SEM_TENANT = "htasistemas@gmail.com";
+function ehEmailMasterSemTenant(email) {
+    return email?.trim().toLowerCase() === EMAIL_MASTER_SEM_TENANT;
+}
+function ehLoginMasterSemTenant(login) {
+    return login?.trim().toLowerCase() === EMAIL_MASTER_SEM_TENANT;
+}
 export const authLoginSchema = z.object({
-    nomeUsuario: z.string().trim().min(1, "Informe usuario ou e-mail."),
-    senha: z.string().min(1, "Informe a senha.")
+    cnpj: z
+        .string()
+        .trim()
+        .optional()
+        .transform((value) => normalizarCnpj(value) ?? undefined),
+    codigoInstituicao: z.string().trim().optional(),
+    slug: z.string().trim().optional(),
+    nomeUsuario: z.string().trim().optional(),
+    email: z.string().trim().email("Informe um email valido.").optional(),
+    senha: z.string().min(1, "Informe a senha."),
+    origin: z.string().trim().url("Origem invalida.").optional(),
+    host: z.string().trim().optional()
+}).superRefine((value, ctx) => {
+    const possuiEmail = Boolean(value.email?.trim());
+    const possuiUsuario = Boolean(value.nomeUsuario?.trim());
+    const possuiInstituicao = Boolean(value.cnpj?.trim()) || Boolean(value.codigoInstituicao?.trim()) || Boolean(value.slug?.trim());
+    const dispensarInstituicao = ehEmailMasterSemTenant(value.email) || ehLoginMasterSemTenant(value.nomeUsuario);
+    if (!possuiEmail && !possuiUsuario) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["email"],
+            message: "Informe o e-mail ou usuario."
+        });
+    }
+    if (!possuiInstituicao && !dispensarInstituicao && !possuiEmail) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["cnpj"],
+            message: "Informe o CNPJ, codigo ou slug da instituicao."
+        });
+    }
 });
 export const authGoogleSchema = z.object({
-    idToken: z.string().trim().min(1, "Token Google obrigatorio.")
+    idToken: z.string().trim().min(1, "Token Google obrigatorio."),
+    cnpj: z
+        .string()
+        .trim()
+        .optional()
+        .transform((value) => normalizarCnpj(value) ?? undefined),
+    slug: z.string().trim().optional(),
+    codigoInstituicao: z.string().trim().optional()
 });
 export const authEsqueciSenhaSchema = z.object({
-    email: z.string().trim().email("Informe um email valido.")
+    email: z.string().trim().email("Informe um email valido."),
+    cnpj: z
+        .string()
+        .trim()
+        .optional()
+        .transform((value) => normalizarCnpj(value) ?? undefined),
+    codigoInstituicao: z.string().trim().optional(),
+    slug: z.string().trim().optional()
+});
+export const authMfaVerificarSchema = z.object({
+    challengeId: z.string().trim().uuid("Challenge invalido."),
+    codigo: z.string().trim().regex(/^\d{6}$/, "Informe o codigo de 6 digitos.")
+});
+export const authFaceVerificarSchema = z.object({
+    challengeId: z.string().trim().uuid("Challenge invalido."),
+    face_imagem: z.string().trim().min(1, "Capture a face para confirmar o acesso.")
+});
+export const authPasskeyLoginOptionsSchema = z.object({
+    cnpj: z
+        .string()
+        .trim()
+        .optional()
+        .transform((value) => normalizarCnpj(value) ?? undefined),
+    codigoInstituicao: z.string().trim().optional(),
+    slug: z.string().trim().optional(),
+    email: z.string().trim().email("Informe um email valido."),
+    origin: z.string().trim().url("Origem invalida."),
+    host: z.string().trim().optional()
+});
+export const authPasskeyLoginVerifySchema = z.object({
+    challengeId: z.string().trim().uuid("Challenge invalido."),
+    response: z.record(z.any()),
+    origin: z.string().trim().url("Origem invalida."),
+    host: z.string().trim().optional()
+});
+export const authPasskeyRegisterOptionsSchema = z.object({
+    origin: z.string().trim().url("Origem invalida."),
+    host: z.string().trim().optional()
+});
+export const authPasskeyRegisterVerifySchema = z.object({
+    challengeId: z.string().trim().uuid("Challenge invalido."),
+    response: z.record(z.any()),
+    origin: z.string().trim().url("Origem invalida."),
+    host: z.string().trim().optional(),
+    nome: z.string().trim().max(120).optional()
 });

@@ -28,6 +28,10 @@ const optionalDecimal = z.preprocess((value) => {
     }
     return value;
 }, z.number().finite().nonnegative().optional());
+function exibirData(data) {
+    const [ano, mes, dia] = data.split("-");
+    return ano && mes && dia ? `${dia}/${mes}/${ano}` : data;
+}
 const optionalInteger = z.preprocess((value) => {
     if (value == null || value === "")
         return undefined;
@@ -61,6 +65,8 @@ const cpfSchema = z
     .trim()
     .transform((value) => normalizarCpf(value))
     .refine((value) => validarCpf(value), "Informe um CPF válido.");
+const optionalCpfSchema = z.preprocess((value) => (typeof value === "string" && !value.trim() ? undefined : value), cpfSchema.optional().nullable());
+const optionalCnpjSchema = z.preprocess((value) => (typeof value === "string" && !value.trim() ? undefined : value), cnpjSchema.optional().nullable());
 const telefoneSchema = z
     .string()
     .trim()
@@ -145,20 +151,20 @@ export const planoTrabalhoInputSchema = z
     .object({
     id: optionalTrimmedString,
     codigoInterno: optionalTrimmedString.nullable().optional(),
-    titulo: requiredTrimmedString("Informe o título do plano."),
-    tipoParceria: requiredTrimmedString("Informe o tipo da parceria."),
-    orgaoParceiro: requiredTrimmedString("Informe o órgão concedente ou parceiro."),
+    titulo: optionalTrimmedString,
+    tipoParceria: optionalTrimmedString,
+    orgaoParceiro: optionalTrimmedString,
     editalChamamento: optionalTrimmedString.nullable().optional(),
-    periodoInicio: requiredIsoDate("Informe a data inicial do período."),
-    periodoFim: requiredIsoDate("Informe a data final do período."),
+    periodoInicio: optionalIsoDate,
+    periodoFim: optionalIsoDate,
     status: requiredTrimmedString("Informe a situação do plano.", 1),
-    responsavelTecnico: requiredTrimmedString("Informe o responsável técnico."),
-    responsavelLegal: requiredTrimmedString("Informe o responsável legal."),
+    responsavelTecnico: optionalTrimmedString,
+    responsavelLegal: optionalTrimmedString,
     termoFomentoId: optionalTrimmedString.nullable().optional(),
     numeroProcesso: optionalTrimmedString.nullable().optional(),
-    razaoSocial: requiredTrimmedString("Informe a razão social."),
+    razaoSocial: optionalTrimmedString,
     nomeFantasia: optionalTrimmedString.nullable().optional(),
-    cnpj: cnpjSchema,
+    cnpj: optionalCnpjSchema,
     cep: cepSchema.optional().nullable(),
     logradouro: optionalTrimmedString.nullable().optional(),
     numero: optionalTrimmedString.nullable().optional(),
@@ -168,8 +174,8 @@ export const planoTrabalhoInputSchema = z
     uf: z.preprocess((value) => (typeof value === "string" ? value.trim().toUpperCase() : value), z.string().length(2, "Informe a UF com 2 letras.").optional()).nullable().optional(),
     telefone: telefoneSchema.optional().nullable(),
     email: emailSchema.optional().nullable(),
-    representanteLegal: requiredTrimmedString("Informe o representante legal."),
-    representanteCpf: cpfSchema,
+    representanteLegal: optionalTrimmedString,
+    representanteCpf: optionalCpfSchema,
     representanteCargo: optionalTrimmedString.nullable().optional(),
     bancoNome: optionalTrimmedString.nullable().optional(),
     bancoAgencia: optionalTrimmedString.nullable().optional(),
@@ -183,19 +189,19 @@ export const planoTrabalhoInputSchema = z
     conselhosCertificacoes: optionalTrimmedString.nullable().optional(),
     publicoAtendidoAtual: optionalTrimmedString.nullable().optional(),
     capacidadeTecnicaOperacional: optionalTrimmedString.nullable().optional(),
-    descricaoObjeto: requiredTrimmedString("Informe o objeto do plano."),
-    areaAtuacao: requiredTrimmedString("Informe a área de atuação."),
-    localExecucao: requiredTrimmedString("Informe o local de execução."),
+    descricaoObjeto: optionalTrimmedString,
+    areaAtuacao: optionalTrimmedString,
+    localExecucao: optionalTrimmedString,
     abrangenciaTerritorial: optionalTrimmedString.nullable().optional(),
-    publicoAlvo: requiredTrimmedString("Informe o público-alvo."),
+    publicoAlvo: optionalTrimmedString,
     quantidadeBeneficiarios: optionalInteger.nullable().optional(),
     criteriosSelecao: optionalTrimmedString.nullable().optional(),
-    problemaSocial: requiredTrimmedString("Informe o problema social que será enfrentado."),
+    problemaSocial: optionalTrimmedString,
     causasConsequencias: optionalTrimmedString.nullable().optional(),
     dadosIndicadores: optionalTrimmedString.nullable().optional(),
     capacidadeExecucao: optionalTrimmedString.nullable().optional(),
     impactoEsperado: optionalTrimmedString.nullable().optional(),
-    objetivoGeral: requiredTrimmedString("Informe o objetivo geral."),
+    objetivoGeral: optionalTrimmedString,
     objetivosEspecificos: z.array(planoObjetivoEspecificoInputSchema).default([]),
     metas: z.array(planoMetaInputSchema).default([]),
     aplicacaoRecursos: z.array(planoAplicacaoRecursoInputSchema).default([]),
@@ -216,7 +222,7 @@ export const planoTrabalhoInputSchema = z
     localDeclaracao: optionalTrimmedString.nullable().optional(),
     dataDeclaracao: optionalIsoDate.nullable().optional(),
     nomeRepresentanteDeclaracao: optionalTrimmedString.nullable().optional(),
-    cpfRepresentanteDeclaracao: cpfSchema.optional().nullable(),
+    cpfRepresentanteDeclaracao: optionalCpfSchema,
     cargoRepresentanteDeclaracao: optionalTrimmedString.nullable().optional(),
     declaracaoVeracidade: optionalBoolean.default(false),
     aprovacaoInterna: optionalTrimmedString.nullable().optional(),
@@ -225,7 +231,33 @@ export const planoTrabalhoInputSchema = z
     arquivoFormato: optionalTrimmedString.nullable().optional()
 })
     .superRefine((input, ctx) => {
-    if (input.periodoFim < input.periodoInicio) {
+    if (input.status !== "RASCUNHO") {
+        const obrigatorios = [
+            ["titulo", "Informe o título do plano."],
+            ["tipoParceria", "Informe o tipo da parceria."],
+            ["orgaoParceiro", "Informe o órgão concedente ou parceiro."],
+            ["periodoInicio", "Informe a data inicial do período."],
+            ["periodoFim", "Informe a data final do período."],
+            ["responsavelTecnico", "Informe o responsável técnico."],
+            ["responsavelLegal", "Informe o responsável legal."],
+            ["razaoSocial", "Informe a razão social."],
+            ["cnpj", "Informe um CNPJ válido."],
+            ["representanteLegal", "Informe o representante legal."],
+            ["representanteCpf", "Informe um CPF válido."],
+            ["descricaoObjeto", "Informe o objeto do plano."],
+            ["areaAtuacao", "Informe a área de atuação."],
+            ["localExecucao", "Informe o local de execução."],
+            ["publicoAlvo", "Informe o público-alvo."],
+            ["problemaSocial", "Informe o problema social que será enfrentado."],
+            ["objetivoGeral", "Informe o objetivo geral."]
+        ];
+        obrigatorios.forEach(([campo, mensagem]) => {
+            if (input[campo] == null || input[campo] === "") {
+                ctx.addIssue({ code: z.ZodIssueCode.custom, path: [campo], message: mensagem });
+            }
+        });
+    }
+    if (input.periodoFim && input.periodoInicio && input.periodoFim < input.periodoInicio) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["periodoFim"],
@@ -233,18 +265,18 @@ export const planoTrabalhoInputSchema = z
         });
     }
     input.metas.forEach((meta, index) => {
-        if (meta.dataInicio && meta.dataInicio < input.periodoInicio) {
+        if (meta.dataInicio && input.periodoInicio && meta.dataInicio < input.periodoInicio) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 path: ["metas", index, "dataInicio"],
-                message: "A meta não pode iniciar antes do período de execução."
+                message: `A meta deve iniciar entre ${exibirData(input.periodoInicio)} e ${exibirData(input.periodoFim ?? input.periodoInicio)}.`
             });
         }
-        if (meta.dataFim && meta.dataFim > input.periodoFim) {
+        if (meta.dataFim && input.periodoFim && meta.dataFim > input.periodoFim) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 path: ["metas", index, "dataFim"],
-                message: "A meta não pode terminar após o período de execução."
+                message: `A meta deve terminar entre ${exibirData(input.periodoInicio ?? input.periodoFim)} e ${exibirData(input.periodoFim)}.`
             });
         }
         if (meta.dataInicio && meta.dataFim && meta.dataFim < meta.dataInicio) {
@@ -255,18 +287,18 @@ export const planoTrabalhoInputSchema = z
             });
         }
         meta.etapas.forEach((etapa, etapaIndex) => {
-            if (etapa.dataInicio && etapa.dataInicio < input.periodoInicio) {
+            if (etapa.dataInicio && input.periodoInicio && etapa.dataInicio < input.periodoInicio) {
                 ctx.addIssue({
                     code: z.ZodIssueCode.custom,
                     path: ["metas", index, "etapas", etapaIndex, "dataInicio"],
-                    message: "A etapa não pode iniciar antes do período de execução."
+                    message: `A etapa deve iniciar entre ${exibirData(input.periodoInicio)} e ${exibirData(input.periodoFim ?? input.periodoInicio)}.`
                 });
             }
-            if (etapa.dataFim && etapa.dataFim > input.periodoFim) {
+            if (etapa.dataFim && input.periodoFim && etapa.dataFim > input.periodoFim) {
                 ctx.addIssue({
                     code: z.ZodIssueCode.custom,
                     path: ["metas", index, "etapas", etapaIndex, "dataFim"],
-                    message: "A etapa não pode terminar após o período de execução."
+                    message: `A etapa deve terminar entre ${exibirData(input.periodoInicio ?? input.periodoFim)} e ${exibirData(input.periodoFim)}.`
                 });
             }
             if (etapa.dataInicio && etapa.dataFim && etapa.dataFim < etapa.dataInicio) {

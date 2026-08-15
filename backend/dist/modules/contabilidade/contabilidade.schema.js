@@ -44,6 +44,7 @@ export const contaBancariaInputSchema = z.object({
     }),
     titular: optionalTrimmedString.nullable().optional(),
     projetoVinculado: optionalTrimmedString.nullable().optional(),
+    fontePagamento: optionalTrimmedString.nullable().optional(),
     pixVinculado: z.coerce.boolean().optional(),
     tipoChavePix: optionalTrimmedString.nullable().optional(),
     chavePix: optionalTrimmedString.nullable().optional(),
@@ -158,6 +159,10 @@ export const emendaImpositivaInputSchema = z.object({
     status: z.string().trim().min(2, "Informe o status."),
     observacoes: optionalTrimmedString.nullable().optional()
 });
+export const fechamentoMensalInputSchema = z.object({
+    competencia: z.string().trim().regex(/^\d{4}-\d{2}$/, "Informe a competÃªncia no formato aaaa-mm."),
+    observacao: optionalTrimmedString.nullable().optional()
+});
 export const statusInputSchema = z.object({
     status: z.enum(LANCAMENTO_FINANCEIRO_STATUS, {
         errorMap: () => ({ message: "Selecione o status." })
@@ -177,4 +182,7 @@ export const pagamentoInputSchema = z.object({
     contaBancariaId: z.coerce.number().int().positive().optional().nullable(),
     formaPagamento: optionalTrimmedString.nullable().optional(),
     observacao: optionalTrimmedString.nullable().optional()
+});
+export const remocaoLancamentoInputSchema = z.object({
+    senha: z.string().trim().min(1, "Informe a senha para excluir o lançamento.")
 });

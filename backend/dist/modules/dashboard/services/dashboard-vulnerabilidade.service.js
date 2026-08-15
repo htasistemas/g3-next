@@ -1,5 +1,6 @@
 import { UnidadeAssistencialRepository } from "../../unidades-assistenciais/repositories/unidade-assistencial.repository.js";
 import { TtlCache } from "../../../shared/cache/ttl-cache.js";
+import { AppError } from "../../../shared/errors/app-error.js";
 import { DashboardVulnerabilidadeRepository } from "../repositories/dashboard-vulnerabilidade.repository.js";
 import { DashboardGeocodingService } from "./dashboard-geocoding.service.js";
 function mapPontos(rows, camada) {
@@ -34,15 +35,16 @@ export class DashboardVulnerabilidadeService {
     repository = new DashboardVulnerabilidadeRepository();
     geocodingService = new DashboardGeocodingService();
     cache = new TtlCache(90_000, 4);
-    async obterMapa() {
-        return this.cache.getOrSet("mapa", async () => this.montarMapa());
+    async obterMapa(rawTenantId) {
+        const tenantId = this.parseTenant(rawTenantId);
+        return this.cache.getOrSet(`mapa:${tenantId}`, async () => this.montarMapa(tenantId));
     }
-    async montarMapa() {
-        const unidade = await this.unidadeRepository.buscarAtual();
+    async montarMapa(tenantId) {
+        const unidade = await this.unidadeRepository.buscarAtual(tenantId);
         const [cestaBasica, familias, violencia] = await Promise.all([
-            this.repository.listarCestaBasica(),
-            this.repository.listarFamiliasCadastradas(),
-            this.repository.listarSituacoesViolencia()
+            this.repository.listarCestaBasica(tenantId),
+            this.repository.listarFamiliasCadastradas(tenantId),
+            this.repository.listarSituacoesViolencia(tenantId)
         ]);
         return {
             unidadePrincipal: unidade
@@ -85,9 +87,10 @@ export class DashboardVulnerabilidadeService {
             ]
         };
     }
-    async geocodificarPendentes(limit = 15) {
-        const totalAntes = await this.repository.contarEnderecosPendentes();
-        const enderecos = await this.repository.listarEnderecosPendentes(limit);
+    async geocodificarPendentes(limit = 15, rawTenantId) {
+        const tenantId = this.parseTenant(rawTenantId);
+        const totalAntes = await this.repository.contarEnderecosPendentes(tenantId);
+        const enderecos = await this.repository.listarEnderecosPendentes(tenantId, limit);
         let processados = 0;
         let atualizados = 0;
         let naoEncontrados = 0;
@@ -110,5 +113,12 @@ export class DashboardVulnerabilidadeService {
             naoEncontrados,
             restanteEstimado: Math.max(0, totalAntes - atualizados)
         };
+    }
+    parseTenant(rawTenantId) {
+        const tenantId = rawTenantId?.trim();
+        if (!tenantId) {
+            throw new AppError("Tenant da sessao nao identificado.", 401);
+        }
+        return tenantId;
     }
 }

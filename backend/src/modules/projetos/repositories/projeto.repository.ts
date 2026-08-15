@@ -850,6 +850,11 @@ export class ProjetoRepository {
   private buildWhere(filters: ProjetoFilters, tenantId: string, alias: string) {
     const conditions: string[] = [`${alias}.tenant_id::text = '${escapeSqlValue(tenantId)}'`];
     const nome = trimOrUndefined(filters.nome);
+    if (filters.projeto_id) {
+      const projetoId = Number(filters.projeto_id);
+      if (!Number.isInteger(projetoId) || projetoId <= 0) throw new AppError("Projeto inválido.", 400);
+      conditions.push(`${alias}.id = ${projetoId}`);
+    }
     if (nome) {
       conditions.push(`${alias}.nome ILIKE '%${escapeSqlLike(nome)}%'`);
     }

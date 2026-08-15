@@ -38,6 +38,11 @@ const sqlEstrutura = [
       aceita_whatsapp BOOLEAN NOT NULL DEFAULT TRUE,
       aceita_receber_campanhas BOOLEAN NOT NULL DEFAULT TRUE,
       categoria_doador VARCHAR(40),
+      segmento_relacionamento VARCHAR(60),
+      status_retencao VARCHAR(30),
+      motivo_risco VARCHAR(255),
+      proxima_acao_sugerida VARCHAR(255),
+      score_relacionamento INTEGER NOT NULL DEFAULT 0,
       responsavel_relacionamento VARCHAR(120),
       observacoes_internas TEXT,
       portal_ativo BOOLEAN NOT NULL DEFAULT TRUE,
@@ -60,6 +65,28 @@ const sqlEstrutura = [
       valor_norm VARCHAR(255),
       principal BOOLEAN NOT NULL DEFAULT FALSE,
       observacao VARCHAR(255),
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      created_by BIGINT,
+      updated_by BIGINT
+    );
+  `,
+    `
+    CREATE TABLE IF NOT EXISTS captacao_tarefas_relacionamento (
+      id BIGSERIAL PRIMARY KEY,
+      uuid VARCHAR(40) NOT NULL UNIQUE,
+      instituicao_id BIGINT,
+      doador_id BIGINT NOT NULL REFERENCES captacao_doadores(id) ON DELETE CASCADE,
+      titulo VARCHAR(160) NOT NULL,
+      descricao TEXT,
+      status VARCHAR(20) NOT NULL DEFAULT 'pendente',
+      prioridade VARCHAR(20) NOT NULL DEFAULT 'media',
+      tipo VARCHAR(40) NOT NULL DEFAULT 'follow_up',
+      responsavel VARCHAR(120),
+      data_prevista DATE,
+      concluida_em TIMESTAMP,
+      origem VARCHAR(40) NOT NULL DEFAULT 'manual',
+      tenant_id UUID,
       created_at TIMESTAMP NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
       created_by BIGINT,
@@ -352,27 +379,221 @@ const sqlEstrutura = [
       updated_by BIGINT
     );
   `,
+    `ALTER TABLE captacao_doadores ADD COLUMN IF NOT EXISTS tenant_id UUID;`,
+    `ALTER TABLE captacao_doadores_contatos ADD COLUMN IF NOT EXISTS tenant_id UUID;`,
+    `ALTER TABLE captacao_campanhas ADD COLUMN IF NOT EXISTS tenant_id UUID;`,
+    `ALTER TABLE captacao_campanhas_metricas ADD COLUMN IF NOT EXISTS tenant_id UUID;`,
+    `ALTER TABLE captacao_recorrencias ADD COLUMN IF NOT EXISTS tenant_id UUID;`,
+    `ALTER TABLE captacao_doacoes ADD COLUMN IF NOT EXISTS tenant_id UUID;`,
+    `ALTER TABLE captacao_doacoes_eventos ADD COLUMN IF NOT EXISTS tenant_id UUID;`,
+    `ALTER TABLE captacao_transacoes_pix ADD COLUMN IF NOT EXISTS tenant_id UUID;`,
+    `ALTER TABLE captacao_transacoes_cartao ADD COLUMN IF NOT EXISTS tenant_id UUID;`,
+    `ALTER TABLE captacao_transacoes_boleto ADD COLUMN IF NOT EXISTS tenant_id UUID;`,
+    `ALTER TABLE captacao_comprovantes ADD COLUMN IF NOT EXISTS tenant_id UUID;`,
+    `ALTER TABLE captacao_configuracoes ADD COLUMN IF NOT EXISTS tenant_id UUID;`,
+    `ALTER TABLE captacao_logs ADD COLUMN IF NOT EXISTS tenant_id UUID;`,
+    `ALTER TABLE captacao_preferencias_comunicacao ADD COLUMN IF NOT EXISTS tenant_id UUID;`,
+    `ALTER TABLE captacao_portal_acessos ADD COLUMN IF NOT EXISTS tenant_id UUID;`,
+    `ALTER TABLE captacao_doadores ADD COLUMN IF NOT EXISTS segmento_relacionamento VARCHAR(60);`,
+    `ALTER TABLE captacao_doadores ADD COLUMN IF NOT EXISTS status_retencao VARCHAR(30);`,
+    `ALTER TABLE captacao_doadores ADD COLUMN IF NOT EXISTS motivo_risco VARCHAR(255);`,
+    `ALTER TABLE captacao_doadores ADD COLUMN IF NOT EXISTS proxima_acao_sugerida VARCHAR(255);`,
+    `ALTER TABLE captacao_doadores ADD COLUMN IF NOT EXISTS score_relacionamento INTEGER NOT NULL DEFAULT 0;`,
     `CREATE INDEX IF NOT EXISTS captacao_doadores_status_idx ON captacao_doadores (status) WHERE deleted_at IS NULL;`,
     `CREATE INDEX IF NOT EXISTS captacao_doadores_nome_idx ON captacao_doadores (nome);`,
-    `CREATE UNIQUE INDEX IF NOT EXISTS captacao_doadores_documento_unique_idx ON captacao_doadores (cpf_cnpj_norm) WHERE deleted_at IS NULL AND cpf_cnpj_norm IS NOT NULL;`,
-    `CREATE UNIQUE INDEX IF NOT EXISTS captacao_doadores_email_unique_idx ON captacao_doadores (email_principal_norm) WHERE deleted_at IS NULL AND email_principal_norm IS NOT NULL;`,
+    `CREATE INDEX IF NOT EXISTS captacao_tarefas_relacionamento_doador_idx ON captacao_tarefas_relacionamento (doador_id);`,
+    `CREATE INDEX IF NOT EXISTS captacao_tarefas_relacionamento_status_idx ON captacao_tarefas_relacionamento (status);`,
+    `CREATE INDEX IF NOT EXISTS captacao_tarefas_relacionamento_tenant_idx ON captacao_tarefas_relacionamento (tenant_id, status, data_prevista DESC);`,
+    `DROP INDEX IF EXISTS captacao_doadores_documento_unique_idx;`,
+    `DROP INDEX IF EXISTS captacao_doadores_email_unique_idx;`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS captacao_doadores_documento_unique_idx ON captacao_doadores (tenant_id, cpf_cnpj_norm) WHERE deleted_at IS NULL AND tenant_id IS NOT NULL AND cpf_cnpj_norm IS NOT NULL;`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS captacao_doadores_email_unique_idx ON captacao_doadores (tenant_id, email_principal_norm) WHERE deleted_at IS NULL AND tenant_id IS NOT NULL AND email_principal_norm IS NOT NULL;`,
     `CREATE INDEX IF NOT EXISTS captacao_campanhas_status_idx ON captacao_campanhas (status) WHERE deleted_at IS NULL;`,
     `CREATE INDEX IF NOT EXISTS captacao_doacoes_data_idx ON captacao_doacoes (data_hora) WHERE deleted_at IS NULL;`,
     `CREATE INDEX IF NOT EXISTS captacao_doacoes_situacao_idx ON captacao_doacoes (situacao) WHERE deleted_at IS NULL;`,
     `CREATE INDEX IF NOT EXISTS captacao_doacoes_campanha_idx ON captacao_doacoes (campanha_id) WHERE deleted_at IS NULL;`,
     `CREATE INDEX IF NOT EXISTS captacao_doacoes_doador_idx ON captacao_doacoes (doador_id) WHERE deleted_at IS NULL;`,
     `CREATE INDEX IF NOT EXISTS captacao_logs_entidade_idx ON captacao_logs (entidade_tipo, entidade_id, created_at DESC);`,
+    `CREATE INDEX IF NOT EXISTS captacao_doadores_tenant_idx ON captacao_doadores (tenant_id) WHERE deleted_at IS NULL;`,
+    `CREATE INDEX IF NOT EXISTS captacao_campanhas_tenant_idx ON captacao_campanhas (tenant_id) WHERE deleted_at IS NULL;`,
+    `CREATE INDEX IF NOT EXISTS captacao_doacoes_tenant_idx ON captacao_doacoes (tenant_id) WHERE deleted_at IS NULL;`,
+    `CREATE INDEX IF NOT EXISTS captacao_comprovantes_tenant_idx ON captacao_comprovantes (tenant_id);`,
+    `CREATE INDEX IF NOT EXISTS captacao_logs_tenant_idx ON captacao_logs (tenant_id, created_at DESC);`,
+    `
+    UPDATE captacao_doadores
+       SET tenant_id = origem.tenant_id
+      FROM (
+        SELECT tenant_id
+        FROM unidade_assistencial
+        WHERE tenant_id IS NOT NULL
+        ORDER BY unidade_principal DESC, atualizado_em DESC, criado_em ASC
+        LIMIT 1
+      ) origem
+     WHERE captacao_doadores.tenant_id IS NULL;
+  `,
+    `
+    UPDATE captacao_doadores_contatos
+       SET tenant_id = d.tenant_id
+      FROM captacao_doadores d
+     WHERE captacao_doadores_contatos.tenant_id IS NULL
+       AND d.id = captacao_doadores_contatos.doador_id;
+  `,
+    `
+    UPDATE captacao_campanhas
+       SET tenant_id = origem.tenant_id
+      FROM (
+        SELECT tenant_id
+        FROM unidade_assistencial
+        WHERE tenant_id IS NOT NULL
+        ORDER BY unidade_principal DESC, atualizado_em DESC, criado_em ASC
+        LIMIT 1
+      ) origem
+     WHERE captacao_campanhas.tenant_id IS NULL;
+  `,
+    `
+    UPDATE captacao_campanhas_metricas
+       SET tenant_id = c.tenant_id
+      FROM captacao_campanhas c
+     WHERE captacao_campanhas_metricas.tenant_id IS NULL
+       AND c.id = captacao_campanhas_metricas.campanha_id;
+  `,
+    `
+    UPDATE captacao_recorrencias
+       SET tenant_id = COALESCE(
+         (
+           SELECT d.tenant_id
+             FROM captacao_doadores d
+            WHERE d.id = captacao_recorrencias.doador_id
+            LIMIT 1
+         ),
+         (
+           SELECT c.tenant_id
+             FROM captacao_campanhas c
+            WHERE c.id = captacao_recorrencias.campanha_id
+            LIMIT 1
+         )
+       )
+     WHERE captacao_recorrencias.tenant_id IS NULL
+       AND EXISTS (
+         SELECT 1
+           FROM captacao_doadores d
+          WHERE d.id = captacao_recorrencias.doador_id
+       );
+  `,
+    `
+    UPDATE captacao_doacoes
+       SET tenant_id = COALESCE(
+         (
+           SELECT d.tenant_id
+             FROM captacao_doadores d
+            WHERE d.id = captacao_doacoes.doador_id
+            LIMIT 1
+         ),
+         (
+           SELECT c.tenant_id
+             FROM captacao_campanhas c
+            WHERE c.id = captacao_doacoes.campanha_id
+            LIMIT 1
+         ),
+         (
+           SELECT r.tenant_id
+             FROM captacao_recorrencias r
+            WHERE r.id = captacao_doacoes.recorrencia_id
+            LIMIT 1
+         )
+       )
+     WHERE captacao_doacoes.tenant_id IS NULL
+       AND EXISTS (
+         SELECT 1
+           FROM captacao_doadores d
+          WHERE d.id = captacao_doacoes.doador_id
+       );
+  `,
+    `
+    UPDATE captacao_doacoes_eventos
+       SET tenant_id = d.tenant_id
+      FROM captacao_doacoes d
+     WHERE captacao_doacoes_eventos.tenant_id IS NULL
+       AND d.id = captacao_doacoes_eventos.doacao_id;
+  `,
+    `
+    UPDATE captacao_transacoes_pix
+       SET tenant_id = d.tenant_id
+      FROM captacao_doacoes d
+     WHERE captacao_transacoes_pix.tenant_id IS NULL
+       AND d.id = captacao_transacoes_pix.doacao_id;
+  `,
+    `
+    UPDATE captacao_transacoes_cartao
+       SET tenant_id = d.tenant_id
+      FROM captacao_doacoes d
+     WHERE captacao_transacoes_cartao.tenant_id IS NULL
+       AND d.id = captacao_transacoes_cartao.doacao_id;
+  `,
+    `
+    UPDATE captacao_transacoes_boleto
+       SET tenant_id = d.tenant_id
+      FROM captacao_doacoes d
+     WHERE captacao_transacoes_boleto.tenant_id IS NULL
+       AND d.id = captacao_transacoes_boleto.doacao_id;
+  `,
+    `
+    UPDATE captacao_comprovantes
+       SET tenant_id = d.tenant_id
+      FROM captacao_doacoes d
+     WHERE captacao_comprovantes.tenant_id IS NULL
+       AND d.id = captacao_comprovantes.doacao_id;
+  `,
+    `
+    UPDATE captacao_logs
+       SET tenant_id = origem.tenant_id
+      FROM (
+        SELECT tenant_id
+        FROM unidade_assistencial
+        WHERE tenant_id IS NOT NULL
+        ORDER BY unidade_principal DESC, atualizado_em DESC, criado_em ASC
+        LIMIT 1
+      ) origem
+     WHERE captacao_logs.tenant_id IS NULL;
+  `,
+    `
+    UPDATE captacao_preferencias_comunicacao
+       SET tenant_id = d.tenant_id
+      FROM captacao_doadores d
+     WHERE captacao_preferencias_comunicacao.tenant_id IS NULL
+       AND d.id = captacao_preferencias_comunicacao.doador_id;
+  `,
+    `
+    UPDATE captacao_portal_acessos
+       SET tenant_id = d.tenant_id
+      FROM captacao_doadores d
+     WHERE captacao_portal_acessos.tenant_id IS NULL
+       AND d.id = captacao_portal_acessos.doador_id;
+  `,
+    `
+    UPDATE captacao_tarefas_relacionamento
+       SET tenant_id = d.tenant_id
+      FROM captacao_doadores d
+     WHERE captacao_tarefas_relacionamento.tenant_id IS NULL
+       AND d.id = captacao_tarefas_relacionamento.doador_id;
+  `,
     `
     INSERT INTO captacao_configuracoes (
-      id,
+      tenant_id,
       modulo_habilitado,
       portal_doador_habilitado,
       campanhas_publicas_habilitadas,
       doacoes_recorrentes_habilitadas,
       envio_automatico_comprovantes
     )
-    VALUES (1, TRUE, TRUE, TRUE, TRUE, TRUE)
-    ON CONFLICT (id) DO NOTHING;
+    SELECT DISTINCT ua.tenant_id, TRUE, TRUE, TRUE, TRUE, TRUE
+    FROM unidade_assistencial ua
+    WHERE ua.tenant_id IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1
+        FROM captacao_configuracoes cfg
+      WHERE cfg.tenant_id = ua.tenant_id
+      );
   `,
     `
     INSERT INTO permissao (nome)
@@ -410,12 +631,36 @@ function toTimestamp(value) {
     const parsed = new Date(value);
     return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
+function tenantFilter(alias, tenantId) {
+    if (!tenantId)
+        return "1 = 1";
+    return alias ? `${alias}.tenant_id::text = '${tenantId}'` : `tenant_id::text = '${tenantId}'`;
+}
 export async function ensureCaptacaoRecursosEstrutura() {
     if (!ensurePromise) {
         ensurePromise = (async () => {
             for (const sql of sqlEstrutura) {
                 await prisma.$executeRawUnsafe(sql);
             }
+            await prisma.$executeRawUnsafe(`
+        DELETE FROM captacao_configuracoes cfg
+        USING (
+          SELECT id
+          FROM (
+            SELECT
+              id,
+              ROW_NUMBER() OVER (
+                PARTITION BY tenant_id
+                ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST, id DESC
+              ) AS rn
+            FROM captacao_configuracoes
+            WHERE tenant_id IS NOT NULL
+          ) duplicadas
+          WHERE duplicadas.rn > 1
+        ) purge
+        WHERE cfg.id = purge.id
+      `);
+            await prisma.$executeRawUnsafe("CREATE UNIQUE INDEX IF NOT EXISTS captacao_configuracoes_tenant_unique_idx ON captacao_configuracoes (tenant_id) WHERE tenant_id IS NOT NULL;");
         })().catch((error) => {
             ensurePromise = null;
             throw error;
@@ -446,10 +691,10 @@ export class CaptacaoRecursosRepository {
           AND data_final < CURRENT_DATE;
       `);
     }
-    async listarDoadores(filters) {
+    async listarDoadores(filters, tenantId) {
         await this.ajustarCampanhasEncerradas();
         const params = [];
-        const parts = ["d.deleted_at IS NULL"];
+        const parts = ["d.deleted_at IS NULL", tenantFilter("d", tenantId)];
         const pagina = Math.max(1, Number(filters.pagina ?? 1) || 1);
         const limite = Math.min(100, Math.max(1, Number(filters.limite ?? 20) || 20));
         const offset = (pagina - 1) * limite;
@@ -509,7 +754,7 @@ export class CaptacaoRecursosRepository {
             total: Number(countRows[0]?.total ?? 0)
         };
     }
-    async buscarDoadorPorIdOuFalhar(id) {
+    async buscarDoadorPorIdOuFalhar(id, tenantId) {
         const rows = await this.query(`
         SELECT d.*,
                COALESCE(stats.quantidade_doacoes, 0) AS quantidade_doacoes,
@@ -533,7 +778,7 @@ export class CaptacaoRecursosRepository {
           FROM captacao_doacoes
           GROUP BY doador_id
         ) stats ON stats.doador_id = d.id
-        WHERE d.id = $1 AND d.deleted_at IS NULL
+        WHERE d.id = $1 AND d.deleted_at IS NULL AND ${tenantFilter("d", tenantId)}
         LIMIT 1
       `, [id]);
         if (!rows[0]) {
@@ -541,9 +786,9 @@ export class CaptacaoRecursosRepository {
         }
         return rows[0];
     }
-    async buscarDoadorDuplicado(documentoNorm, emailNorm, ignoreId) {
+    async buscarDoadorDuplicado(documentoNorm, emailNorm, ignoreId, tenantId) {
         const params = [];
-        const parts = ["deleted_at IS NULL"];
+        const parts = ["deleted_at IS NULL", tenantFilter("", tenantId)];
         const push = (value) => {
             params.push(value);
             return `$${params.length}`;
@@ -567,7 +812,7 @@ export class CaptacaoRecursosRepository {
       `, params);
         return rows[0];
     }
-    async salvarDoador(id, uuid, input, userId) {
+    async salvarDoador(id, uuid, input, userId, tenantId) {
         const payload = {
             tipoDoador: input.tipoDoador,
             nome: input.nome,
@@ -598,6 +843,11 @@ export class CaptacaoRecursosRepository {
             aceitaWhatsapp: Boolean(input.aceitaWhatsapp),
             aceitaReceberCampanhas: Boolean(input.aceitaReceberCampanhas),
             categoriaDoador: input.categoriaDoador ?? null,
+            segmentoRelacionamento: input.segmentoRelacionamento ?? null,
+            statusRetencao: input.statusRetencao ?? null,
+            motivoRisco: input.motivoRisco ?? null,
+            proximaAcaoSugerida: input.proximaAcaoSugerida ?? null,
+            scoreRelacionamento: Number(input.scoreRelacionamento ?? 0) || 0,
             responsavelRelacionamento: input.responsavelRelacionamento ?? null,
             observacoesInternas: input.observacoesInternas ?? null,
             portalAtivo: Boolean(input.portalAtivo),
@@ -634,11 +884,17 @@ export class CaptacaoRecursosRepository {
             payload.aceitaWhatsapp,
             payload.aceitaReceberCampanhas,
             payload.categoriaDoador,
+            payload.segmentoRelacionamento,
+            payload.statusRetencao,
+            payload.motivoRisco,
+            payload.proximaAcaoSugerida,
+            payload.scoreRelacionamento,
             payload.responsavelRelacionamento,
             payload.observacoesInternas,
             payload.portalAtivo,
             payload.anexoPrincipalCaminho,
-            userId ?? null
+            userId ?? null,
+            tenantId ?? null
         ];
         let row;
         if (!id) {
@@ -648,11 +904,12 @@ export class CaptacaoRecursosRepository {
               data_nascimento_fundacao, email_principal, email_principal_norm, email_secundario, email_secundario_norm,
               telefone, telefone_norm, whatsapp, whatsapp_norm, endereco_completo, bairro, cidade, uf, cep, cep_norm,
               observacoes, origem_cadastro, status, aceitou_lgpd, data_aceite_lgpd, aceita_email, aceita_whatsapp,
-              aceita_receber_campanhas, categoria_doador, responsavel_relacionamento, observacoes_internas,
-              portal_ativo, anexo_principal_caminho, created_by, updated_by
+              aceita_receber_campanhas, categoria_doador, segmento_relacionamento, status_retencao, motivo_risco,
+              proxima_acao_sugerida, score_relacionamento, responsavel_relacionamento, observacoes_internas,
+              portal_ativo, anexo_principal_caminho, created_by, updated_by, tenant_id
             )
             VALUES (
-              $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$35
+              $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$40,$41
             )
             RETURNING *
           `, params))[0];
@@ -689,13 +946,18 @@ export class CaptacaoRecursosRepository {
                    aceita_whatsapp = $28,
                    aceita_receber_campanhas = $29,
                    categoria_doador = $30,
-                   responsavel_relacionamento = $31,
-                   observacoes_internas = $32,
-                   portal_ativo = $33,
-                   anexo_principal_caminho = $34,
-                   updated_by = $35,
+                   segmento_relacionamento = $31,
+                   status_retencao = $32,
+                   motivo_risco = $33,
+                   proxima_acao_sugerida = $34,
+                   score_relacionamento = $35,
+                   responsavel_relacionamento = $36,
+                   observacoes_internas = $37,
+                   portal_ativo = $38,
+                   anexo_principal_caminho = $39,
+                   updated_by = $40,
                    updated_at = NOW()
-             WHERE id = $36 AND deleted_at IS NULL
+             WHERE id = $41 AND deleted_at IS NULL AND ${tenantFilter("captacao_doadores", tenantId)}
             RETURNING *
           `, [...params, id]))[0];
         }
@@ -703,7 +965,7 @@ export class CaptacaoRecursosRepository {
             throw new AppError("Nao foi possivel salvar o doador.", 500);
         }
         const doadorId = BigInt(String(row.id));
-        await this.exec(`DELETE FROM captacao_doadores_contatos WHERE doador_id = $1`, [doadorId]);
+        await this.exec(`DELETE FROM captacao_doadores_contatos WHERE doador_id = $1 AND ${tenantFilter("captacao_doadores_contatos", tenantId)}`, [doadorId]);
         const contatos = [
             { tipo: "email_principal", valor: payload.emailPrincipal, valorNorm: payload.emailPrincipalNorm, principal: true },
             { tipo: "email_secundario", valor: payload.emailSecundario, valorNorm: payload.emailSecundarioNorm, principal: false },
@@ -713,16 +975,16 @@ export class CaptacaoRecursosRepository {
         for (const contato of contatos) {
             await this.exec(`
           INSERT INTO captacao_doadores_contatos (
-            uuid, doador_id, tipo_contato, valor, valor_norm, principal, created_by, updated_by
+            uuid, doador_id, tipo_contato, valor, valor_norm, principal, created_by, updated_by, tenant_id
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
-        `, [randomUUID(), doadorId, contato.tipo, contato.valor, contato.valorNorm, contato.principal, userId ?? null]);
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8)
+        `, [randomUUID(), doadorId, contato.tipo, contato.valor, contato.valorNorm, contato.principal, userId ?? null, tenantId ?? null]);
         }
         await this.exec(`
         INSERT INTO captacao_preferencias_comunicacao (
-          uuid, doador_id, aceita_email, aceita_whatsapp, aceita_campanhas, aceite_lgpd, data_aceite_lgpd, created_by, updated_by
+          uuid, doador_id, aceita_email, aceita_whatsapp, aceita_campanhas, aceite_lgpd, data_aceite_lgpd, created_by, updated_by, tenant_id
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9)
         ON CONFLICT (doador_id) DO UPDATE SET
           aceita_email = EXCLUDED.aceita_email,
           aceita_whatsapp = EXCLUDED.aceita_whatsapp,
@@ -739,27 +1001,97 @@ export class CaptacaoRecursosRepository {
             payload.aceitaReceberCampanhas,
             payload.aceitouLgpd,
             payload.dataAceiteLgpd,
-            userId ?? null
+            userId ?? null,
+            tenantId ?? null
         ]);
         return row;
     }
-    async inativarDoador(id, userId) {
+    async inativarDoador(id, userId, tenantId) {
         const row = (await this.query(`
           UPDATE captacao_doadores
              SET status = 'inativo',
                  updated_by = $2,
                  updated_at = NOW()
-           WHERE id = $1 AND deleted_at IS NULL
+           WHERE id = $1 AND deleted_at IS NULL AND ${tenantFilter("captacao_doadores", tenantId)}
            RETURNING *
         `, [id, userId ?? null]))[0];
         if (!row)
             throw new AppError("Doador nao encontrado.", 404);
         return row;
     }
-    async listarCampanhas(filters) {
+    async listarTarefasRelacionamentoPorDoador(doadorId, tenantId) {
+        return this.query(`
+        SELECT *
+        FROM captacao_tarefas_relacionamento
+        WHERE doador_id = $1 AND ${tenantFilter("captacao_tarefas_relacionamento", tenantId)}
+        ORDER BY
+          CASE status
+            WHEN 'pendente' THEN 0
+            WHEN 'em_andamento' THEN 1
+            WHEN 'concluida' THEN 2
+            ELSE 3
+          END,
+          data_prevista ASC NULLS LAST,
+          created_at DESC,
+          id DESC
+      `, [doadorId]);
+    }
+    async salvarTarefaRelacionamento(doadorId, input, userId, tenantId) {
+        const payload = {
+            titulo: trimOrUndefined(String(input.titulo ?? "")),
+            descricao: trimOrUndefined(String(input.descricao ?? "")),
+            status: trimOrUndefined(String(input.status ?? "")) ?? "pendente",
+            prioridade: trimOrUndefined(String(input.prioridade ?? "")) ?? "media",
+            tipo: trimOrUndefined(String(input.tipo ?? "")) ?? "follow_up",
+            responsavel: trimOrUndefined(String(input.responsavel ?? "")),
+            dataPrevista: toPgDate(String(input.dataPrevista ?? "")),
+            origem: trimOrUndefined(String(input.origem ?? "")) ?? "manual"
+        };
+        const row = (await this.query(`
+          INSERT INTO captacao_tarefas_relacionamento (
+            uuid, doador_id, titulo, descricao, status, prioridade, tipo, responsavel, data_prevista, origem,
+            created_by, updated_by, tenant_id
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11, $12)
+          RETURNING *
+        `, [
+            randomUUID(),
+            doadorId,
+            payload.titulo,
+            payload.descricao,
+            payload.status,
+            payload.prioridade,
+            payload.tipo,
+            payload.responsavel,
+            payload.dataPrevista,
+            payload.origem,
+            userId ?? null,
+            tenantId ?? null
+        ]))[0];
+        if (!row) {
+            throw new AppError("Nao foi possivel salvar a tarefa de relacionamento.", 500);
+        }
+        return row;
+    }
+    async concluirTarefaRelacionamento(id, userId, tenantId) {
+        const row = (await this.query(`
+          UPDATE captacao_tarefas_relacionamento
+             SET status = 'concluida',
+                 concluida_em = NOW(),
+                 updated_by = $2,
+                 updated_at = NOW()
+           WHERE id = $1 AND ${tenantFilter("captacao_tarefas_relacionamento", tenantId)}
+           RETURNING *
+        `, [id, userId ?? null]))[0];
+        if (!row) {
+            throw new AppError("Tarefa de relacionamento nao encontrada.", 404);
+        }
+        return row;
+    }
+    async listarCampanhas(filters, tenantId) {
         await this.ajustarCampanhasEncerradas();
         const params = [];
-        const parts = ["c.deleted_at IS NULL"];
+        const parts = ["c.deleted_at IS NULL", tenantFilter("c", tenantId)];
         const pagina = Math.max(1, Number(filters.pagina ?? 1) || 1);
         const limite = Math.min(100, Math.max(1, Number(filters.limite ?? 20) || 20));
         const offset = (pagina - 1) * limite;
@@ -795,7 +1127,7 @@ export class CaptacaoRecursosRepository {
         const countRows = await this.query(`SELECT COUNT(*)::BIGINT AS total ${baseFrom}`, params.slice(0, params.length - 2));
         return { rows, total: Number(countRows[0]?.total ?? 0) };
     }
-    async buscarCampanhaPorIdOuFalhar(id) {
+    async buscarCampanhaPorIdOuFalhar(id, tenantId) {
         const rows = await this.query(`
         SELECT c.*, COALESCE(m.total_arrecadado, c.valor_arrecadado, 0)::DOUBLE PRECISION AS total_arrecadado,
                COALESCE(m.total_doacoes, 0)::INT AS total_doacoes,
@@ -803,7 +1135,7 @@ export class CaptacaoRecursosRepository {
                COALESCE(m.percentual_atingido, c.percentual_atingido, 0)::DOUBLE PRECISION AS percentual_atingido
         FROM captacao_campanhas c
         LEFT JOIN captacao_campanhas_metricas m ON m.campanha_id = c.id
-        WHERE c.id = $1 AND c.deleted_at IS NULL
+        WHERE c.id = $1 AND c.deleted_at IS NULL AND ${tenantFilter("c", tenantId)}
         LIMIT 1
       `, [id]);
         if (!rows[0]) {
@@ -811,7 +1143,7 @@ export class CaptacaoRecursosRepository {
         }
         return rows[0];
     }
-    async salvarCampanha(id, uuid, input, userId) {
+    async salvarCampanha(id, uuid, input, userId, tenantId) {
         const params = [
             uuid,
             input.nome,
@@ -831,7 +1163,8 @@ export class CaptacaoRecursosRepository {
             input.urlPublica ?? null,
             input.qrCodePublico ?? null,
             input.mensagemAgradecimento ?? null,
-            userId ?? null
+            userId ?? null,
+            tenantId ?? null
         ];
         let row;
         if (!id) {
@@ -840,9 +1173,9 @@ export class CaptacaoRecursosRepository {
               uuid, nome, descricao_curta, descricao_completa, objetivo, meta_financeira,
               data_inicial, data_final, status, imagem_banner, cor_destaque, tipo, responsavel,
               destaque_no_portal, visivel_ao_publico, url_publica, qr_code_publico, mensagem_agradecimento,
-              created_by, updated_by
+              created_by, updated_by, tenant_id
             )
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$19)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$19,$20)
             RETURNING *
           `, params))[0];
         }
@@ -868,7 +1201,7 @@ export class CaptacaoRecursosRepository {
                    mensagem_agradecimento = $18,
                    updated_by = $19,
                    updated_at = NOW()
-             WHERE id = $20 AND deleted_at IS NULL
+             WHERE id = $20 AND deleted_at IS NULL AND ${tenantFilter("captacao_campanhas", tenantId)}
              RETURNING *
           `, [...params, id]))[0];
         }
@@ -876,28 +1209,28 @@ export class CaptacaoRecursosRepository {
             throw new AppError("Nao foi possivel salvar a campanha.", 500);
         await this.exec(`
         INSERT INTO captacao_campanhas_metricas (
-          uuid, campanha_id, total_arrecadado, total_doacoes, total_doadores, percentual_atingido, created_by, updated_by
+          uuid, campanha_id, total_arrecadado, total_doacoes, total_doadores, percentual_atingido, created_by, updated_by, tenant_id
         )
-        VALUES ($1, $2, 0, 0, 0, 0, $3, $3)
+        VALUES ($1, $2, 0, 0, 0, 0, $3, $3, $4)
         ON CONFLICT (campanha_id) DO NOTHING
-      `, [randomUUID(), row.id, userId ?? null]);
-        await this.recalcularMetricasCampanha(BigInt(String(row.id)), userId);
-        return this.buscarCampanhaPorIdOuFalhar(BigInt(String(row.id)));
+      `, [randomUUID(), row.id, userId ?? null, tenantId ?? null]);
+        await this.recalcularMetricasCampanha(BigInt(String(row.id)), userId, tenantId);
+        return this.buscarCampanhaPorIdOuFalhar(BigInt(String(row.id)), tenantId);
     }
-    async alterarStatusCampanha(id, status, userId) {
+    async alterarStatusCampanha(id, status, userId, tenantId) {
         const row = (await this.query(`
           UPDATE captacao_campanhas
              SET status = $2,
                  updated_by = $3,
                  updated_at = NOW()
-           WHERE id = $1 AND deleted_at IS NULL
+           WHERE id = $1 AND deleted_at IS NULL AND ${tenantFilter("captacao_campanhas", tenantId)}
            RETURNING *
         `, [id, status, userId ?? null]))[0];
         if (!row)
             throw new AppError("Campanha nao encontrada.", 404);
         return row;
     }
-    async recalcularMetricasCampanha(campanhaId, userId) {
+    async recalcularMetricasCampanha(campanhaId, userId, tenantId) {
         await this.exec(`
         UPDATE captacao_campanhas_metricas metricas
            SET total_arrecadado = base.total_arrecadado,
@@ -922,7 +1255,7 @@ export class CaptacaoRecursosRepository {
               END AS percentual_atingido
             FROM captacao_campanhas c
             LEFT JOIN captacao_doacoes d ON d.campanha_id = c.id
-            WHERE c.id = $1
+            WHERE c.id = $1 AND ${tenantFilter("c", tenantId)}
             GROUP BY c.id, c.meta_financeira
           ) base
          WHERE metricas.campanha_id = base.campanha_id
@@ -935,12 +1268,13 @@ export class CaptacaoRecursosRepository {
           FROM captacao_campanhas_metricas m
          WHERE c.id = m.campanha_id
            AND c.id = $1
+           AND ${tenantFilter("c", tenantId)}
       `, [campanhaId]);
     }
-    async listarDoacoes(filters) {
+    async listarDoacoes(filters, tenantId) {
         await this.ajustarCampanhasEncerradas();
         const params = [];
-        const parts = ["d.deleted_at IS NULL"];
+        const parts = ["d.deleted_at IS NULL", tenantFilter("d", tenantId)];
         const pagina = Math.max(1, Number(filters.pagina ?? 1) || 1);
         const limite = Math.min(100, Math.max(1, Number(filters.limite ?? 20) || 20));
         const offset = (pagina - 1) * limite;
@@ -998,7 +1332,7 @@ export class CaptacaoRecursosRepository {
         const countRows = await this.query(`SELECT COUNT(*)::BIGINT AS total ${baseFrom}`, params.slice(0, params.length - 2));
         return { rows, total: Number(countRows[0]?.total ?? 0) };
     }
-    async buscarDoacaoPorIdOuFalhar(id) {
+    async buscarDoacaoPorIdOuFalhar(id, tenantId) {
         const rows = await this.query(`
         SELECT
           d.*,
@@ -1019,14 +1353,14 @@ export class CaptacaoRecursosRepository {
         LEFT JOIN captacao_transacoes_pix pix ON pix.doacao_id = d.id
         LEFT JOIN captacao_transacoes_cartao cartao ON cartao.doacao_id = d.id
         LEFT JOIN captacao_transacoes_boleto boleto ON boleto.doacao_id = d.id
-        WHERE d.id = $1 AND d.deleted_at IS NULL
+        WHERE d.id = $1 AND d.deleted_at IS NULL AND ${tenantFilter("d", tenantId)}
         LIMIT 1
       `, [id]);
         if (!rows[0])
             throw new AppError("Doacao nao encontrada.", 404);
         return rows[0];
     }
-    async salvarRecorrencia(id, uuid, doadorId, campanhaId, input, referenciaExterna, userId) {
+    async salvarRecorrencia(id, uuid, doadorId, campanhaId, input, referenciaExterna, userId, tenantId) {
         const params = [
             uuid,
             doadorId,
@@ -1039,7 +1373,8 @@ export class CaptacaoRecursosRepository {
             Boolean(input.semPrevisaoTermino),
             input.status ?? "ativa",
             referenciaExterna ?? null,
-            userId ?? null
+            userId ?? null,
+            tenantId ?? null
         ];
         const rows = id
             ? await this.query(`
@@ -1056,22 +1391,22 @@ export class CaptacaoRecursosRepository {
                    referencia_externa = $11,
                    updated_by = $12,
                    updated_at = NOW()
-             WHERE id = $13 AND deleted_at IS NULL
+             WHERE id = $13 AND deleted_at IS NULL AND ${tenantFilter("captacao_recorrencias", tenantId)}
              RETURNING *
           `, [...params, id])
             : await this.query(`
             INSERT INTO captacao_recorrencias (
               uuid, doador_id, campanha_id, valor_recorrente, periodicidade, forma_pagamento,
-              data_proxima_cobranca, quantidade_ciclos, sem_previsao_termino, status, referencia_externa, created_by, updated_by
+              data_proxima_cobranca, quantidade_ciclos, sem_previsao_termino, status, referencia_externa, created_by, updated_by, tenant_id
             )
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$12)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$12,$13)
             RETURNING *
           `, params);
         if (!rows[0])
             throw new AppError("Nao foi possivel salvar a recorrencia.", 500);
         return rows[0];
     }
-    async salvarDoacao(id, uuid, numeroDoacao, input, userId) {
+    async salvarDoacao(id, uuid, numeroDoacao, input, userId, tenantId) {
         const params = [
             uuid,
             numeroDoacao,
@@ -1092,7 +1427,8 @@ export class CaptacaoRecursosRepository {
             input.observacoesInternas ?? null,
             input.usuarioResponsavel ?? null,
             Boolean(input.comprovanteGerado),
-            userId ?? null
+            userId ?? null,
+            tenantId ?? null
         ];
         const rows = id
             ? await this.query(`
@@ -1116,7 +1452,7 @@ export class CaptacaoRecursosRepository {
                    comprovante_gerado = $19,
                    updated_by = $20,
                    updated_at = NOW()
-             WHERE id = $21 AND deleted_at IS NULL
+             WHERE id = $21 AND deleted_at IS NULL AND ${tenantFilter("captacao_doacoes", tenantId)}
              RETURNING *
           `, [...params, id])
             : await this.query(`
@@ -1124,16 +1460,16 @@ export class CaptacaoRecursosRepository {
               uuid, numero_doacao, doador_id, campanha_id, recorrencia_id, valor, valor_liquido,
               valor_taxas, tipo_doacao, forma_pagamento, situacao, origem, identificador_externo,
               txid, link_pagamento, data_vencimento, observacoes_internas, usuario_responsavel,
-              comprovante_gerado, created_by, updated_by
+              comprovante_gerado, created_by, updated_by, tenant_id
             )
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$20)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$20,$21)
             RETURNING *
           `, params);
         if (!rows[0])
             throw new AppError("Nao foi possivel salvar a doacao.", 500);
         return rows[0];
     }
-    async alterarSituacaoDoacao(id, situacao, userId, extras) {
+    async alterarSituacaoDoacao(id, situacao, userId, tenantId, extras) {
         const rows = await this.query(`
         UPDATE captacao_doacoes
            SET situacao = $2,
@@ -1142,30 +1478,30 @@ export class CaptacaoRecursosRepository {
                comprovante_gerado = COALESCE($5, comprovante_gerado),
                updated_by = $6,
                updated_at = NOW()
-         WHERE id = $1 AND deleted_at IS NULL
+         WHERE id = $1 AND deleted_at IS NULL AND ${tenantFilter("captacao_doacoes", tenantId)}
          RETURNING *
       `, [id, situacao, extras?.txid ?? null, extras?.linkPagamento ?? null, extras?.comprovanteGerado ?? null, userId ?? null]);
         if (!rows[0])
             throw new AppError("Doacao nao encontrada.", 404);
         return rows[0];
     }
-    async registrarEventoDoacao(doacaoId, tipoEvento, descricao, payloadJson, userId) {
+    async registrarEventoDoacao(doacaoId, tipoEvento, descricao, payloadJson, userId, tenantId) {
         await this.exec(`
         INSERT INTO captacao_doacoes_eventos (
-          uuid, doacao_id, tipo_evento, descricao, payload_json, created_by
+          uuid, doacao_id, tipo_evento, descricao, payload_json, created_by, tenant_id
         )
-        VALUES ($1, $2, $3, $4, CAST($5 AS JSONB), $6)
-      `, [randomUUID(), doacaoId, tipoEvento, descricao, JSON.stringify(payloadJson ?? {}), userId ?? null]);
+        VALUES ($1, $2, $3, $4, CAST($5 AS JSONB), $6, $7)
+      `, [randomUUID(), doacaoId, tipoEvento, descricao, JSON.stringify(payloadJson ?? {}), userId ?? null, tenantId ?? null]);
     }
-    async listarEventosDoacao(doacaoId) {
-        return this.query(`SELECT * FROM captacao_doacoes_eventos WHERE doacao_id = $1 ORDER BY created_at DESC, id DESC`, [doacaoId]);
+    async listarEventosDoacao(doacaoId, tenantId) {
+        return this.query(`SELECT * FROM captacao_doacoes_eventos WHERE doacao_id = $1 AND ${tenantFilter("captacao_doacoes_eventos", tenantId)} ORDER BY created_at DESC, id DESC`, [doacaoId]);
     }
-    async salvarTransacaoPix(doacaoId, result, userId) {
+    async salvarTransacaoPix(doacaoId, result, userId, tenantId) {
         await this.exec(`
         INSERT INTO captacao_transacoes_pix (
-          uuid, doacao_id, txid, payload_pix, qr_code_svg, status, data_expiracao, provider_nome, payload_json, created_by, updated_by
+          uuid, doacao_id, txid, payload_pix, qr_code_svg, status, data_expiracao, provider_nome, payload_json, created_by, updated_by, tenant_id
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CAST($9 AS JSONB), $10, $10)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CAST($9 AS JSONB), $10, $10, $11)
         ON CONFLICT (doacao_id) DO UPDATE SET
           txid = EXCLUDED.txid,
           payload_pix = EXCLUDED.payload_pix,
@@ -1176,14 +1512,14 @@ export class CaptacaoRecursosRepository {
           payload_json = EXCLUDED.payload_json,
           updated_by = EXCLUDED.updated_by,
           updated_at = NOW()
-      `, [randomUUID(), doacaoId, result.txid ?? null, result.qrCodeCopiaCola ?? null, result.qrCodeSvg ?? null, result.status ?? "aguardando_pagamento", toTimestamp(String(result.expiresAt ?? "")), result.provider ?? "mock-g3n", JSON.stringify(result.payloadJson ?? {}), userId ?? null]);
+      `, [randomUUID(), doacaoId, result.txid ?? null, result.qrCodeCopiaCola ?? null, result.qrCodeSvg ?? null, result.status ?? "aguardando_pagamento", toTimestamp(String(result.expiresAt ?? "")), result.provider ?? "mock-g3n", JSON.stringify(result.payloadJson ?? {}), userId ?? null, tenantId ?? null]);
     }
-    async salvarTransacaoCartao(doacaoId, result, userId) {
+    async salvarTransacaoCartao(doacaoId, result, userId, tenantId) {
         await this.exec(`
         INSERT INTO captacao_transacoes_cartao (
-          uuid, doacao_id, referencia_externa, status, provider_nome, payload_json, historico_json, created_by, updated_by
+          uuid, doacao_id, referencia_externa, status, provider_nome, payload_json, historico_json, created_by, updated_by, tenant_id
         )
-        VALUES ($1, $2, $3, $4, $5, CAST($6 AS JSONB), CAST($7 AS JSONB), $8, $8)
+        VALUES ($1, $2, $3, $4, $5, CAST($6 AS JSONB), CAST($7 AS JSONB), $8, $8, $9)
         ON CONFLICT (doacao_id) DO UPDATE SET
           referencia_externa = EXCLUDED.referencia_externa,
           status = EXCLUDED.status,
@@ -1192,15 +1528,15 @@ export class CaptacaoRecursosRepository {
           historico_json = EXCLUDED.historico_json,
           updated_by = EXCLUDED.updated_by,
           updated_at = NOW()
-      `, [randomUUID(), doacaoId, result.externalId ?? null, result.status ?? "aguardando_pagamento", result.provider ?? "mock-g3n", JSON.stringify(result.payloadJson ?? {}), JSON.stringify([{ status: result.status ?? "aguardando_pagamento", em: new Date().toISOString() }]), userId ?? null]);
+      `, [randomUUID(), doacaoId, result.externalId ?? null, result.status ?? "aguardando_pagamento", result.provider ?? "mock-g3n", JSON.stringify(result.payloadJson ?? {}), JSON.stringify([{ status: result.status ?? "aguardando_pagamento", em: new Date().toISOString() }]), userId ?? null, tenantId ?? null]);
     }
-    async salvarTransacaoBoleto(doacaoId, result, userId) {
+    async salvarTransacaoBoleto(doacaoId, result, userId, tenantId) {
         await this.exec(`
         INSERT INTO captacao_transacoes_boleto (
           uuid, doacao_id, numero_documento, nosso_numero, linha_digitavel, codigo_barras, data_emissao,
-          data_vencimento, status, provider_nome, payload_json, created_by, updated_by
+          data_vencimento, status, provider_nome, payload_json, created_by, updated_by, tenant_id
         )
-        VALUES ($1, $2, $3, $4, $5, $6, CURRENT_DATE, $7, $8, $9, CAST($10 AS JSONB), $11, $11)
+        VALUES ($1, $2, $3, $4, $5, $6, CURRENT_DATE, $7, $8, $9, CAST($10 AS JSONB), $11, $11, $12)
         ON CONFLICT (doacao_id) DO UPDATE SET
           numero_documento = EXCLUDED.numero_documento,
           nosso_numero = EXCLUDED.nosso_numero,
@@ -1212,15 +1548,15 @@ export class CaptacaoRecursosRepository {
           payload_json = EXCLUDED.payload_json,
           updated_by = EXCLUDED.updated_by,
           updated_at = NOW()
-      `, [randomUUID(), doacaoId, result.externalId ?? null, result.nossoNumero ?? null, result.linhaDigitavel ?? null, result.codigoBarras ?? null, toPgDate(String(result.dueDate ?? "")), result.status ?? "aguardando_pagamento", result.provider ?? "mock-g3n", JSON.stringify(result.payloadJson ?? {}), userId ?? null]);
+      `, [randomUUID(), doacaoId, result.externalId ?? null, result.nossoNumero ?? null, result.linhaDigitavel ?? null, result.codigoBarras ?? null, toPgDate(String(result.dueDate ?? "")), result.status ?? "aguardando_pagamento", result.provider ?? "mock-g3n", JSON.stringify(result.payloadJson ?? {}), userId ?? null, tenantId ?? null]);
     }
-    async salvarComprovante(doacaoId, data, userId) {
+    async salvarComprovante(doacaoId, data, userId, tenantId) {
         const rows = await this.query(`
         INSERT INTO captacao_comprovantes (
           uuid, doacao_id, doador_id, campanha_id, numero_comprovante, codigo_validacao, arquivo_caminho,
-          mensagem_agradecimento, created_by, updated_by
+          mensagem_agradecimento, created_by, updated_by, tenant_id
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$9)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$9,$10)
         ON CONFLICT (doacao_id) DO UPDATE SET
           numero_comprovante = EXCLUDED.numero_comprovante,
           codigo_validacao = EXCLUDED.codigo_validacao,
@@ -1229,34 +1565,34 @@ export class CaptacaoRecursosRepository {
           updated_by = EXCLUDED.updated_by,
           updated_at = NOW()
         RETURNING *
-      `, [data.uuid, doacaoId, data.doadorId ?? null, data.campanhaId ?? null, data.numeroComprovante, data.codigoValidacao, data.arquivoCaminho ?? null, data.mensagemAgradecimento ?? null, userId ?? null]);
+      `, [data.uuid, doacaoId, data.doadorId ?? null, data.campanhaId ?? null, data.numeroComprovante, data.codigoValidacao, data.arquivoCaminho ?? null, data.mensagemAgradecimento ?? null, userId ?? null, tenantId ?? null]);
         return rows[0];
     }
-    async marcarComprovanteEnviado(id, userId) {
+    async marcarComprovanteEnviado(id, userId, tenantId) {
         await this.exec(`
         UPDATE captacao_comprovantes
            SET enviado_email = TRUE,
                data_envio_email = NOW(),
                updated_by = $2,
                updated_at = NOW()
-         WHERE id = $1
+         WHERE id = $1 AND ${tenantFilter("captacao_comprovantes", tenantId)}
       `, [id, userId ?? null]);
     }
-    async buscarComprovantePorDoacao(doacaoId) {
+    async buscarComprovantePorDoacao(doacaoId, tenantId) {
         const rows = await this.query(`
         SELECT c.*, d.numero_doacao, doadores.nome AS doador_nome, campanhas.nome AS campanha_nome
         FROM captacao_comprovantes c
         INNER JOIN captacao_doacoes d ON d.id = c.doacao_id
         LEFT JOIN captacao_doadores doadores ON doadores.id = c.doador_id
         LEFT JOIN captacao_campanhas campanhas ON campanhas.id = c.campanha_id
-        WHERE c.doacao_id = $1
+        WHERE c.doacao_id = $1 AND ${tenantFilter("c", tenantId)}
         LIMIT 1
       `, [doacaoId]);
         return rows[0];
     }
-    async listarComprovantes(filters) {
+    async listarComprovantes(filters, tenantId) {
         const params = [];
-        const parts = ["1 = 1"];
+        const parts = [tenantFilter("c", tenantId)];
         const pagina = Math.max(1, Number(filters.pagina ?? 1) || 1);
         const limite = Math.min(100, Math.max(1, Number(filters.limite ?? 20) || 20));
         const offset = (pagina - 1) * limite;
@@ -1290,13 +1626,43 @@ export class CaptacaoRecursosRepository {
         const countRows = await this.query(`SELECT COUNT(*)::BIGINT AS total ${baseFrom}`, params.slice(0, params.length - 2));
         return { rows, total: Number(countRows[0]?.total ?? 0) };
     }
-    async obterConfiguracoes() {
-        const rows = await this.query(`SELECT * FROM captacao_configuracoes WHERE id = 1 LIMIT 1`);
+    async obterConfiguracoes(tenantId) {
+        if (tenantId) {
+            await this.exec(`
+          INSERT INTO captacao_configuracoes (
+            tenant_id,
+            modulo_habilitado,
+            portal_doador_habilitado,
+            campanhas_publicas_habilitadas,
+            doacoes_recorrentes_habilitadas,
+            envio_automatico_comprovantes
+          )
+          SELECT $1, TRUE, TRUE, TRUE, TRUE, TRUE
+          WHERE NOT EXISTS (
+            SELECT 1 FROM captacao_configuracoes WHERE tenant_id::text = $1
+          )
+        `, [tenantId]);
+        }
+        const rows = await this.query(`SELECT * FROM captacao_configuracoes WHERE ${tenantFilter("captacao_configuracoes", tenantId)} ORDER BY id ASC LIMIT 1`);
         return rows[0];
     }
-    async salvarConfiguracoes(input, userId) {
-        const current = await this.obterConfiguracoes();
+    async salvarConfiguracoes(input, userId, tenantId) {
+        const current = await this.obterConfiguracoes(tenantId);
         const merged = { ...(current ?? {}), ...input };
+        await this.exec(`
+        INSERT INTO captacao_configuracoes (
+          tenant_id,
+          modulo_habilitado,
+          portal_doador_habilitado,
+          campanhas_publicas_habilitadas,
+          doacoes_recorrentes_habilitadas,
+          envio_automatico_comprovantes
+        )
+        SELECT $1, TRUE, TRUE, TRUE, TRUE, TRUE
+        WHERE NOT EXISTS (
+          SELECT 1 FROM captacao_configuracoes WHERE tenant_id::text = $1
+        )
+      `, [tenantId ?? null]);
         const rows = await this.query(`
         UPDATE captacao_configuracoes
            SET modulo_habilitado = $1,
@@ -1330,27 +1696,27 @@ export class CaptacaoRecursosRepository {
                lgpd_base_legal = $29,
                updated_by = $30,
                updated_at = NOW()
-         WHERE id = 1
+         WHERE ${tenantFilter("captacao_configuracoes", tenantId)}
          RETURNING *
       `, [Boolean(merged.modulo_habilitado), Boolean(merged.portal_doador_habilitado), Boolean(merged.campanhas_publicas_habilitadas), Boolean(merged.doacoes_recorrentes_habilitadas), Boolean(merged.envio_automatico_comprovantes), merged.pix_chave ?? null, merged.pix_recebedor ?? null, merged.pix_cidade ?? null, merged.pix_ambiente ?? "sandbox", merged.pix_webhook_url ?? null, Number(merged.pix_expiracao_minutos ?? 1440), merged.pix_provider ?? "mock-g3n", merged.cartao_provider ?? "mock-g3n", merged.cartao_ambiente ?? "sandbox", merged.cartao_chave_publica ?? null, merged.cartao_chave_privada_ref ?? null, Number(merged.cartao_tentativas_falha ?? 2), merged.boleto_provider ?? "mock-g3n", merged.boleto_ambiente ?? "sandbox", Number(merged.boleto_prazo_vencimento_dias ?? 5), merged.boleto_instrucao ?? null, merged.mensagem_agradecimento ?? null, merged.modelo_comprovante ?? null, merged.modelo_email_cobranca ?? null, merged.modelo_lembrete ?? null, merged.modelo_campanha ?? null, merged.lgpd_termo_consentimento ?? null, merged.lgpd_politica_privacidade ?? null, merged.lgpd_base_legal ?? null, userId ?? null]);
         return rows[0];
     }
-    async registrarLog(entidadeTipo, entidadeId, acao, descricao, detalhesJson, userId) {
+    async registrarLog(entidadeTipo, entidadeId, acao, descricao, detalhesJson, userId, tenantId) {
         await this.exec(`
         INSERT INTO captacao_logs (
-          uuid, entidade_tipo, entidade_id, acao, descricao, detalhes_json, created_by
+          uuid, entidade_tipo, entidade_id, acao, descricao, detalhes_json, created_by, tenant_id
         )
-        VALUES ($1, $2, $3, $4, $5, CAST($6 AS JSONB), $7)
-      `, [randomUUID(), entidadeTipo, entidadeId ?? null, acao, descricao, JSON.stringify(detalhesJson ?? {}), userId ?? null]);
+        VALUES ($1, $2, $3, $4, $5, CAST($6 AS JSONB), $7, $8)
+      `, [randomUUID(), entidadeTipo, entidadeId ?? null, acao, descricao, JSON.stringify(detalhesJson ?? {}), userId ?? null, tenantId ?? null]);
     }
-    async listarLogs(limit = 200) {
-        return this.query(`SELECT * FROM captacao_logs ORDER BY created_at DESC, id DESC LIMIT $1`, [limit]);
+    async listarLogs(limit = 200, tenantId) {
+        return this.query(`SELECT * FROM captacao_logs WHERE ${tenantFilter("captacao_logs", tenantId)} ORDER BY created_at DESC, id DESC LIMIT $1`, [limit]);
     }
-    async listarDashboardBase(filters) {
-        const doacoes = await this.listarDoacoes({ ...filters, pagina: 1, limite: 5000 });
-        const campanhas = await this.listarCampanhas({ pagina: 1, limite: 5000 });
-        const doadores = await this.listarDoadores({ pagina: 1, limite: 5000, status: "ativo" });
-        const recorrencias = await this.query(`SELECT * FROM captacao_recorrencias WHERE deleted_at IS NULL ORDER BY created_at DESC`);
+    async listarDashboardBase(filters, tenantId) {
+        const doacoes = await this.listarDoacoes({ ...filters, pagina: 1, limite: 5000 }, tenantId);
+        const campanhas = await this.listarCampanhas({ pagina: 1, limite: 5000 }, tenantId);
+        const doadores = await this.listarDoadores({ pagina: 1, limite: 5000, status: "ativo" }, tenantId);
+        const recorrencias = await this.query(`SELECT * FROM captacao_recorrencias WHERE deleted_at IS NULL AND ${tenantFilter("captacao_recorrencias", tenantId)} ORDER BY created_at DESC`);
         return { doacoes: doacoes.rows, campanhas: campanhas.rows, doadores: doadores.rows, recorrencias };
     }
     async obterDoadorPortalPorCredenciais(emailNorm, documentoNorm) {
@@ -1367,19 +1733,19 @@ export class CaptacaoRecursosRepository {
       `, params);
         return rows[0];
     }
-    async criarAcessoPortal(doadorId, token, metadata, userId) {
+    async criarAcessoPortal(doadorId, token, metadata, userId, tenantId) {
         const expiraEm = new Date(Date.now() + 1000 * 60 * 60 * 12).toISOString();
         await this.exec(`
         INSERT INTO captacao_portal_acessos (
-          uuid, doador_id, token_acesso, email_utilizado, ip_origem, user_agent, expira_em, created_by, updated_by
+          uuid, doador_id, token_acesso, email_utilizado, ip_origem, user_agent, expira_em, created_by, updated_by, tenant_id
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
-      `, [randomUUID(), doadorId, token, metadata.email ?? null, metadata.ip ?? null, metadata.userAgent ?? null, expiraEm, userId ?? null]);
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9)
+      `, [randomUUID(), doadorId, token, metadata.email ?? null, metadata.ip ?? null, metadata.userAgent ?? null, expiraEm, userId ?? null, tenantId ?? null]);
         return { token, expiraEm };
     }
     async obterAcessoPortalValido(token) {
         const rows = await this.query(`
-        SELECT a.*, d.nome, d.email_principal, d.cpf_cnpj, d.id AS doador_id_real
+        SELECT a.*, d.nome, d.email_principal, d.cpf_cnpj, d.id AS doador_id_real, d.tenant_id
         FROM captacao_portal_acessos a
         INNER JOIN captacao_doadores d ON d.id = a.doador_id
         WHERE a.token_acesso = $1
@@ -1393,35 +1759,35 @@ export class CaptacaoRecursosRepository {
     async registrarAcessoPortal(token) {
         await this.exec(`UPDATE captacao_portal_acessos SET ultimo_acesso_em = NOW(), updated_at = NOW() WHERE token_acesso = $1`, [token]);
     }
-    async listarDoacoesPorDoador(doadorId) {
+    async listarDoacoesPorDoador(doadorId, tenantId) {
         return this.query(`
         SELECT d.*, campanhas.nome AS campanha_nome
         FROM captacao_doacoes d
         LEFT JOIN captacao_campanhas campanhas ON campanhas.id = d.campanha_id
-        WHERE d.doador_id = $1 AND d.deleted_at IS NULL
+        WHERE d.doador_id = $1 AND d.deleted_at IS NULL AND ${tenantFilter("d", tenantId)}
         ORDER BY d.data_hora DESC, d.id DESC
       `, [doadorId]);
     }
-    async listarRecorrenciasPorDoador(doadorId) {
+    async listarRecorrenciasPorDoador(doadorId, tenantId) {
         return this.query(`
         SELECT r.*, campanhas.nome AS campanha_nome
         FROM captacao_recorrencias r
         LEFT JOIN captacao_campanhas campanhas ON campanhas.id = r.campanha_id
-        WHERE r.doador_id = $1 AND r.deleted_at IS NULL
+        WHERE r.doador_id = $1 AND r.deleted_at IS NULL AND ${tenantFilter("r", tenantId)}
         ORDER BY r.created_at DESC, r.id DESC
       `, [doadorId]);
     }
-    async listarComprovantesPorDoador(doadorId) {
+    async listarComprovantesPorDoador(doadorId, tenantId) {
         return this.query(`
         SELECT c.*, d.numero_doacao, d.valor_liquido, d.forma_pagamento, d.data_hora, campanhas.nome AS campanha_nome
         FROM captacao_comprovantes c
         INNER JOIN captacao_doacoes d ON d.id = c.doacao_id
         LEFT JOIN captacao_campanhas campanhas ON campanhas.id = c.campanha_id
-        WHERE c.doador_id = $1
+        WHERE c.doador_id = $1 AND ${tenantFilter("c", tenantId)}
         ORDER BY c.created_at DESC, c.id DESC
       `, [doadorId]);
     }
-    async atualizarDadosPortalDoador(doadorId, input) {
+    async atualizarDadosPortalDoador(doadorId, input, tenantId) {
         const rows = await this.query(`
         UPDATE captacao_doadores
            SET email_principal = COALESCE($2, email_principal),
@@ -1433,7 +1799,7 @@ export class CaptacaoRecursosRepository {
                cidade = COALESCE($8, cidade),
                uf = COALESCE($9, uf),
                updated_at = NOW()
-         WHERE id = $1 AND deleted_at IS NULL
+         WHERE id = $1 AND deleted_at IS NULL AND ${tenantFilter("captacao_doadores", tenantId)}
          RETURNING *
       `, [doadorId, input.email ?? null, input.emailNorm ?? null, input.telefone ?? null, input.telefoneNorm ?? null, input.whatsapp ?? null, input.whatsappNorm ?? null, input.cidade ?? null, input.uf ?? null]);
         if (!rows[0])

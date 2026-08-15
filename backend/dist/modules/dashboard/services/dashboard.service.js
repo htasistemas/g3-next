@@ -8,6 +8,11 @@ function arredondarUmaCasa(valor) {
 function arredondarDuasCasas(valor) {
     return Math.round(valor * 100) / 100;
 }
+function limitarPercentual(valor) {
+    if (!Number.isFinite(valor))
+        return 0;
+    return Math.max(0, Math.min(100, valor));
+}
 function calcularIdade(dataNascimento, dataReferencia = new Date()) {
     const anoAtual = dataReferencia.getUTCFullYear();
     const mesAtual = dataReferencia.getUTCMonth();
@@ -22,58 +27,65 @@ function calcularIdade(dataNascimento, dataReferencia = new Date()) {
     return idade;
 }
 export class DashboardService {
-    repository = new DashboardRepository();
     cache = new TtlCache(20_000, 24);
-    async obterAssistencia(rawFilters) {
+    async obterAssistencia(rawFilters, tenantId) {
         const filters = dashboardFiltrosSchema.parse(rawFilters);
         this.validarPeriodo(filters);
+        const tenantNormalizado = tenantId?.trim();
+        if (!tenantNormalizado) {
+            throw new AppError("Tenant da sessao nao identificado.", 401);
+        }
+        const repository = new DashboardRepository(tenantNormalizado);
         const cacheKey = JSON.stringify({
+            tenantId: tenantNormalizado,
             startDate: filters.startDate ?? null,
             endDate: filters.endDate ?? null
         });
-        return this.cache.getOrSet(cacheKey, async () => this.gerarAssistencia(filters));
+        return this.cache.getOrSet(cacheKey, async () => this.gerarAssistencia(repository, filters));
     }
-    async gerarAssistencia(filters) {
-        const [totalBeneficiarios, totalProfissionais, totalVoluntarios, totalFamiliasCadastradas, totalBensPatrimonio, totalItensAlmoxarifado, totalLivrosDisponiveis, totalVeiculos, beneficiariosPeriodo, porStatus, cadastrosCompletos, datasNascimento, totalSituacaoSocial, mediaPessoasBanco, rendasFamiliares, bairros, vulnerabilidades, insegurancaAlimentar, termosAtivos, termosValorTotal, termosAlertas, contasFinanceirasRows, lancamentosFinanceirosRows, cursosAtivos, taxaMediaOcupacaoCursos, certificadosEmitidos, doacoesPeriodo, itensDoadoResumo, visitasDomiciliares, termosVencendo, execucaoFinanceira, absenteismo] = await Promise.all([
-            this.repository.contarBeneficiarios(),
-            this.repository.contarProfissionais(),
-            this.repository.contarVoluntarios(),
-            this.repository.contarFamilias(),
-            this.repository.contarBensPatrimonio(),
-            this.repository.contarItensAlmoxarifado(),
-            this.repository.somarLivrosDisponiveis(),
-            this.repository.contarVeiculos(),
-            this.repository.contarBeneficiariosPeriodo(filters.startDate, filters.endDate),
-            this.repository.contarBeneficiariosPorStatus(),
-            this.repository.contarCadastroCompleto(),
-            this.repository.listarDatasNascimento(),
-            this.repository.contarSituacaoSocialTotal(),
-            this.repository.calcularMediaPessoas(),
-            this.repository.listarRendasFamiliares(),
-            this.repository.contarBeneficiariosPorBairro(),
-            this.repository.contarVulnerabilidades(),
-            this.repository.contarInsegurancaAlimentar(),
-            this.repository.contarTermosAtivos(),
-            this.repository.somarValorTotalTermosAtivos(),
-            this.repository.listarAlertasTermos(),
-            this.repository.listarContasFinanceiras(),
-            this.repository.listarLancamentosFinanceiros(),
-            this.repository.contarCursosAtivos(),
-            this.repository.calcularTaxaMediaOcupacaoCursos(),
-            this.repository.contarCertificadosEmitidos(),
-            this.repository.contarDoacoesPeriodo(filters.startDate, filters.endDate),
-            this.repository.obterResumoItensDoacao(filters.startDate, filters.endDate),
-            this.repository.contarVisitasDomiciliares(filters.startDate, filters.endDate),
-            this.repository.contarTermosVencendo(),
-            this.repository.calcularExecucaoFinanceira(),
-            this.repository.calcularAbsenteismo()
+    async gerarAssistencia(repository, filters) {
+        const [totalBeneficiarios, totalProfissionais, totalVoluntarios, totalFamiliasCadastradas, totalBensPatrimonio, totalItensAlmoxarifado, totalLivrosDisponiveis, totalVeiculos, beneficiariosPeriodo, porStatus, cadastrosCompletos, datasNascimento, totalSituacaoSocial, mediaPessoasBanco, rendasFamiliares, bairros, vulnerabilidades, insegurancaAlimentar, termosAtivos, termosValorTotal, termosAlertas, valoresAReceber, valoresEmCaixa, valoresEmBanco, contasFinanceirasRows, cursosAtivos, taxaMediaOcupacaoCursos, certificadosEmitidos, doacoesPeriodo, itensDoadoResumo, visitasDomiciliares, termosVencendo, execucaoFinanceira, absenteismo] = await Promise.all([
+            repository.contarBeneficiarios(),
+            repository.contarProfissionais(),
+            repository.contarVoluntarios(),
+            repository.contarFamilias(),
+            repository.contarBensPatrimonio(),
+            repository.contarItensAlmoxarifado(),
+            repository.somarLivrosDisponiveis(),
+            repository.contarVeiculos(),
+            repository.contarBeneficiariosPeriodo(filters.startDate, filters.endDate),
+            repository.contarBeneficiariosPorStatus(),
+            repository.contarCadastroCompleto(),
+            repository.listarDatasNascimento(),
+            repository.contarSituacaoSocialTotal(),
+            repository.calcularMediaPessoas(),
+            repository.listarRendasFamiliares(),
+            repository.contarBeneficiariosPorBairro(0),
+            repository.contarVulnerabilidades(),
+            repository.contarInsegurancaAlimentar(),
+            repository.contarTermosAtivos(),
+            repository.somarValorTotalTermosAtivos(),
+            repository.listarAlertasTermos(),
+            repository.somarValoresAReceber(),
+            repository.somarValoresEmCaixa(),
+            repository.somarValoresEmBanco(),
+            repository.listarContasFinanceiras(),
+            repository.contarCursosAtivos(),
+            repository.calcularTaxaMediaOcupacaoCursos(),
+            repository.contarCertificadosEmitidos(),
+            repository.contarDoacoesPeriodo(filters.startDate, filters.endDate),
+            repository.obterResumoItensDoacao(filters.startDate, filters.endDate),
+            repository.contarVisitasDomiciliares(filters.startDate, filters.endDate),
+            repository.contarTermosVencendo(),
+            repository.calcularExecucaoFinanceira(),
+            repository.calcularAbsenteismo()
         ]);
         const pendentes = porStatus["INCOMPLETO"] ?? 0;
         const bloqueados = porStatus["BLOQUEADO"] ?? 0;
         const emAnalise = porStatus["EM_ANALISE"] ?? 0;
         const desatualizados = porStatus["DESATUALIZADO"] ?? 0;
         const ativos = Math.max(0, totalBeneficiarios - pendentes - bloqueados - emAnalise - desatualizados);
-        const cadastroCompletoPercentual = totalBeneficiarios === 0 ? 0 : (cadastrosCompletos / totalBeneficiarios) * 100;
+        const cadastroCompletoPercentual = limitarPercentual(totalBeneficiarios === 0 ? 0 : (cadastrosCompletos / totalBeneficiarios) * 100);
         const faixaEtaria = this.calcularFaixaEtaria(datasNascimento);
         const idades = this.calcularIdades(datasNascimento);
         const rendas = this.parseRendas(rendasFamiliares);
@@ -82,13 +94,6 @@ export class DashboardService {
         const rendaPerCapitaMedia = mediaPessoas > 0 ? rendaMediaFamiliar / mediaPessoas : 0;
         const faixaRenda = this.calcularFaixaRenda(rendas);
         const contasFinanceiras = this.mapearContasFinanceiras(contasFinanceirasRows);
-        const valoresEmCaixa = contasFinanceiras
-            .filter((item) => item.categoria === "Caixa")
-            .reduce((total, item) => total + item.saldo, 0);
-        const valoresEmBanco = contasFinanceiras
-            .filter((item) => item.categoria === "Banco")
-            .reduce((total, item) => total + item.saldo, 0);
-        const valoresAReceber = this.calcularValoresAReceber(lancamentosFinanceirosRows);
         const familiasExtremaPobreza = faixaRenda["Ate 200"] ?? 0;
         return {
             filters: {
@@ -228,42 +233,12 @@ export class DashboardService {
             .filter((item) => item.saldo > 0)
             .sort((a, b) => b.saldo - a.saldo || a.nome.localeCompare(b.nome, "pt-BR"));
     }
-    calcularValoresAReceber(rows) {
-        return rows
-            .filter((row) => this.ehLancamentoAReceber(row.tipo) && !this.ehSituacaoLiquidada(row.situacao))
-            .reduce((total, row) => total + this.toNumber(row.valor), 0);
-    }
     classificarContaFinanceira(tipo, recebimentoLocal) {
         if (recebimentoLocal) {
             return "Caixa";
         }
         const tipoNormalizado = this.normalizarTexto(tipo);
         return tipoNormalizado.includes("caixa") ? "Caixa" : "Banco";
-    }
-    ehLancamentoAReceber(tipo) {
-        const tipoNormalizado = this.normalizarTexto(tipo);
-        return (tipoNormalizado === "receber" ||
-            tipoNormalizado === "a receber" ||
-            tipoNormalizado === "receita" ||
-            tipoNormalizado === "entrada" ||
-            tipoNormalizado === "credito" ||
-            tipoNormalizado.includes("receber") ||
-            tipoNormalizado.startsWith("receita") ||
-            tipoNormalizado.includes("entrada") ||
-            tipoNormalizado.includes("credito"));
-    }
-    ehSituacaoLiquidada(situacao) {
-        const situacaoNormalizada = this.normalizarTexto(situacao);
-        return [
-            "pago",
-            "paga",
-            "recebido",
-            "recebida",
-            "liquidado",
-            "liquidada",
-            "concluido",
-            "concluida"
-        ].includes(situacaoNormalizada);
     }
     normalizarTexto(valor) {
         return String(valor ?? "")

@@ -532,15 +532,10 @@ export class BeneficiarioRepository {
       `);
     };
 
-    let ids = await consultarIds([this.tenantSql("b", tenantId)]);
-
-    if (!ids.length) {
-      ids = await consultarIds([Prisma.sql`b.tenant_id IS NULL`]);
-    }
-
-    if (!ids.length && !condicoesFiltro.length) {
-      ids = await consultarIds([]);
-    }
+    // O tenant da sessão é obrigatório. Nunca fazer fallback para registros
+    // sem tenant ou para todos os registros: isso transformaria dados legados
+    // em uma possível resposta cross-tenant.
+    const ids = await consultarIds([this.tenantSql("b", tenantId)]);
 
     if (!ids.length) {
       return [];

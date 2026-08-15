@@ -1,6 +1,78 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.834",
+                        "releaseDate": "2026-08-15",
+                        "title": "Relatórios completos de termos de parceria",
+                        "description": "Incluídos relatórios gerenciais por projeto e relatório completo individual do termo no padrão institucional do G3N.",
+                        "changes": ["Relatório consolidado com vigência, situação, valores contratado/recebido/executado e contagens operacionais.", "Relatório completo com objeto, responsabilidades, recursos, metas, rubricas, recebimentos, despesas, documentos, aditivos e linha do tempo.", "Relatórios em PDF respeitando tenant e permissões de leitura.", "Manual do sistema atualizado."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.833",
+                        "releaseDate": "2026-08-14",
+                        "title": "Termos de parceria ampliados",
+                        "description": "A tela passou a cobrir os principais elementos do ciclo de parceria e a persistir os campos profissionais já existentes no banco.",
+                        "changes": ["Identificação jurídica, proposta, edital, responsáveis, público-alvo, território, prazos e legislação adicionados ao formulário.", "Listagem com indicadores, filtros por situação e projeto, busca, paginação e valores financeiros.", "Metas, rubricas, recebimentos e despesas passaram a ser incluídos e excluídos pela própria tela, com validações do backend.", "Manual do sistema atualizado."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.832",
+                        "releaseDate": "2026-08-14",
+                        "title": "Tela de login restaurada",
+                        "description": "Corrigida a chave de carregamento da rota Termos de parceria que interrompia a inicializacao do roteador e ocultava a tela de login.",
+                        "changes": ["Rota do modulo juridico alinhada ao registro oficial de route-modules.", "Tela de login novamente disponivel no bundle de producao.", "Autenticacao validada com contexto institucional."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.831",
+                        "releaseDate": "2026-08-14",
+                        "title": "Padronizacao das abas de termos de parceria",
+                        "description": "A tela passou a reutilizar o layout oficial de quatro abas do modulo juridico.",
+                        "changes": ["Listagem de termos como aba inicial.", "Abas Dados gerais, Documentos e Aditivos alinhadas ao Termo de fomento.", "Removida a navegacao lateral excessiva da entrada principal."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.830",
+                        "releaseDate": "2026-08-14",
+                        "title": "Correcao de login e padrao visual juridico",
+                        "description": "Corrigido o envio do contexto institucional no login e alinhada a tela de termos ao padrao de cadastros do G3N.",
+                        "changes": ["CNPJ e slug informados no login voltam a ser enviados ao backend.", "Termos de parceria recebeu barra de acoes, navegacao lateral numerada, cartao principal e progresso visual.", "Build frontend validado."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.829",
+                        "releaseDate": "2026-08-14",
+                        "title": "Visao operacional dos termos de parceria",
+                        "description": "A tela recebeu abas operacionais, CRUD de registros filhos e formulários de aditivos e filiais executoras.",
+                        "changes": ["Incluídas abas de metas, rubricas, recebimentos, despesas, documentos, aditivos e filiais executoras.", "Incluída edição e exclusão lógica de registros operacionais.", "Incluídos testes de build, API e persistência."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.828",
+                        "releaseDate": "2026-08-14",
+                        "title": "Auditoria e endurecimento dos termos de parceria",
+                        "description": "Validações, persistência, exclusão lógica, segurança multi-tenant, máscaras brasileiras e anexos do módulo foram reforçados.",
+                        "changes": ["Corrigida a persistência completa dos dados principais na atualização de termos.", "Adicionadas validações de datas, valores, duplicidade por tenant, saldos de rubricas e vínculos de projeto, unidade e meta.", "Adicionadas constraints e índice único incremental no banco.", "Incluída exclusão lógica de termos e lançamentos com trilha de timeline.", "Tela alinhada com seleção de projeto/filial, filtros, moeda brasileira, datas e upload de documentos."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.827",
+                        "releaseDate": "2026-08-13",
+                        "title": "Gestao de parcerias e recursos publicos",
+                        "description": "Novo submenu Termos de parceria para consolidar instrumentos juridicos, projetos, execucao financeira, unidades executoras, aditivos, documentos e prestacao de contas.",
+                        "changes": ["Criado dashboard e listagem protegidos por tenant para parcerias.", "Reutilizado o nucleo profissional de prestacao de contas para metas, rubricas, recebimentos, despesas e documentos.", "Criadas estruturas incrementais para dados juridicos ampliados, unidades executoras, aditivos, contas bancarias e linha do tempo.", "Incluidas permissoes especificas do modulo e validacao backend de projeto e unidade no ambiente ativo.", "Manual do sistema atualizado."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.824",
+                        "releaseDate": "2026-08-13",
+                        "title": "Autenticacao por e-mail e contexto organizacional",
+                        "description": "O login deixa de exigir CNPJ, ambientes autorizados podem ser selecionados com seguranca e a sessao passa a representar o contexto organizacional ativo.",
+                        "changes": ["Criadas estruturas incrementais de identidade global, acesso, entidade juridica, unidade organizacional e local de execucao.", "Usuarios com mais de um ambiente recebem somente os ambientes autorizados.", "Troca de ambiente renova o contexto no backend e registra auditoria.", "Filtros legados por tenant_id permanecem ativos durante a migracao.", "Manual do sistema atualizado."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.823",
                         "releaseDate": "2026-08-11",
                         "title": "Consulta CPF/CNPJ nas cotações de compras",

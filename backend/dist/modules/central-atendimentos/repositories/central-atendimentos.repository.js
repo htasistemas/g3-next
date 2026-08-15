@@ -7,6 +7,7 @@ const estruturaSql = [
     `
     CREATE TABLE IF NOT EXISTS central_atendimento (
       id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
       beneficiario_id BIGINT NOT NULL,
       familia_id BIGINT,
       data_hora TIMESTAMP NOT NULL,
@@ -26,10 +27,13 @@ const estruturaSql = [
       atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
     )
   `,
+    "ALTER TABLE central_atendimento ADD COLUMN IF NOT EXISTS tenant_id UUID",
+    "CREATE INDEX IF NOT EXISTS central_atendimento_tenant_beneficiario_idx ON central_atendimento(tenant_id, beneficiario_id)",
     "CREATE INDEX IF NOT EXISTS central_atendimento_beneficiario_idx ON central_atendimento(beneficiario_id)",
     `
     CREATE TABLE IF NOT EXISTS central_beneficio (
       id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
       beneficiario_id BIGINT NOT NULL,
       familia_id BIGINT,
       data DATE NOT NULL,
@@ -49,10 +53,13 @@ const estruturaSql = [
       atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
     )
   `,
+    "ALTER TABLE central_beneficio ADD COLUMN IF NOT EXISTS tenant_id UUID",
+    "CREATE INDEX IF NOT EXISTS central_beneficio_tenant_beneficiario_idx ON central_beneficio(tenant_id, beneficiario_id)",
     "CREATE INDEX IF NOT EXISTS central_beneficio_beneficiario_idx ON central_beneficio(beneficiario_id)",
     `
     CREATE TABLE IF NOT EXISTS central_encaminhamento (
       id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
       beneficiario_id BIGINT NOT NULL,
       familia_id BIGINT,
       data DATE NOT NULL,
@@ -69,10 +76,13 @@ const estruturaSql = [
       atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
     )
   `,
+    "ALTER TABLE central_encaminhamento ADD COLUMN IF NOT EXISTS tenant_id UUID",
+    "CREATE INDEX IF NOT EXISTS central_encaminhamento_tenant_beneficiario_idx ON central_encaminhamento(tenant_id, beneficiario_id)",
     "CREATE INDEX IF NOT EXISTS central_encaminhamento_beneficiario_idx ON central_encaminhamento(beneficiario_id)",
     `
     CREATE TABLE IF NOT EXISTS central_auditoria (
       id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
       beneficiario_id BIGINT,
       familia_id BIGINT,
       entidade VARCHAR(80) NOT NULL,
@@ -84,7 +94,9 @@ const estruturaSql = [
       usuario_nome VARCHAR(160),
       criado_em TIMESTAMP NOT NULL DEFAULT NOW()
     )
-  `
+  `,
+    "ALTER TABLE central_auditoria ADD COLUMN IF NOT EXISTS tenant_id UUID",
+    "CREATE INDEX IF NOT EXISTS central_auditoria_tenant_beneficiario_idx ON central_auditoria(tenant_id, beneficiario_id, criado_em DESC)"
 ];
 let estruturaPromise = null;
 const parametrosSistemaRepository = new ParametrosSistemaRepository();
@@ -113,6 +125,28 @@ function inicioAnoAtual() {
     return new Date(Date.UTC(hoje.getUTCFullYear(), 0, 1));
 }
 export class CentralAtendimentosRepository {
+    async validarBeneficiarioTenant(beneficiarioId, tenantId) {
+        const rows = await prisma.$queryRaw(Prisma.sql `
+      SELECT id
+      FROM cadastro_beneficiario
+      WHERE id = ${beneficiarioId}
+        AND tenant_id::text = ${tenantId}
+      LIMIT 1
+    `);
+        if (!rows[0]) {
+            throw new AppError("Beneficiario nao encontrado.", 404);
+        }
+    }
+    async validarFamiliaTenant(familiaId, tenantId) {
+        const rows = await prisma.$queryRaw(Prisma.sql `
+      SELECT id
+      FROM vinculo_familiar
+      WHERE id = ${familiaId}
+        AND tenant_id::text = ${tenantId}
+      LIMIT 1
+    `);
+        return rows[0]?.id ?? null;
+    }
     async ensureEstrutura() {
         if (!estruturaPromise) {
             estruturaPromise = (async () => {
@@ -123,7 +157,7 @@ export class CentralAtendimentosRepository {
         }
         await estruturaPromise;
     }
-    async buscarBeneficiarios(filters) {
+    async buscarBeneficiarios(filters, tenantId) {
         await this.ensureEstrutura();
         const busca = trimOrUndefined(filters.busca);
         const bairro = trimOrUndefined(filters.bairro);
@@ -135,7 +169,7 @@ export class CentralAtendimentosRepository {
         const inicioMes = inicioMesAtual();
         const limiteRecente = new Date();
         limiteRecente.setDate(limiteRecente.getDate() - 90);
-        const where = [];
+        const where = [Prisma.sql `AND b.tenant_id::text = ${tenantId}`];
         if (busca) {
             const like = `%${busca}%`;
             const digits = `%${normalizeDigits(busca)}%`;
@@ -163,6 +197,7 @@ export class CentralAtendimentosRepository {
         AND EXISTS (
           SELECT 1 FROM central_beneficio cb
           WHERE cb.beneficiario_id = b.id
+            AND cb.tenant_id::text = ${tenantId}
             AND cb.data >= ${inicioMes}
         )
       `);
@@ -175,10 +210,12 @@ export class CentralAtendimentosRepository {
             SELECT MAX(ca.data_hora)::timestamp AS data_ref
             FROM central_atendimento ca
             WHERE ca.beneficiario_id = b.id
+              AND ca.tenant_id::text = ${tenantId}
             UNION ALL
             SELECT MAX(v.data_visita)::timestamp AS data_ref
             FROM visita_domiciliar v
             WHERE v.beneficiario_id = b.id
+              AND v.tenant_id::text = ${tenantId}
           ) t
         ), TIMESTAMP '1900-01-01') < ${limiteRecente}
       `);
@@ -215,10 +252,11 @@ export class CentralAtendimentosRepository {
         SELECT m.vinculo_familiar_id AS familia_id
         FROM vinculo_familiar_membro m
         WHERE m.beneficiario_id = b.id
+          AND m.tenant_id::text = ${tenantId}
         ORDER BY m.id ASC
         LIMIT 1
       ) fm ON TRUE
-      LEFT JOIN vinculo_familiar f ON f.id = fm.familia_id
+      LEFT JOIN vinculo_familiar f ON f.id = fm.familia_id AND f.tenant_id::text = ${tenantId}
       WHERE 1 = 1
       ${Prisma.join(where, "\n")}
       ORDER BY b.nome_completo ASC
@@ -240,19 +278,19 @@ export class CentralAtendimentosRepository {
             ultimoAtendimento: row.ultimo_atendimento instanceof Date ? row.ultimo_atendimento.toISOString() : undefined
         }));
     }
-    async obterVisaoGeral(beneficiarioId) {
+    async obterVisaoGeral(beneficiarioId, tenantId) {
         await this.ensureEstrutura();
-        const beneficiario = await this.buscarResumoBeneficiario(beneficiarioId);
+        const beneficiario = await this.buscarResumoBeneficiario(beneficiarioId, tenantId);
         if (!beneficiario)
             throw new AppError("Beneficiário não encontrado.", 404);
         const [atendimentos, beneficiosCentral, encaminhamentos, familia, inscricoes] = await Promise.all([
-            this.listarAtendimentos(beneficiarioId),
-            this.listarBeneficios(beneficiarioId),
-            this.listarEncaminhamentos(beneficiarioId),
-            this.obterGrupoFamiliar(beneficiarioId),
-            this.listarInscricoes(beneficiario)
+            this.listarAtendimentos(beneficiarioId, tenantId),
+            this.listarBeneficios(beneficiarioId, tenantId),
+            this.listarEncaminhamentos(beneficiarioId, tenantId),
+            this.obterGrupoFamiliar(beneficiarioId, tenantId),
+            this.listarInscricoes(beneficiario, tenantId)
         ]);
-        const doacoes = await this.listarDoacoes(beneficiarioId, familia?.id ? BigInt(familia.id) : undefined);
+        const doacoes = await this.listarDoacoes(beneficiarioId, tenantId, familia?.id ? BigInt(familia.id) : undefined);
         const beneficios = [...beneficiosCentral, ...doacoes].sort((a, b) => String(b.data).localeCompare(String(a.data)));
         const historico = this.montarHistorico(beneficiario, atendimentos, beneficios, inscricoes, encaminhamentos);
         const custos = this.calcularCustos(beneficios, familia);
@@ -305,12 +343,14 @@ export class CentralAtendimentosRepository {
             grupoFamiliar: familia
         };
     }
-    async listarAtendimentos(beneficiarioId) {
+    async listarAtendimentos(beneficiarioId, tenantId) {
         await this.ensureEstrutura();
+        await this.validarBeneficiarioTenant(beneficiarioId, tenantId);
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT id, data_hora, tipo_atendimento, setor, profissional_responsavel, prioridade, status, classificacao, necessidade_identificada, resumo, observacoes, retorno_previsto
       FROM central_atendimento
       WHERE beneficiario_id = ${beneficiarioId}
+        AND tenant_id::text = ${tenantId}
       ORDER BY data_hora DESC, id DESC
     `);
         return rows.map((row) => ({
@@ -328,23 +368,29 @@ export class CentralAtendimentosRepository {
             retornoPrevisto: formatIsoDate(row.retorno_previsto)
         }));
     }
-    async criarAtendimento(beneficiarioId, input, usuario) {
+    async criarAtendimento(beneficiarioId, input, usuario, tenantId) {
         await this.ensureEstrutura();
-        const familiaId = await this.buscarFamiliaId(beneficiarioId);
+        if (!tenantId)
+            throw new AppError("Tenant da sessao nao identificado.", 401);
+        await this.validarBeneficiarioTenant(beneficiarioId, tenantId);
+        const familiaId = await this.buscarFamiliaId(beneficiarioId, tenantId);
         const inserted = await prisma.$queryRaw(Prisma.sql `
       INSERT INTO central_atendimento (
-        beneficiario_id, familia_id, data_hora, tipo_atendimento, setor, profissional_responsavel, prioridade, status, classificacao, necessidade_identificada, resumo, observacoes, retorno_previsto, criado_por_usuario_id, criado_por_nome, criado_em, atualizado_em
+        tenant_id, beneficiario_id, familia_id, data_hora, tipo_atendimento, setor, profissional_responsavel, prioridade, status, classificacao, necessidade_identificada, resumo, observacoes, retorno_previsto, criado_por_usuario_id, criado_por_nome, criado_em, atualizado_em
       ) VALUES (
-        ${beneficiarioId}, ${familiaId}, ${new Date(input.data_hora)}, ${input.tipo_atendimento}, ${input.setor}, ${input.profissional_responsavel}, ${trimOrUndefined(input.prioridade)}, ${trimOrUndefined(input.status) ?? "Aberto"}, ${trimOrUndefined(input.classificacao)}, ${trimOrUndefined(input.necessidade_identificada)}, ${input.resumo}, ${trimOrUndefined(input.observacoes)}, ${toOptionalDate(input.retorno_previsto)}, ${usuario?.id ? BigInt(usuario.id) : null}, ${trimOrUndefined(usuario?.nome ?? usuario?.nomeUsuario)}, NOW(), NOW()
+        ${tenantId}::uuid, ${beneficiarioId}, ${familiaId}, ${new Date(input.data_hora)}, ${input.tipo_atendimento}, ${input.setor}, ${input.profissional_responsavel}, ${trimOrUndefined(input.prioridade)}, ${trimOrUndefined(input.status) ?? "Aberto"}, ${trimOrUndefined(input.classificacao)}, ${trimOrUndefined(input.necessidade_identificada)}, ${input.resumo}, ${trimOrUndefined(input.observacoes)}, ${toOptionalDate(input.retorno_previsto)}, ${usuario?.id ? BigInt(usuario.id) : null}, ${trimOrUndefined(usuario?.nome ?? usuario?.nomeUsuario)}, NOW(), NOW()
       )
       RETURNING id
     `);
-        await this.registrarAuditoria(beneficiarioId, familiaId, "central_atendimento", inserted[0]?.id, "criar", `Atendimento ${input.tipo_atendimento} registrado.`, input, usuario);
-        return this.listarAtendimentos(beneficiarioId);
+        await this.registrarAuditoria(beneficiarioId, familiaId, "central_atendimento", inserted[0]?.id, "criar", `Atendimento ${input.tipo_atendimento} registrado.`, input, usuario, tenantId);
+        return this.listarAtendimentos(beneficiarioId, tenantId);
     }
-    async atualizarAtendimento(id, beneficiarioId, input, usuario) {
+    async atualizarAtendimento(id, beneficiarioId, input, usuario, tenantId) {
         await this.ensureEstrutura();
-        const familiaId = await this.buscarFamiliaId(beneficiarioId);
+        if (!tenantId)
+            throw new AppError("Tenant da sessao nao identificado.", 401);
+        await this.validarBeneficiarioTenant(beneficiarioId, tenantId);
+        const familiaId = await this.buscarFamiliaId(beneficiarioId, tenantId);
         await prisma.$executeRaw(Prisma.sql `
       UPDATE central_atendimento
       SET
@@ -362,26 +408,33 @@ export class CentralAtendimentosRepository {
         atualizado_em = NOW()
       WHERE id = ${id}
         AND beneficiario_id = ${beneficiarioId}
+        AND tenant_id::text = ${tenantId}
     `);
-        await this.registrarAuditoria(beneficiarioId, familiaId, "central_atendimento", id, "editar", `Atendimento ${input.tipo_atendimento} atualizado.`, input, usuario);
-        return this.listarAtendimentos(beneficiarioId);
+        await this.registrarAuditoria(beneficiarioId, familiaId, "central_atendimento", id, "editar", `Atendimento ${input.tipo_atendimento} atualizado.`, input, usuario, tenantId);
+        return this.listarAtendimentos(beneficiarioId, tenantId);
     }
-    async removerAtendimento(id, beneficiarioId, usuario) {
+    async removerAtendimento(id, beneficiarioId, usuario, tenantId) {
         await this.ensureEstrutura();
-        const familiaId = await this.buscarFamiliaId(beneficiarioId);
+        if (!tenantId)
+            throw new AppError("Tenant da sessao nao identificado.", 401);
+        await this.validarBeneficiarioTenant(beneficiarioId, tenantId);
+        const familiaId = await this.buscarFamiliaId(beneficiarioId, tenantId);
         await prisma.$executeRaw(Prisma.sql `
       DELETE FROM central_atendimento
       WHERE id = ${id}
         AND beneficiario_id = ${beneficiarioId}
+        AND tenant_id::text = ${tenantId}
     `);
-        await this.registrarAuditoria(beneficiarioId, familiaId, "central_atendimento", id, "excluir", "Atendimento removido da Central.", { id: String(id) }, usuario);
+        await this.registrarAuditoria(beneficiarioId, familiaId, "central_atendimento", id, "excluir", "Atendimento removido da Central.", { id: String(id) }, usuario, tenantId);
     }
-    async listarBeneficios(beneficiarioId) {
+    async listarBeneficios(beneficiarioId, tenantId) {
         await this.ensureEstrutura();
+        await this.validarBeneficiarioTenant(beneficiarioId, tenantId);
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT id, data, tipo, item, quantidade::float8 AS quantidade, valor_unitario::float8 AS valor_unitario, valor_total::float8 AS valor_total, origem_recurso, projeto_programa, profissional_responsavel, observacoes, ciente_alertas
       FROM central_beneficio
       WHERE beneficiario_id = ${beneficiarioId}
+        AND tenant_id::text = ${tenantId}
       ORDER BY data DESC, id DESC
     `);
         return rows.map((row) => ({
@@ -400,26 +453,32 @@ export class CentralAtendimentosRepository {
             cienteAlertas: Boolean(row.ciente_alertas)
         }));
     }
-    async criarBeneficio(beneficiarioId, input, usuario) {
+    async criarBeneficio(beneficiarioId, input, usuario, tenantId) {
         await this.ensureEstrutura();
-        const familiaId = await this.buscarFamiliaId(beneficiarioId);
+        if (!tenantId)
+            throw new AppError("Tenant da sessao nao identificado.", 401);
+        await this.validarBeneficiarioTenant(beneficiarioId, tenantId);
+        const familiaId = await this.buscarFamiliaId(beneficiarioId, tenantId);
         const quantidade = input.quantidade ?? 1;
         const valorUnitario = input.valor_unitario ?? 0;
         const valorTotal = input.valor_total ?? quantidade * valorUnitario;
         const inserted = await prisma.$queryRaw(Prisma.sql `
       INSERT INTO central_beneficio (
-        beneficiario_id, familia_id, data, tipo, item, quantidade, valor_unitario, valor_total, origem_recurso, projeto_programa, profissional_responsavel, observacoes, ciente_alertas, criado_por_usuario_id, criado_por_nome, criado_em, atualizado_em
+        tenant_id, beneficiario_id, familia_id, data, tipo, item, quantidade, valor_unitario, valor_total, origem_recurso, projeto_programa, profissional_responsavel, observacoes, ciente_alertas, criado_por_usuario_id, criado_por_nome, criado_em, atualizado_em
       ) VALUES (
-        ${beneficiarioId}, ${familiaId}, ${toOptionalDate(input.data)}, ${input.tipo}, ${input.item}, ${quantidade}, ${valorUnitario}, ${valorTotal}, ${trimOrUndefined(input.origem_recurso)}, ${trimOrUndefined(input.projeto_programa)}, ${input.profissional_responsavel}, ${trimOrUndefined(input.observacoes)}, ${Boolean(input.ciente_alertas)}, ${usuario?.id ? BigInt(usuario.id) : null}, ${trimOrUndefined(usuario?.nome ?? usuario?.nomeUsuario)}, NOW(), NOW()
+        ${tenantId}::uuid, ${beneficiarioId}, ${familiaId}, ${toOptionalDate(input.data)}, ${input.tipo}, ${input.item}, ${quantidade}, ${valorUnitario}, ${valorTotal}, ${trimOrUndefined(input.origem_recurso)}, ${trimOrUndefined(input.projeto_programa)}, ${input.profissional_responsavel}, ${trimOrUndefined(input.observacoes)}, ${Boolean(input.ciente_alertas)}, ${usuario?.id ? BigInt(usuario.id) : null}, ${trimOrUndefined(usuario?.nome ?? usuario?.nomeUsuario)}, NOW(), NOW()
       )
       RETURNING id
     `);
-        await this.registrarAuditoria(beneficiarioId, familiaId, "central_beneficio", inserted[0]?.id, "criar", `Benefício ${input.tipo} / ${input.item} registrado.`, { ...input, valor_total: valorTotal }, usuario);
-        return this.listarBeneficios(beneficiarioId);
+        await this.registrarAuditoria(beneficiarioId, familiaId, "central_beneficio", inserted[0]?.id, "criar", `Benefício ${input.tipo} / ${input.item} registrado.`, { ...input, valor_total: valorTotal }, usuario, tenantId);
+        return this.listarBeneficios(beneficiarioId, tenantId);
     }
-    async atualizarBeneficio(id, beneficiarioId, input, usuario) {
+    async atualizarBeneficio(id, beneficiarioId, input, usuario, tenantId) {
         await this.ensureEstrutura();
-        const familiaId = await this.buscarFamiliaId(beneficiarioId);
+        if (!tenantId)
+            throw new AppError("Tenant da sessao nao identificado.", 401);
+        await this.validarBeneficiarioTenant(beneficiarioId, tenantId);
+        const familiaId = await this.buscarFamiliaId(beneficiarioId, tenantId);
         const quantidade = input.quantidade ?? 1;
         const valorUnitario = input.valor_unitario ?? 0;
         const valorTotal = input.valor_total ?? quantidade * valorUnitario;
@@ -440,26 +499,33 @@ export class CentralAtendimentosRepository {
         atualizado_em = NOW()
       WHERE id = ${id}
         AND beneficiario_id = ${beneficiarioId}
+        AND tenant_id::text = ${tenantId}
     `);
-        await this.registrarAuditoria(beneficiarioId, familiaId, "central_beneficio", id, "editar", `Benefício ${input.tipo} / ${input.item} atualizado.`, { ...input, valor_total: valorTotal }, usuario);
-        return this.listarBeneficios(beneficiarioId);
+        await this.registrarAuditoria(beneficiarioId, familiaId, "central_beneficio", id, "editar", `Benefício ${input.tipo} / ${input.item} atualizado.`, { ...input, valor_total: valorTotal }, usuario, tenantId);
+        return this.listarBeneficios(beneficiarioId, tenantId);
     }
-    async removerBeneficio(id, beneficiarioId, usuario) {
+    async removerBeneficio(id, beneficiarioId, usuario, tenantId) {
         await this.ensureEstrutura();
-        const familiaId = await this.buscarFamiliaId(beneficiarioId);
+        if (!tenantId)
+            throw new AppError("Tenant da sessao nao identificado.", 401);
+        await this.validarBeneficiarioTenant(beneficiarioId, tenantId);
+        const familiaId = await this.buscarFamiliaId(beneficiarioId, tenantId);
         await prisma.$executeRaw(Prisma.sql `
       DELETE FROM central_beneficio
       WHERE id = ${id}
         AND beneficiario_id = ${beneficiarioId}
+        AND tenant_id::text = ${tenantId}
     `);
-        await this.registrarAuditoria(beneficiarioId, familiaId, "central_beneficio", id, "excluir", "Benefício removido da Central.", { id: String(id) }, usuario);
+        await this.registrarAuditoria(beneficiarioId, familiaId, "central_beneficio", id, "excluir", "Benefício removido da Central.", { id: String(id) }, usuario, tenantId);
     }
-    async listarEncaminhamentos(beneficiarioId) {
+    async listarEncaminhamentos(beneficiarioId, tenantId) {
         await this.ensureEstrutura();
+        await this.validarBeneficiarioTenant(beneficiarioId, tenantId);
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT id, data, tipo, destino, profissional, motivo, retorno_esperado, status, observacoes
       FROM central_encaminhamento
       WHERE beneficiario_id = ${beneficiarioId}
+        AND tenant_id::text = ${tenantId}
       ORDER BY data DESC, id DESC
     `);
         return rows.map((row) => ({
@@ -474,23 +540,29 @@ export class CentralAtendimentosRepository {
             observacoes: row.observacoes ? String(row.observacoes) : undefined
         }));
     }
-    async criarEncaminhamento(beneficiarioId, input, usuario) {
+    async criarEncaminhamento(beneficiarioId, input, usuario, tenantId) {
         await this.ensureEstrutura();
-        const familiaId = await this.buscarFamiliaId(beneficiarioId);
+        if (!tenantId)
+            throw new AppError("Tenant da sessao nao identificado.", 401);
+        await this.validarBeneficiarioTenant(beneficiarioId, tenantId);
+        const familiaId = await this.buscarFamiliaId(beneficiarioId, tenantId);
         const inserted = await prisma.$queryRaw(Prisma.sql `
       INSERT INTO central_encaminhamento (
-        beneficiario_id, familia_id, data, tipo, destino, profissional, motivo, retorno_esperado, status, observacoes, criado_por_usuario_id, criado_por_nome, criado_em, atualizado_em
+        tenant_id, beneficiario_id, familia_id, data, tipo, destino, profissional, motivo, retorno_esperado, status, observacoes, criado_por_usuario_id, criado_por_nome, criado_em, atualizado_em
       ) VALUES (
-        ${beneficiarioId}, ${familiaId}, ${toOptionalDate(input.data)}, ${input.tipo}, ${input.destino}, ${input.profissional}, ${input.motivo}, ${toOptionalDate(input.retorno_esperado)}, ${trimOrUndefined(input.status) ?? "Pendente"}, ${trimOrUndefined(input.observacoes)}, ${usuario?.id ? BigInt(usuario.id) : null}, ${trimOrUndefined(usuario?.nome ?? usuario?.nomeUsuario)}, NOW(), NOW()
+        ${tenantId}::uuid, ${beneficiarioId}, ${familiaId}, ${toOptionalDate(input.data)}, ${input.tipo}, ${input.destino}, ${input.profissional}, ${input.motivo}, ${toOptionalDate(input.retorno_esperado)}, ${trimOrUndefined(input.status) ?? "Pendente"}, ${trimOrUndefined(input.observacoes)}, ${usuario?.id ? BigInt(usuario.id) : null}, ${trimOrUndefined(usuario?.nome ?? usuario?.nomeUsuario)}, NOW(), NOW()
       )
       RETURNING id
     `);
-        await this.registrarAuditoria(beneficiarioId, familiaId, "central_encaminhamento", inserted[0]?.id, "criar", `Encaminhamento ${input.tipo} para ${input.destino} registrado.`, input, usuario);
-        return this.listarEncaminhamentos(beneficiarioId);
+        await this.registrarAuditoria(beneficiarioId, familiaId, "central_encaminhamento", inserted[0]?.id, "criar", `Encaminhamento ${input.tipo} para ${input.destino} registrado.`, input, usuario, tenantId);
+        return this.listarEncaminhamentos(beneficiarioId, tenantId);
     }
-    async atualizarEncaminhamento(id, beneficiarioId, input, usuario) {
+    async atualizarEncaminhamento(id, beneficiarioId, input, usuario, tenantId) {
         await this.ensureEstrutura();
-        const familiaId = await this.buscarFamiliaId(beneficiarioId);
+        if (!tenantId)
+            throw new AppError("Tenant da sessao nao identificado.", 401);
+        await this.validarBeneficiarioTenant(beneficiarioId, tenantId);
+        const familiaId = await this.buscarFamiliaId(beneficiarioId, tenantId);
         await prisma.$executeRaw(Prisma.sql `
       UPDATE central_encaminhamento
       SET
@@ -505,38 +577,43 @@ export class CentralAtendimentosRepository {
         atualizado_em = NOW()
       WHERE id = ${id}
         AND beneficiario_id = ${beneficiarioId}
+        AND tenant_id::text = ${tenantId}
     `);
-        await this.registrarAuditoria(beneficiarioId, familiaId, "central_encaminhamento", id, "editar", `Encaminhamento ${input.tipo} para ${input.destino} atualizado.`, input, usuario);
-        return this.listarEncaminhamentos(beneficiarioId);
+        await this.registrarAuditoria(beneficiarioId, familiaId, "central_encaminhamento", id, "editar", `Encaminhamento ${input.tipo} para ${input.destino} atualizado.`, input, usuario, tenantId);
+        return this.listarEncaminhamentos(beneficiarioId, tenantId);
     }
-    async removerEncaminhamento(id, beneficiarioId, usuario) {
+    async removerEncaminhamento(id, beneficiarioId, usuario, tenantId) {
         await this.ensureEstrutura();
-        const familiaId = await this.buscarFamiliaId(beneficiarioId);
+        if (!tenantId)
+            throw new AppError("Tenant da sessao nao identificado.", 401);
+        await this.validarBeneficiarioTenant(beneficiarioId, tenantId);
+        const familiaId = await this.buscarFamiliaId(beneficiarioId, tenantId);
         await prisma.$executeRaw(Prisma.sql `
       DELETE FROM central_encaminhamento
       WHERE id = ${id}
         AND beneficiario_id = ${beneficiarioId}
+        AND tenant_id::text = ${tenantId}
     `);
-        await this.registrarAuditoria(beneficiarioId, familiaId, "central_encaminhamento", id, "excluir", "Encaminhamento removido da Central.", { id: String(id) }, usuario);
+        await this.registrarAuditoria(beneficiarioId, familiaId, "central_encaminhamento", id, "excluir", "Encaminhamento removido da Central.", { id: String(id) }, usuario, tenantId);
     }
-    async listarHistorico(beneficiarioId) {
-        const visao = await this.obterVisaoGeral(beneficiarioId);
+    async listarHistorico(beneficiarioId, tenantId) {
+        const visao = await this.obterVisaoGeral(beneficiarioId, tenantId);
         return visao.historico;
     }
-    async listarCustos(beneficiarioId) {
-        const visao = await this.obterVisaoGeral(beneficiarioId);
+    async listarCustos(beneficiarioId, tenantId) {
+        const visao = await this.obterVisaoGeral(beneficiarioId, tenantId);
         return visao.custos;
     }
-    async listarGrupoFamiliar(beneficiarioId) {
-        const visao = await this.obterVisaoGeral(beneficiarioId);
+    async listarGrupoFamiliar(beneficiarioId, tenantId) {
+        const visao = await this.obterVisaoGeral(beneficiarioId, tenantId);
         return visao.grupoFamiliar;
     }
-    async listarAlertas(beneficiarioId) {
-        const visao = await this.obterVisaoGeral(beneficiarioId);
+    async listarAlertas(beneficiarioId, tenantId) {
+        const visao = await this.obterVisaoGeral(beneficiarioId, tenantId);
         return visao.alertas;
     }
-    async gerarRelatorio(beneficiarioId, tipo) {
-        const visao = await this.obterVisaoGeral(beneficiarioId);
+    async gerarRelatorio(beneficiarioId, tipo, tenantId) {
+        const visao = await this.obterVisaoGeral(beneficiarioId, tenantId);
         if (tipo === "familiar")
             return { tipo, emitidoEm: new Date().toISOString(), familia: visao.grupoFamiliar, alertas: visao.alertas };
         if (tipo === "social")
@@ -545,7 +622,7 @@ export class CentralAtendimentosRepository {
             return { tipo, emitidoEm: new Date().toISOString(), beneficiario: visao.beneficiario, beneficios: visao.beneficios, custos: visao.custos };
         return { tipo, emitidoEm: new Date().toISOString(), ...visao };
     }
-    async buscarResumoBeneficiario(beneficiarioId) {
+    async buscarResumoBeneficiario(beneficiarioId, tenantId) {
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT
         b.id, b.codigo, b.nome_completo, b.data_nascimento, b.sexo_biologico, b.status, b.nome_mae, b.foto_3x4,
@@ -569,10 +646,11 @@ export class CentralAtendimentosRepository {
         SELECT m.vinculo_familiar_id AS familia_id
         FROM vinculo_familiar_membro m
         WHERE m.beneficiario_id = b.id
+          AND m.tenant_id::text = ${tenantId}
         ORDER BY m.id ASC
         LIMIT 1
       ) fm ON TRUE
-      LEFT JOIN vinculo_familiar f ON f.id = fm.familia_id
+      LEFT JOIN vinculo_familiar f ON f.id = fm.familia_id AND f.tenant_id::text = ${tenantId}
       LEFT JOIN LATERAL (
         SELECT br.nome_completo
         FROM vinculo_familiar_membro m
@@ -583,29 +661,33 @@ export class CentralAtendimentosRepository {
         LIMIT 1
       ) responsavel ON TRUE
       WHERE b.id = ${beneficiarioId}
+        AND b.tenant_id::text = ${tenantId}
       LIMIT 1
     `);
         return rows[0] ?? null;
     }
-    async buscarFamiliaId(beneficiarioId) {
+    async buscarFamiliaId(beneficiarioId, tenantId) {
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT vinculo_familiar_id AS familia_id
       FROM vinculo_familiar_membro
       WHERE beneficiario_id = ${beneficiarioId}
+        AND tenant_id::text = ${tenantId}
       ORDER BY id ASC
       LIMIT 1
     `);
         return rows[0]?.familia_id ?? null;
     }
-    async obterGrupoFamiliar(beneficiarioId) {
-        const familiaId = await this.buscarFamiliaId(beneficiarioId);
+    async obterGrupoFamiliar(beneficiarioId, tenantId) {
+        const familiaId = await this.buscarFamiliaId(beneficiarioId, tenantId);
         if (!familiaId)
             return null;
+        await this.validarFamiliaTenant(familiaId, tenantId);
         const [familiaRows, membrosRows, custoRows] = await Promise.all([
             prisma.$queryRaw(Prisma.sql `
         SELECT id, nome_familia, logradouro, numero, bairro, municipio, uf, status, arranjo_familiar
         FROM vinculo_familiar
         WHERE id = ${familiaId}
+          AND tenant_id::text = ${tenantId}
         LIMIT 1
       `),
             prisma.$queryRaw(Prisma.sql `
@@ -621,6 +703,8 @@ export class CentralAtendimentosRepository {
         INNER JOIN cadastro_beneficiario b ON b.id = m.beneficiario_id
         LEFT JOIN contato_beneficiario c ON c.beneficiario_id = b.id
         WHERE m.vinculo_familiar_id = ${familiaId}
+          AND m.tenant_id::text = ${tenantId}
+          AND b.tenant_id::text = ${tenantId}
         ORDER BY COALESCE(m.responsavel_familiar, FALSE) DESC, b.nome_completo ASC
       `),
             prisma.$queryRaw(Prisma.sql `
@@ -630,6 +714,7 @@ export class CentralAtendimentosRepository {
           COALESCE(SUM(valor_total), 0)::float8 AS custo_total
         FROM central_beneficio
         WHERE familia_id = ${familiaId}
+          AND tenant_id::text = ${tenantId}
       `)
         ]);
         const familia = familiaRows[0];
@@ -639,6 +724,7 @@ export class CentralAtendimentosRepository {
       SELECT COUNT(*)::integer AS total
       FROM central_beneficio
       WHERE familia_id = ${familiaId}
+        AND tenant_id::text = ${tenantId}
         AND data >= ${inicioMesAtual()}
         AND (LOWER(COALESCE(tipo, '')) LIKE '%cesta%' OR LOWER(COALESCE(item, '')) LIKE '%cesta%')
     `);
@@ -664,7 +750,7 @@ export class CentralAtendimentosRepository {
             alertas: toNumber(cestasMes[0]?.total) > 0 ? ["Membro da família já recebeu cesta básica neste mês."] : []
         };
     }
-    async listarInscricoes(beneficiario) {
+    async listarInscricoes(beneficiario, tenantId) {
         const cpf = normalizeDigits(beneficiario.cpf);
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT
@@ -673,10 +759,14 @@ export class CentralAtendimentosRepository {
       FROM cursos_atendimentos_matriculas m
       INNER JOIN cursos_atendimentos c ON c.id = m.curso_id
       LEFT JOIN salas_unidade s ON s.id = c.sala_id
-      WHERE (
+      WHERE c.tenant_id::text = ${tenantId}
+        AND m.tenant_id::text = ${tenantId}
+        AND (
         ${cpf ? Prisma.sql `regexp_replace(COALESCE(m.cpf, ''), '[^0-9]', '', 'g') = ${cpf}` : Prisma.sql `1 = 0`}
       ) OR (
-        LOWER(TRIM(COALESCE(m.beneficiario_nome, ''))) = LOWER(TRIM(${beneficiario.nome_completo}))
+        c.tenant_id::text = ${tenantId}
+        AND m.tenant_id::text = ${tenantId}
+        AND LOWER(TRIM(COALESCE(m.beneficiario_nome, ''))) = LOWER(TRIM(${beneficiario.nome_completo}))
       )
       ORDER BY COALESCE(m.data_matricula, m.data_agendada) DESC NULLS LAST, m.id DESC
     `);
@@ -692,7 +782,7 @@ export class CentralAtendimentosRepository {
             dataInscricao: formatIsoDate(row.data_matricula ?? row.data_agendada)
         }));
     }
-    async listarDoacoes(beneficiarioId, familiaId) {
+    async listarDoacoes(beneficiarioId, tenantId, familiaId) {
         const destinatario = familiaId
             ? Prisma.sql `(d.beneficiario_id = ${beneficiarioId} OR d.vinculo_familiar_id = ${familiaId})`
             : Prisma.sql `d.beneficiario_id = ${beneficiarioId}`;
@@ -703,7 +793,9 @@ export class CentralAtendimentosRepository {
       FROM doacao_realizada d
       INNER JOIN doacao_realizada_item di ON di.doacao_realizada_id = d.id
       INNER JOIN almoxarifado_item ai ON ai.id = di.almoxarifado_item_id
-      WHERE ${destinatario}
+      WHERE d.tenant_id::text = ${tenantId}
+        AND ai.tenant_id::text = ${tenantId}
+        AND ${destinatario}
       ORDER BY d.data_doacao DESC, d.id DESC
     `);
         return rows.map((row) => {
@@ -818,12 +910,12 @@ export class CentralAtendimentosRepository {
             alertar_inscricao_ativa: Boolean(valor?.alertar_inscricao_ativa ?? true)
         };
     }
-    async registrarAuditoria(beneficiarioId, familiaId, entidade, entidadeId, acao, descricao, dadosNovos, usuario) {
+    async registrarAuditoria(beneficiarioId, familiaId, entidade, entidadeId, acao, descricao, dadosNovos, usuario, tenantId) {
         await prisma.$executeRaw(Prisma.sql `
       INSERT INTO central_auditoria (
-        beneficiario_id, familia_id, entidade, entidade_id, acao, descricao, dados_novos, usuario_id, usuario_nome, criado_em
+        tenant_id, beneficiario_id, familia_id, entidade, entidade_id, acao, descricao, dados_novos, usuario_id, usuario_nome, criado_em
       ) VALUES (
-        ${beneficiarioId}, ${familiaId}, ${entidade}, ${entidadeId ?? null}, ${acao}, ${descricao}, ${dadosNovos ? dadosNovos : null}, ${usuario?.id ? BigInt(usuario.id) : null}, ${trimOrUndefined(usuario?.nome ?? usuario?.nomeUsuario)}, NOW()
+        ${tenantId ? Prisma.sql `${tenantId}::uuid` : Prisma.sql `NULL`}, ${beneficiarioId}, ${familiaId}, ${entidade}, ${entidadeId ?? null}, ${acao}, ${descricao}, ${dadosNovos ? dadosNovos : null}, ${usuario?.id ? BigInt(usuario.id) : null}, ${trimOrUndefined(usuario?.nome ?? usuario?.nomeUsuario)}, NOW()
       )
     `);
     }

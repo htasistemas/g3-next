@@ -23,8 +23,8 @@ export class ChamadoTecnicoController {
         const resultado = await service.buscarPorId(request.params.id, request.authUser);
         return response.json(resultado);
     }
-    async listarCatalogo(_request, response) {
-        const resultado = await service.listarCatalogo();
+    async listarCatalogo(request, response) {
+        const resultado = await service.listarCatalogo(request.authUser);
         return response.json(resultado);
     }
     async criar(request, response) {
@@ -81,11 +81,11 @@ export class ChamadoTecnicoController {
         return response.status(204).send();
     }
     async salvarParametro(request, response) {
-        const resultado = await service.salvarParametro(request.body);
+        const resultado = await service.salvarParametro(request.body, request.authUser);
         return response.status(201).json(resultado);
     }
     async atualizarParametro(request, response) {
-        const resultado = await service.salvarParametro(request.body, request.params.parametroId);
+        const resultado = await service.salvarParametro(request.body, request.authUser, request.params.parametroId);
         return response.json(resultado);
     }
 }

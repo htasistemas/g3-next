@@ -10,6 +10,7 @@ const permissaoExclusao = ["ADMINISTRADOR"];
 autorizacaoComprasRoutes.get("/indicadores", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listarIndicadores.bind(controller)));
 autorizacaoComprasRoutes.get("/catalogo/setores-solicitantes", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listarSetoresSolicitantes.bind(controller)));
 autorizacaoComprasRoutes.get("/fornecedores/cnpj/:cnpj", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.buscarFornecedorPorCnpj.bind(controller)));
+autorizacaoComprasRoutes.get("/fornecedores/documentos/:tipo/:documento", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.consultarDocumentoFornecedor.bind(controller)));
 autorizacaoComprasRoutes.get("/", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listar.bind(controller)));
 autorizacaoComprasRoutes.post("/", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.criar.bind(controller)));
 autorizacaoComprasRoutes.get("/:id", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.buscarDetalhe.bind(controller)));

@@ -29,6 +29,18 @@ export class UsuarioController {
     return response.json({ permissoes });
   }
 
+  async listarAcessos(request: AuthenticatedRequest, response: Response) {
+    return response.json({ acessos: await service.listarAcessos(request.params.id, this.buildAtor(request)) });
+  }
+
+  async substituirAcessos(request: AuthenticatedRequest, response: Response) {
+    return response.json({ acessos: await service.substituirAcessos(request.params.id, request.body, this.buildAtor(request)) });
+  }
+
+  async listarCatalogoAcessos(request: AuthenticatedRequest, response: Response) {
+    return response.json(await service.listarCatalogoAcessos(this.buildAtor(request)));
+  }
+
   async buscarFace(request: AuthenticatedRequest, response: Response) {
     const resultado = await service.buscarFace(request.params.id, this.buildAtor(request));
     return response.json(resultado);

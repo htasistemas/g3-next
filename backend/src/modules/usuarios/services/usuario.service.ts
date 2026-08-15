@@ -15,6 +15,7 @@ import {
 } from "../usuario.schema.js";
 import { mapPermissoesParaCatalogo } from "../usuario.mapper.js";
 import { UsuarioRepository } from "../repositories/usuario.repository.js";
+import { UsuarioAcessoRepository } from "../repositories/usuario-acesso.repository.js";
 
 type AtorRaw = {
   id?: string;
@@ -25,6 +26,28 @@ type AtorRaw = {
 
 export class UsuarioService {
   private readonly repository = new UsuarioRepository();
+  private readonly acessoRepository = new UsuarioAcessoRepository();
+
+  async listarAcessos(rawId: string, atorRaw: AtorRaw) {
+    const id = this.parseId(rawId);
+    const ator = this.parseAtor(atorRaw);
+    await this.validarProtecaoAdmin(id, ator.tenant_id);
+    return this.acessoRepository.listar(id.toString(), ator.instituicao_id);
+  }
+
+  async substituirAcessos(rawId: string, rawInput: unknown, atorRaw: AtorRaw) {
+    const id = this.parseId(rawId);
+    const ator = this.parseAtor(atorRaw);
+    await this.validarProtecaoAdmin(id, ator.tenant_id);
+    const input = rawInput && typeof rawInput === "object" ? rawInput as { acessos?: unknown } : {};
+    if (!Array.isArray(input.acessos)) throw new AppError("Informe a lista de escopos de acesso.", 422);
+    return this.acessoRepository.substituir(id.toString(), ator.instituicao_id, input.acessos as any[]);
+  }
+
+  async listarCatalogoAcessos(atorRaw: AtorRaw) {
+    const ator = this.parseAtor(atorRaw);
+    return this.acessoRepository.listarCatalogo(ator.instituicao_id);
+  }
 
   async listar(rawFilters: unknown, atorRaw: AtorRaw) {
     const filtersNormalizados =

@@ -24,6 +24,7 @@ const estruturaSql = [
     `
     CREATE TABLE IF NOT EXISTS familia_historico (
       id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
       familia_id BIGINT NOT NULL,
       tipo_evento VARCHAR(80) NOT NULL,
       descricao TEXT NOT NULL,
@@ -60,7 +61,9 @@ const estruturaSql = [
     WHERE NOT EXISTS (
       SELECT 1 FROM beneficios_parametros WHERE LOWER(beneficio_nome) = LOWER('Cesta básica')
     )
-  `
+  `,
+    "ALTER TABLE familia_historico ADD COLUMN IF NOT EXISTS tenant_id UUID",
+    "CREATE INDEX IF NOT EXISTS familia_historico_tenant_familia_idx ON familia_historico(tenant_id, familia_id, data_evento DESC)",
 ];
 let estruturaPromise = null;
 function toBigInt(id) {
@@ -143,7 +146,17 @@ function normalizarEnderecoFamiliaOrigem(origem) {
     };
     return Object.values(endereco).some(Boolean) ? endereco : null;
 }
-async function buscarFamiliaPorIdTransacao(tx, id) {
+async function buscarFamiliaPorIdTransacao(tx, id, tenantId) {
+    const permitido = await tx.$queryRaw(Prisma.sql `
+    SELECT id
+    FROM vinculo_familiar
+    WHERE id = ${id}
+      AND tenant_id::text = ${tenantId}
+    LIMIT 1
+  `);
+    if (!permitido[0]) {
+        throw new AppError("Familia nao encontrada.", 404);
+    }
     const familia = (await tx.vinculoFamiliar.findUnique({
         where: { id },
         include: familiaInclude
@@ -153,14 +166,16 @@ async function buscarFamiliaPorIdTransacao(tx, id) {
     }
     return familia;
 }
-async function garantirBeneficiariosExistemTransacao(tx, ids) {
+async function garantirBeneficiariosExistemTransacao(tx, ids, tenantId) {
     if (!ids.length)
         return;
     const unicos = [...new Set(ids.map((id) => id.toString()))].map((id) => BigInt(id));
-    const beneficiarios = (await tx.cadastroBeneficiario.findMany({
-        where: { id: { in: unicos } },
-        select: { id: true }
-    }));
+    const beneficiarios = await tx.$queryRaw(Prisma.sql `
+    SELECT id
+    FROM cadastro_beneficiario
+    WHERE id IN (${Prisma.join(unicos)})
+      AND tenant_id::text = ${tenantId}
+  `);
     if (beneficiarios.length !== unicos.length) {
         throw new AppError("Um ou mais beneficiarios informados nao foram encontrados.", 404);
     }
@@ -197,6 +212,52 @@ async function obterEnderecoResponsavelTransacao(tx, beneficiarioId) {
         : null);
 }
 export class FamiliaRepository {
+    async buscarIdsFamiliasPorTenant(tenantId, filters) {
+        const conditions = [Prisma.sql `vf.tenant_id::text = ${tenantId}`];
+        const nome = trimOrUndefined(filters.nome_familia);
+        if (nome) {
+            conditions.push(Prisma.sql `vf.nome_familia ILIKE ${`%${nome}%`}`);
+        }
+        const municipio = trimOrUndefined(filters.municipio);
+        if (municipio) {
+            conditions.push(Prisma.sql `COALESCE(vf.municipio, '') ILIKE ${`%${municipio}%`}`);
+        }
+        const status = trimOrUndefined(filters.status);
+        if (status) {
+            conditions.push(Prisma.sql `vf.status = ${status}`);
+        }
+        const referencia = trimOrUndefined(filters.referencia);
+        if (referencia) {
+            const like = `%${referencia}%`;
+            conditions.push(Prisma.sql `(
+          COALESCE(cb.nome_completo, '') ILIKE ${like}
+          OR COALESCE(cb.nome_social, '') ILIKE ${like}
+          OR COALESCE(cb.codigo, '') ILIKE ${like}
+        )`);
+        }
+        const rows = await prisma.$queryRaw(Prisma.sql `
+      SELECT vf.id
+      FROM vinculo_familiar vf
+      LEFT JOIN cadastro_beneficiario cb ON cb.id = vf.id_referencia_familiar
+      WHERE ${Prisma.join(conditions, " AND ")}
+      ORDER BY vf.nome_familia ASC
+    `);
+        return rows.map((row) => row.id);
+    }
+    async aplicarTenantNaFamiliaTx(tx, familiaId, tenantId) {
+        await tx.$executeRaw(Prisma.sql `
+      UPDATE vinculo_familiar
+      SET tenant_id = ${tenantId}::uuid
+      WHERE id = ${familiaId}
+    `);
+    }
+    async aplicarTenantNosMembrosTx(tx, familiaId, tenantId) {
+        await tx.$executeRaw(Prisma.sql `
+      UPDATE vinculo_familiar_membro
+      SET tenant_id = ${tenantId}::uuid
+      WHERE vinculo_familiar_id = ${familiaId}
+    `);
+    }
     async sincronizarEnderecoBeneficiario(tx, beneficiarioId, endereco) {
         const beneficiario = await tx.cadastroBeneficiario.findUnique({
             where: { id: beneficiarioId },
@@ -271,70 +332,29 @@ export class FamiliaRepository {
             await this.sincronizarEnderecoBeneficiario(tx, toBigInt(membro.id_beneficiario), endereco);
         }
     }
-    async listar(filters) {
+    async listar(filters, tenantId) {
         await garantirEstrutura();
         const db = prisma;
-        const where = {};
-        const andFilters = [];
-        const nome = trimOrUndefined(filters.nome_familia);
-        if (nome) {
-            andFilters.push({ nomeFamilia: { contains: nome, mode: "insensitive" } });
+        const ids = await this.buscarIdsFamiliasPorTenant(tenantId, filters);
+        if (!ids.length) {
+            return [];
         }
-        const municipio = trimOrUndefined(filters.municipio);
-        if (municipio) {
-            andFilters.push({ municipio: { contains: municipio, mode: "insensitive" } });
-        }
-        const status = trimOrUndefined(filters.status);
-        if (status) {
-            andFilters.push({ status });
-        }
-        const referencia = trimOrUndefined(filters.referencia);
-        if (referencia) {
-            andFilters.push({
-                OR: [
-                    {
-                        referenciaFamiliar: {
-                            nomeCompleto: { contains: referencia, mode: "insensitive" }
-                        }
-                    },
-                    {
-                        referenciaFamiliar: {
-                            nomeSocial: { contains: referencia, mode: "insensitive" }
-                        }
-                    },
-                    {
-                        referenciaFamiliar: {
-                            codigo: { contains: referencia, mode: "insensitive" }
-                        }
-                    }
-                ]
-            });
-        }
-        if (andFilters.length) {
-            where.AND = andFilters;
-        }
-        return (await db.vinculoFamiliar.findMany({
-            where,
+        const familias = (await db.vinculoFamiliar.findMany({
+            where: { id: { in: ids } },
             include: familiaInclude,
             orderBy: [{ nomeFamilia: "asc" }]
         }));
+        const ordem = new Map(ids.map((id, index) => [id.toString(), index]));
+        return familias.sort((a, b) => (ordem.get(a.id.toString()) ?? 0) - (ordem.get(b.id.toString()) ?? 0));
     }
-    async buscarPorId(id) {
+    async buscarPorId(id, tenantId) {
         await garantirEstrutura();
-        const db = prisma;
-        return (await db.vinculoFamiliar.findUnique({
-            where: { id },
-            include: familiaInclude
-        }));
+        return buscarFamiliaPorIdTransacao(prisma, id, tenantId);
     }
-    async buscarPorIdOuFalhar(id) {
-        const familia = await this.buscarPorId(id);
-        if (!familia) {
-            throw new AppError("Familia nao encontrada.", 404);
-        }
-        return familia;
+    async buscarPorIdOuFalhar(id, tenantId) {
+        return this.buscarPorId(id, tenantId);
     }
-    async criar(input) {
+    async criar(input, tenantId) {
         await garantirEstrutura();
         const db = prisma;
         return db.$transaction(async (tx) => {
@@ -345,8 +365,8 @@ export class FamiliaRepository {
             const enderecoPrincipal = await this.resolverEnderecoPrincipal(tx, input, referenciaId);
             const membrosIds = (input.membros ?? []).map((membro) => toBigInt(membro.id_beneficiario));
             const idsValidar = [...(referenciaId ? [referenciaId] : []), ...membrosIds];
-            await garantirBeneficiariosExistemTransacao(tx, idsValidar);
-            await this.validarMembrosFamiliaAtiva(tx, idsValidar);
+            await garantirBeneficiariosExistemTransacao(tx, idsValidar, tenantId);
+            await this.validarMembrosFamiliaAtiva(tx, idsValidar, tenantId);
             const familia = await tx.vinculoFamiliar.create({
                 data: {
                     ...mapFamiliaData(input, now),
@@ -369,17 +389,19 @@ export class FamiliaRepository {
                 await tx.vinculoFamiliarMembro.createMany({
                     data: input.membros.map((membro) => mapMembroData(familia.id, membro, now))
                 });
+                await this.aplicarTenantNosMembrosTx(tx, familia.id, tenantId);
                 await this.sincronizarEnderecoFamiliarNosMembros(tx, input.membros, enderecoPrincipal);
             }
+            await this.aplicarTenantNaFamiliaTx(tx, familia.id, tenantId);
             await this.registrarHistorico(tx, familia.id, "familia_criada", "Família criada.", null, input);
-            return buscarFamiliaPorIdTransacao(tx, familia.id);
+            return buscarFamiliaPorIdTransacao(tx, familia.id, tenantId);
         });
     }
-    async atualizar(id, input) {
+    async atualizar(id, input, tenantId) {
         await garantirEstrutura();
         const db = prisma;
         return db.$transaction(async (tx) => {
-            const anterior = await buscarFamiliaPorIdTransacao(tx, id);
+            const anterior = await buscarFamiliaPorIdTransacao(tx, id, tenantId);
             const now = new Date();
             const referenciaId = input.id_referencia_familiar
                 ? toBigInt(input.id_referencia_familiar)
@@ -387,8 +409,8 @@ export class FamiliaRepository {
             const enderecoPrincipal = await this.resolverEnderecoPrincipal(tx, input, referenciaId);
             const membrosIds = (input.membros ?? []).map((membro) => toBigInt(membro.id_beneficiario));
             const idsValidar = [...(referenciaId ? [referenciaId] : []), ...membrosIds];
-            await garantirBeneficiariosExistemTransacao(tx, idsValidar);
-            await this.validarMembrosFamiliaAtiva(tx, idsValidar, id);
+            await garantirBeneficiariosExistemTransacao(tx, idsValidar, tenantId);
+            await this.validarMembrosFamiliaAtiva(tx, idsValidar, tenantId, id);
             await tx.vinculoFamiliar.update({
                 where: { id },
                 data: {
@@ -418,20 +440,21 @@ export class FamiliaRepository {
                     await tx.vinculoFamiliarMembro.createMany({
                         data: input.membros.map((membro) => mapMembroData(id, membro, now))
                     });
+                    await this.aplicarTenantNosMembrosTx(tx, id, tenantId);
                     await this.sincronizarEnderecoFamiliarNosMembros(tx, input.membros, enderecoPrincipal);
                 }
             }
             await this.registrarHistorico(tx, id, "familia_atualizada", "Dados da família atualizados.", anterior, input);
-            return buscarFamiliaPorIdTransacao(tx, id);
+            return buscarFamiliaPorIdTransacao(tx, id, tenantId);
         });
     }
-    async adicionarMembro(familiaId, input) {
+    async adicionarMembro(familiaId, input, tenantId) {
         await garantirEstrutura();
         const db = prisma;
         return db.$transaction(async (tx) => {
-            await buscarFamiliaPorIdTransacao(tx, familiaId);
-            await garantirBeneficiariosExistemTransacao(tx, [toBigInt(input.id_beneficiario)]);
-            await this.validarMembrosFamiliaAtiva(tx, [toBigInt(input.id_beneficiario)], familiaId);
+            await buscarFamiliaPorIdTransacao(tx, familiaId, tenantId);
+            await garantirBeneficiariosExistemTransacao(tx, [toBigInt(input.id_beneficiario)], tenantId);
+            await this.validarMembrosFamiliaAtiva(tx, [toBigInt(input.id_beneficiario)], tenantId, familiaId);
             const now = new Date();
             const existente = await tx.vinculoFamiliarMembro.findFirst({
                 where: {
@@ -458,9 +481,10 @@ export class FamiliaRepository {
                 await tx.vinculoFamiliarMembro.create({
                     data: mapMembroData(familiaId, input, now)
                 });
+                await this.aplicarTenantNosMembrosTx(tx, familiaId, tenantId);
             }
             if (input.usa_endereco_familia !== false) {
-                const familiaAtualizada = await buscarFamiliaPorIdTransacao(tx, familiaId);
+                const familiaAtualizada = await buscarFamiliaPorIdTransacao(tx, familiaId, tenantId);
                 const enderecoPrincipal = normalizarEnderecoFamiliaOrigem({
                     cep: familiaAtualizada.cep ?? undefined,
                     logradouro: familiaAtualizada.logradouro ?? undefined,
@@ -484,15 +508,15 @@ export class FamiliaRepository {
                 data: { qtdMembros: totalMembros, atualizadoEm: now }
             });
             await this.registrarHistorico(tx, familiaId, "membro_adicionado", "Membro adicionado à família.", null, input);
-            return buscarFamiliaPorIdTransacao(tx, familiaId);
+            return buscarFamiliaPorIdTransacao(tx, familiaId, tenantId);
         });
     }
-    async atualizarMembro(familiaId, membroId, input) {
+    async atualizarMembro(familiaId, membroId, input, tenantId) {
         await garantirEstrutura();
         const db = prisma;
         return db.$transaction(async (tx) => {
-            await buscarFamiliaPorIdTransacao(tx, familiaId);
-            await garantirBeneficiariosExistemTransacao(tx, [toBigInt(input.id_beneficiario)]);
+            await buscarFamiliaPorIdTransacao(tx, familiaId, tenantId);
+            await garantirBeneficiariosExistemTransacao(tx, [toBigInt(input.id_beneficiario)], tenantId);
             const now = new Date();
             const membro = await tx.vinculoFamiliarMembro.findUnique({
                 where: { id: membroId }
@@ -500,7 +524,7 @@ export class FamiliaRepository {
             if (!membro || membro.vinculoFamiliarId !== familiaId) {
                 throw new AppError("Membro nao pertence a familia informada.", 400);
             }
-            await this.validarMembrosFamiliaAtiva(tx, [toBigInt(input.id_beneficiario)], familiaId);
+            await this.validarMembrosFamiliaAtiva(tx, [toBigInt(input.id_beneficiario)], tenantId, familiaId);
             await tx.vinculoFamiliarMembro.update({
                 where: { id: membroId },
                 data: {
@@ -516,7 +540,7 @@ export class FamiliaRepository {
                 }
             });
             if (input.usa_endereco_familia !== false) {
-                const familiaAtualizada = await buscarFamiliaPorIdTransacao(tx, familiaId);
+                const familiaAtualizada = await buscarFamiliaPorIdTransacao(tx, familiaId, tenantId);
                 const enderecoPrincipal = normalizarEnderecoFamiliaOrigem({
                     cep: familiaAtualizada.cep ?? undefined,
                     logradouro: familiaAtualizada.logradouro ?? undefined,
@@ -537,14 +561,14 @@ export class FamiliaRepository {
                 data: { atualizadoEm: now }
             });
             await this.registrarHistorico(tx, familiaId, "membro_atualizado", "Membro da família atualizado.", membro, input);
-            return buscarFamiliaPorIdTransacao(tx, familiaId);
+            return buscarFamiliaPorIdTransacao(tx, familiaId, tenantId);
         });
     }
-    async removerMembro(familiaId, membroId) {
+    async removerMembro(familiaId, membroId, tenantId) {
         await garantirEstrutura();
         const db = prisma;
         await db.$transaction(async (tx) => {
-            const familia = await buscarFamiliaPorIdTransacao(tx, familiaId);
+            const familia = await buscarFamiliaPorIdTransacao(tx, familiaId, tenantId);
             const membro = await tx.vinculoFamiliarMembro.findUnique({
                 where: { id: membroId }
             });
@@ -570,10 +594,10 @@ export class FamiliaRepository {
             await this.registrarHistorico(tx, familiaId, "membro_removido", "Membro removido da família.", membro, null);
         });
     }
-    async remover(familiaId) {
+    async remover(familiaId, tenantId) {
         await garantirEstrutura();
         await prisma.$transaction(async (tx) => {
-            const familia = await buscarFamiliaPorIdTransacao(tx, familiaId);
+            const familia = await buscarFamiliaPorIdTransacao(tx, familiaId, tenantId);
             await tx.vinculoFamiliar.update({
                 where: { id: familiaId },
                 data: { status: "INATIVO", atualizadoEm: new Date() }
@@ -581,13 +605,14 @@ export class FamiliaRepository {
             await this.registrarHistorico(tx, familiaId, "familia_inativada", "Família inativada.", familia, { status: "INATIVO" });
         });
     }
-    async listarHistorico(familiaId) {
+    async listarHistorico(familiaId, tenantId) {
         await garantirEstrutura();
-        await this.buscarPorIdOuFalhar(familiaId);
+        await this.buscarPorIdOuFalhar(familiaId, tenantId);
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT id, tipo_evento, descricao, justificativa, usuario_nome, data_evento
       FROM familia_historico
       WHERE familia_id = ${familiaId}
+        AND (tenant_id::text = ${tenantId} OR tenant_id IS NULL)
       ORDER BY data_evento DESC, id DESC
     `);
         return rows.map((row) => ({
@@ -599,9 +624,9 @@ export class FamiliaRepository {
             data_evento: row.data_evento instanceof Date ? row.data_evento.toISOString() : String(row.data_evento ?? "")
         }));
     }
-    async listarAlertas(familiaId) {
+    async listarAlertas(familiaId, tenantId) {
         await garantirEstrutura();
-        const familia = await this.buscarPorIdOuFalhar(familiaId);
+        const familia = await this.buscarPorIdOuFalhar(familiaId, tenantId);
         const alertas = [];
         const responsaveis = familia.membros.filter((membro) => Boolean(membro.responsavelFamiliar));
         if (responsaveis.length !== 1) {
@@ -634,10 +659,11 @@ export class FamiliaRepository {
         }
         return alertas;
     }
-    async definirResponsavel(familiaId, beneficiarioId) {
+    async definirResponsavel(familiaId, beneficiarioId, tenantId) {
         await garantirEstrutura();
         return prisma.$transaction(async (tx) => {
-            const familia = await buscarFamiliaPorIdTransacao(tx, familiaId);
+            const familia = await buscarFamiliaPorIdTransacao(tx, familiaId, tenantId);
+            await garantirBeneficiariosExistemTransacao(tx, [beneficiarioId], tenantId);
             const alvo = familia.membros.find((membro) => membro.beneficiarioId === beneficiarioId);
             if (!alvo) {
                 throw new AppError("O responsável deve pertencer à família.", 400);
@@ -690,13 +716,13 @@ export class FamiliaRepository {
                 }
             }
             await this.registrarHistorico(tx, familiaId, "responsavel_alterado", "Responsável familiar alterado.", null, { beneficiario_id: String(beneficiarioId) });
-            return buscarFamiliaPorIdTransacao(tx, familiaId);
+            return buscarFamiliaPorIdTransacao(tx, familiaId, tenantId);
         });
     }
-    async atualizarEndereco(familiaId, input) {
+    async atualizarEndereco(familiaId, input, tenantId) {
         await garantirEstrutura();
         return prisma.$transaction(async (tx) => {
-            const familia = await buscarFamiliaPorIdTransacao(tx, familiaId);
+            const familia = await buscarFamiliaPorIdTransacao(tx, familiaId, tenantId);
             await tx.vinculoFamiliar.update({
                 where: { id: familiaId },
                 data: {
@@ -723,17 +749,21 @@ export class FamiliaRepository {
                 })), enderecoPrincipal);
             }
             await this.registrarHistorico(tx, familiaId, "endereco_alterado", "Endereço familiar alterado.", familia, input);
-            return buscarFamiliaPorIdTransacao(tx, familiaId);
+            return buscarFamiliaPorIdTransacao(tx, familiaId, tenantId);
         });
     }
-    async validarBeneficioFamiliar(familiaId, beneficioNome, carenciaDias) {
+    async validarBeneficioFamiliar(familiaId, beneficioNome, carenciaDias, tenantId) {
         await garantirEstrutura();
+        if (tenantId) {
+            await this.buscarPorIdOuFalhar(familiaId, tenantId);
+        }
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT d.data_doacao, b.nome_completo
       FROM doacao_realizada d
       LEFT JOIN cadastro_beneficiario b ON b.id = d.beneficiario_id
       LEFT JOIN doacao_realizada_item di ON di.doacao_realizada_id = d.id
       WHERE d.vinculo_familiar_id = ${familiaId}
+        ${tenantId ? Prisma.sql `AND d.tenant_id::text = ${tenantId}` : Prisma.empty}
         AND (
           LOWER(COALESCE(d.tipo_doacao, '')) LIKE LOWER(${`%${beneficioNome}%`})
           OR LOWER(COALESCE(di.descricao_item, '')) LIKE LOWER(${`%${beneficioNome}%`})
@@ -768,10 +798,10 @@ export class FamiliaRepository {
                 : undefined
         };
     }
-    async transferirMembro(familiaOrigemId, input) {
+    async transferirMembro(familiaOrigemId, input, tenantId) {
         await garantirEstrutura();
         return prisma.$transaction(async (tx) => {
-            const familiaOrigem = await buscarFamiliaPorIdTransacao(tx, familiaOrigemId);
+            const familiaOrigem = await buscarFamiliaPorIdTransacao(tx, familiaOrigemId, tenantId);
             const membro = familiaOrigem.membros.find((item) => item.id === BigInt(input.id_membro));
             if (!membro) {
                 throw new AppError("Membro não encontrado na família de origem.", 404);
@@ -780,8 +810,8 @@ export class FamiliaRepository {
                 throw new AppError("Defina outro responsável antes de transferir o responsável familiar.", 400);
             }
             const familiaDestinoId = BigInt(input.familia_destino_id);
-            await buscarFamiliaPorIdTransacao(tx, familiaDestinoId);
-            await this.validarMembrosFamiliaAtiva(tx, [membro.beneficiarioId], familiaDestinoId);
+            await buscarFamiliaPorIdTransacao(tx, familiaDestinoId, tenantId);
+            await this.validarMembrosFamiliaAtiva(tx, [membro.beneficiarioId], tenantId, familiaDestinoId);
             await tx.vinculoFamiliarMembro.delete({ where: { id: membro.id } });
             await tx.vinculoFamiliarMembro.create({
                 data: {
@@ -798,6 +828,7 @@ export class FamiliaRepository {
                     atualizadoEm: new Date()
                 }
             });
+            await this.aplicarTenantNosMembrosTx(tx, familiaDestinoId, tenantId);
             const totalOrigem = await tx.vinculoFamiliarMembro.count({ where: { vinculoFamiliarId: familiaOrigemId } });
             const totalDestino = await tx.vinculoFamiliarMembro.count({ where: { vinculoFamiliarId: familiaDestinoId } });
             await tx.vinculoFamiliar.update({ where: { id: familiaOrigemId }, data: { qtdMembros: totalOrigem, atualizadoEm: new Date() } });
@@ -805,15 +836,15 @@ export class FamiliaRepository {
             await this.registrarHistorico(tx, familiaOrigemId, "transferencia_de_membro", "Membro transferido para outra família.", membro, input);
             await this.registrarHistorico(tx, familiaDestinoId, "membro_adicionado", "Membro recebido por transferência.", null, input);
             return {
-                familia_origem: await buscarFamiliaPorIdTransacao(tx, familiaOrigemId),
-                familia_destino: await buscarFamiliaPorIdTransacao(tx, familiaDestinoId)
+                familia_origem: await buscarFamiliaPorIdTransacao(tx, familiaOrigemId, tenantId),
+                familia_destino: await buscarFamiliaPorIdTransacao(tx, familiaDestinoId, tenantId)
             };
         });
     }
-    async desmembrarFamilia(familiaOrigemId, input) {
+    async desmembrarFamilia(familiaOrigemId, input, tenantId) {
         await garantirEstrutura();
         return prisma.$transaction(async (tx) => {
-            const familiaOrigem = await buscarFamiliaPorIdTransacao(tx, familiaOrigemId);
+            const familiaOrigem = await buscarFamiliaPorIdTransacao(tx, familiaOrigemId, tenantId);
             const idsSelecionados = new Set(input.membro_ids.map((id) => String(id)));
             const membrosSelecionados = familiaOrigem.membros.filter((item) => idsSelecionados.has(String(item.id)));
             if (!membrosSelecionados.length) {
@@ -858,6 +889,7 @@ export class FamiliaRepository {
                     observacoes: trimOrUndefined(input.observacoes)
                 }
             });
+            await this.aplicarTenantNaFamiliaTx(tx, novaFamilia.id, tenantId);
             for (const membro of membrosSelecionados) {
                 await tx.vinculoFamiliarMembro.delete({ where: { id: membro.id } });
                 await tx.vinculoFamiliarMembro.create({
@@ -876,23 +908,25 @@ export class FamiliaRepository {
                     }
                 });
             }
+            await this.aplicarTenantNosMembrosTx(tx, novaFamilia.id, tenantId);
             const totalOrigem = await tx.vinculoFamiliarMembro.count({ where: { vinculoFamiliarId: familiaOrigemId } });
             await tx.vinculoFamiliar.update({ where: { id: familiaOrigemId }, data: { qtdMembros: totalOrigem, atualizadoEm: new Date() } });
             await this.registrarHistorico(tx, familiaOrigemId, "familia_desmembrada", "Família desmembrada.", null, input);
             await this.registrarHistorico(tx, novaFamilia.id, "familia_criada", "Nova família criada por desmembramento.", null, input);
             return {
-                familia_origem: await buscarFamiliaPorIdTransacao(tx, familiaOrigemId),
-                familia_nova: await buscarFamiliaPorIdTransacao(tx, novaFamilia.id)
+                familia_origem: await buscarFamiliaPorIdTransacao(tx, familiaOrigemId, tenantId),
+                familia_nova: await buscarFamiliaPorIdTransacao(tx, novaFamilia.id, tenantId)
             };
         });
     }
-    async validarMembrosFamiliaAtiva(tx, ids, familiaAtualId) {
+    async validarMembrosFamiliaAtiva(tx, ids, tenantId, familiaAtualId) {
         for (const beneficiarioId of ids) {
             const rows = await tx.$queryRaw(Prisma.sql `
         SELECT vf.id, vf.nome_familia
         FROM vinculo_familiar_membro m
         INNER JOIN vinculo_familiar vf ON vf.id = m.vinculo_familiar_id
         WHERE m.beneficiario_id = ${beneficiarioId}
+          AND vf.tenant_id::text = ${tenantId}
           AND vf.status = 'ATIVO'
           ${familiaAtualId ? Prisma.sql `AND vf.id <> ${familiaAtualId}` : Prisma.empty}
         LIMIT 1
@@ -902,16 +936,20 @@ export class FamiliaRepository {
             }
         }
     }
-    async registrarHistorico(tx, familiaId, tipoEvento, descricao, dadosAnteriores, dadosNovos) {
+    async registrarHistorico(tx, familiaId, tipoEvento, descricao, tenantIdOrDadosAnteriores, dadosAnteriores, dadosNovos) {
+        const tenantId = typeof tenantIdOrDadosAnteriores === "string" ? tenantIdOrDadosAnteriores : undefined;
+        const dadosAnterioresNormalizados = typeof tenantIdOrDadosAnteriores === "string" ? dadosAnteriores : tenantIdOrDadosAnteriores;
+        const dadosNovosNormalizados = typeof tenantIdOrDadosAnteriores === "string" ? dadosNovos : dadosAnteriores;
         await tx.$executeRaw(Prisma.sql `
       INSERT INTO familia_historico (
-        familia_id, tipo_evento, descricao, dados_anteriores, dados_novos, data_evento
+        tenant_id, familia_id, tipo_evento, descricao, dados_anteriores, dados_novos, data_evento
       ) VALUES (
+        ${tenantId ? Prisma.sql `${tenantId}::uuid` : Prisma.sql `NULL`},
         ${familiaId},
         ${tipoEvento},
         ${descricao},
-        ${dadosAnteriores ? JSON.stringify(dadosAnteriores) : null}::jsonb,
-        ${dadosNovos ? JSON.stringify(dadosNovos) : null}::jsonb,
+        ${dadosAnterioresNormalizados ? JSON.stringify(dadosAnterioresNormalizados) : null}::jsonb,
+        ${dadosNovosNormalizados ? JSON.stringify(dadosNovosNormalizados) : null}::jsonb,
         NOW()
       )
     `);

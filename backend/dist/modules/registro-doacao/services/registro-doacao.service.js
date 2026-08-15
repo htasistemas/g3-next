@@ -6,7 +6,7 @@ import { mapDoadorToResponse, mapRegistroDoacaoToResponse } from "../registro-do
 import { RegistroDoacaoRepository } from "../repositories/registro-doacao.repository.js";
 export class RegistroDoacaoService {
     repository = new RegistroDoacaoRepository();
-    async listar(rawFilters) {
+    async listar(rawFilters, rawTenantId) {
         const filtersNormalizados = rawFilters && typeof rawFilters === "object"
             ? normalizarObjetoTexto(rawFilters, {
                 doador_nome: "nomePessoa",
@@ -15,45 +15,53 @@ export class RegistroDoacaoService {
             })
             : rawFilters;
         const filters = registroDoacaoFiltersSchema.parse(filtersNormalizados);
-        const registros = await this.repository.listar(filters);
+        const tenantId = this.parseTenant(rawTenantId);
+        const registros = await this.repository.listar(filters, tenantId);
         return registros.map((registro) => mapRegistroDoacaoToResponse(registro, []));
     }
-    async buscarPorId(rawId) {
+    async buscarPorId(rawId, rawTenantId) {
         const id = this.parseId(rawId);
-        const registro = await this.repository.buscarPorIdOuFalhar(id);
+        const tenantId = this.parseTenant(rawTenantId);
+        const registro = await this.repository.buscarPorIdOuFalhar(id, tenantId);
         return mapRegistroDoacaoToResponse(registro.registro, registro.itens);
     }
-    async criar(rawInput) {
+    async criar(rawInput, rawTenantId) {
         const inputNormalizado = this.normalizarPayloadRegistro(rawInput);
         const input = registroDoacaoInputSchema.parse(inputNormalizado);
-        const registro = await this.repository.criar(input);
+        const tenantId = this.parseTenant(rawTenantId);
+        const registro = await this.repository.criar(input, tenantId);
         return mapRegistroDoacaoToResponse(registro.registro, registro.itens);
     }
-    async atualizar(rawId, rawInput) {
+    async atualizar(rawId, rawInput, rawTenantId) {
         const id = this.parseId(rawId);
         const inputNormalizado = this.normalizarPayloadRegistro(rawInput);
         const input = registroDoacaoInputSchema.parse(inputNormalizado);
-        const registro = await this.repository.atualizar(id, input);
+        const tenantId = this.parseTenant(rawTenantId);
+        const registro = await this.repository.atualizar(id, input, tenantId);
         return mapRegistroDoacaoToResponse(registro.registro, registro.itens);
     }
-    async remover(rawId) {
+    async remover(rawId, rawTenantId) {
         const id = this.parseId(rawId);
-        await this.repository.remover(id);
+        const tenantId = this.parseTenant(rawTenantId);
+        await this.repository.remover(id, tenantId);
     }
-    async listarDoadores(rawTermo) {
+    async listarDoadores(rawTermo, rawTenantId) {
         const termo = typeof rawTermo === "string" ? rawTermo : undefined;
-        const doadores = await this.repository.listarDoadores(termo);
+        const tenantId = this.parseTenant(rawTenantId);
+        const doadores = await this.repository.listarDoadores(termo, tenantId);
         return doadores.map(mapDoadorToResponse);
     }
-    async criarDoador(rawInput) {
+    async criarDoador(rawInput, rawTenantId) {
         const inputNormalizado = this.normalizarPayloadDoador(rawInput);
         const input = doadorInputSchema.parse(inputNormalizado);
-        const doador = await this.repository.criarDoador(input);
+        const tenantId = this.parseTenant(rawTenantId);
+        const doador = await this.repository.criarDoador(input, tenantId);
         return mapDoadorToResponse(doador);
     }
-    async removerDoador(rawId) {
+    async removerDoador(rawId, rawTenantId) {
         const id = this.parseId(rawId);
-        await this.repository.removerDoador(id);
+        const tenantId = this.parseTenant(rawTenantId);
+        await this.repository.removerDoador(id, tenantId);
     }
     parseId(rawId) {
         const id = Number(rawId);
@@ -61,6 +69,13 @@ export class RegistroDoacaoService {
             throw new AppError("Identificador invalido.", 400);
         }
         return BigInt(id);
+    }
+    parseTenant(rawTenantId) {
+        const tenantId = rawTenantId?.trim();
+        if (!tenantId) {
+            throw new AppError("Tenant da sessao nao identificado.", 401);
+        }
+        return tenantId;
     }
     normalizarPayloadRegistro(rawInput) {
         if (!rawInput || typeof rawInput !== "object") {

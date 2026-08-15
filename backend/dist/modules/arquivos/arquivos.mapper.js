@@ -10,6 +10,7 @@ function toJsonDate(value) {
 export function mapArquivoMetadataToResponse(row) {
     return {
         id: Number(row.id),
+        tenant_id: row.tenant_id,
         entidade_tipo: row.entidade_tipo,
         entidade_id: toJsonNumber(row.entidade_id),
         categoria: row.categoria,

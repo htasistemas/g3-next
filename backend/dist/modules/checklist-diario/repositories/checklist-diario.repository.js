@@ -3,6 +3,10 @@ import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
 import { ensureChecklistDiarioEstrutura } from "./checklist-diario-estrutura.repository.js";
+const CHECKLIST_GERACAO_SEMANA_TRANSACTION_OPTIONS = {
+    maxWait: 10_000,
+    timeout: 120_000
+};
 function startOfWeek(date) {
     const copy = new Date(date);
     copy.setHours(0, 0, 0, 0);
@@ -34,12 +38,16 @@ function normalizeDateRange(periodoInicio, periodoFim) {
     return { start, end };
 }
 export class ChecklistDiarioRepository {
+    tenantSql(alias, tenantId) {
+        return Prisma.sql `${Prisma.raw(alias)}.tenant_id::text = ${tenantId}`;
+    }
     async ensureEstrutura() {
         await ensureChecklistDiarioEstrutura(prisma);
     }
     async registrarHistorico(tx, input) {
         await tx.$executeRaw(Prisma.sql `
       INSERT INTO checklist_execucao_historico (
+        tenant_id,
         referencia_tipo,
         execucao_id,
         modelo_id,
@@ -55,6 +63,7 @@ export class ChecklistDiarioRepository {
         dados_json,
         criado_em
       ) VALUES (
+        ${input.tenantId}::uuid,
         ${input.referenciaTipo},
         ${input.execucaoId ?? null},
         ${input.modeloId ?? null},
@@ -72,12 +81,24 @@ export class ChecklistDiarioRepository {
       )
     `);
     }
-    async obterConfiguracao() {
+    async garantirConfiguracaoTenant(tenantId) {
+        await prisma.$executeRaw(Prisma.sql `
+      INSERT INTO checklist_configuracoes (tenant_id, sabado_ativo, domingo_ativo, criado_em, atualizado_em)
+      SELECT ${tenantId}::uuid, FALSE, FALSE, NOW(), NOW()
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM checklist_configuracoes
+        WHERE tenant_id::text = ${tenantId}
+      )
+    `);
+    }
+    async obterConfiguracao(tenantId) {
         await this.ensureEstrutura();
+        await this.garantirConfiguracaoTenant(tenantId);
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT id, sabado_ativo, domingo_ativo, criado_em, atualizado_em
       FROM checklist_configuracoes
-      WHERE id = 1
+      WHERE tenant_id::text = ${tenantId}
       LIMIT 1
     `);
         const config = rows[0];
@@ -86,7 +107,7 @@ export class ChecklistDiarioRepository {
         }
         return config;
     }
-    async buscarUsuarioContexto(usuarioId) {
+    async buscarUsuarioContexto(usuarioId, tenantId) {
         await this.ensureEstrutura();
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT
@@ -100,6 +121,7 @@ export class ChecklistDiarioRepository {
       LEFT JOIN unidade_assistencial ua
         ON LOWER(TRIM(ua.nome_fantasia)) = LOWER(TRIM(u.unidade))
       WHERE u.id = ${usuarioId}
+        AND u.tenant_id::text = ${tenantId}
       LIMIT 1
     `);
         const usuario = rows[0];
@@ -108,7 +130,7 @@ export class ChecklistDiarioRepository {
         }
         return usuario;
     }
-    async listarUsuariosElegiveis(tx, filtroUsuarioId) {
+    async listarUsuariosElegiveis(tx, tenantId, filtroUsuarioId) {
         return tx.$queryRaw(Prisma.sql `
       SELECT
         u.id,
@@ -121,11 +143,12 @@ export class ChecklistDiarioRepository {
       LEFT JOIN unidade_assistencial ua
         ON LOWER(TRIM(ua.nome_fantasia)) = LOWER(TRIM(u.unidade))
       WHERE COALESCE(NULLIF(TRIM(u.status), ''), 'ATIVO') = 'ATIVO'
+        AND u.tenant_id::text = ${tenantId}
         ${filtroUsuarioId ? Prisma.sql `AND u.id = ${filtroUsuarioId}` : Prisma.empty}
       ORDER BY 2
     `);
     }
-    async listarModelosAplicaveis(tx, usuario) {
+    async listarModelosAplicaveis(tx, usuario, tenantId) {
         return tx.$queryRaw(Prisma.sql `
       SELECT
         m.id,
@@ -160,6 +183,8 @@ export class ChecklistDiarioRepository {
       INNER JOIN checklist_modelo_itens i ON i.modelo_id = m.id
       LEFT JOIN unidade_assistencial ua ON ua.id = m.unidade_id
       WHERE m.ativo = TRUE
+        AND m.tenant_id::text = ${tenantId}
+        AND i.tenant_id::text = ${tenantId}
         AND i.ativo = TRUE
         AND (
           m.tipo = 'INSTITUCIONAL'
@@ -174,7 +199,7 @@ export class ChecklistDiarioRepository {
       ORDER BY m.nome ASC, i.dia_semana ASC, i.ordem ASC, i.id ASC
     `);
     }
-    async atualizarStatusAutomatico() {
+    async atualizarStatusAutomatico(tenantId) {
         await this.ensureEstrutura();
         await prisma.$executeRaw(Prisma.sql `
       UPDATE checklist_execucoes
@@ -182,6 +207,7 @@ export class ChecklistDiarioRepository {
         status = 'ATRASADO',
         atualizado_em = NOW()
       WHERE status = 'PENDENTE'
+        AND tenant_id::text = ${tenantId}
         AND concluido_em IS NULL
         AND dispensado_em IS NULL
         AND ativo = TRUE
@@ -189,16 +215,16 @@ export class ChecklistDiarioRepository {
         AND (referencia_data + horario_previsto) < NOW()
     `);
     }
-    async gerarChecklistDaSemana(input, usuarioAtual) {
+    async gerarChecklistDaSemana(input, tenantId, usuarioAtual) {
         await this.ensureEstrutura();
         const dataBase = toOptionalDate(input.dataReferencia) ?? new Date();
         const semanaInicio = startOfWeek(dataBase);
-        const configuracao = await this.obterConfiguracao();
+        const configuracao = await this.obterConfiguracao(tenantId);
         return prisma.$transaction(async (tx) => {
-            const usuarios = await this.listarUsuariosElegiveis(tx, input.usuarioId ? BigInt(input.usuarioId) : undefined);
+            const usuarios = await this.listarUsuariosElegiveis(tx, tenantId, input.usuarioId ? BigInt(input.usuarioId) : undefined);
             let geradas = 0;
             for (const usuario of usuarios) {
-                const modelos = await this.listarModelosAplicaveis(tx, usuario);
+                const modelos = await this.listarModelosAplicaveis(tx, usuario, tenantId);
                 for (const item of modelos) {
                     const diaSemana = Number(item.dia_semana);
                     if (diaSemana === 6 && !configuracao.sabado_ativo)
@@ -211,6 +237,7 @@ export class ChecklistDiarioRepository {
             SELECT id
             FROM checklist_execucoes
             WHERE chave_geracao = ${chave}
+              AND tenant_id::text = ${tenantId}
             LIMIT 1
           `);
                     if (existente[0] && !input.forcar) {
@@ -230,6 +257,7 @@ export class ChecklistDiarioRepository {
                 atividade_critica = ${item.atividade_critica},
                 atualizado_em = NOW()
               WHERE id = ${existente[0].id}
+                AND tenant_id::text = ${tenantId}
                 AND status = 'PENDENTE'
             `);
                         await this.registrarHistorico(tx, {
@@ -238,6 +266,7 @@ export class ChecklistDiarioRepository {
                             modeloId: item.modelo_id,
                             modeloItemId: item.id,
                             usuarioResponsavelId: usuarioAtual ? BigInt(usuarioAtual.id) : null,
+                            tenantId,
                             acao: "REGENERACAO_CONTROLADA",
                             statusAnterior: "PENDENTE",
                             statusNovo: "PENDENTE",
@@ -252,6 +281,7 @@ export class ChecklistDiarioRepository {
                     }
                     const inserted = await tx.$queryRaw(Prisma.sql `
             INSERT INTO checklist_execucoes (
+              tenant_id,
               modelo_id,
               modelo_item_id,
               usuario_id,
@@ -277,6 +307,7 @@ export class ChecklistDiarioRepository {
               criado_em,
               atualizado_em
             ) VALUES (
+              ${tenantId}::uuid,
               ${item.modelo_id},
               ${item.id},
               ${usuario.id},
@@ -302,6 +333,7 @@ export class ChecklistDiarioRepository {
               NOW(),
               NOW()
             )
+            ON CONFLICT DO NOTHING
             RETURNING id
           `);
                     if (inserted[0]?.id) {
@@ -311,6 +343,7 @@ export class ChecklistDiarioRepository {
                             modeloId: item.modelo_id,
                             modeloItemId: item.id,
                             usuarioResponsavelId: usuarioAtual ? BigInt(usuarioAtual.id) : null,
+                            tenantId,
                             acao: "GERACAO_AUTOMATICA",
                             statusNovo: "PENDENTE",
                             origem: input.forcar ? "MANUAL" : "AUTOMATICA",
@@ -327,9 +360,9 @@ export class ChecklistDiarioRepository {
                 semanaInicio: semanaInicio.toISOString().slice(0, 10),
                 totalGerado: geradas
             };
-        });
+        }, CHECKLIST_GERACAO_SEMANA_TRANSACTION_OPTIONS);
     }
-    async garantirSemanaAtualGerada(filtros, scope, usuarioAtual) {
+    async garantirSemanaAtualGerada(filtros, scope, tenantId, usuarioAtual) {
         const { start, end } = normalizeDateRange(filtros.periodoInicio, filtros.periodoFim);
         const semanaAtualInicio = startOfWeek(new Date());
         const semanaAtualFim = addDays(semanaAtualInicio, 6);
@@ -339,17 +372,18 @@ export class ChecklistDiarioRepository {
         await this.gerarChecklistDaSemana({
             dataReferencia: semanaAtualInicio.toISOString().slice(0, 10),
             usuarioId: scope.visualizarTodos ? filtros.usuarioId : scope.usuarioId
-        }, usuarioAtual);
+        }, tenantId, usuarioAtual);
     }
     buildScopeFilter(filtros, scope) {
         const usuarioId = scope.visualizarTodos ? filtros.usuarioId : scope.usuarioId;
         return usuarioId ? Prisma.sql `AND e.usuario_id = ${BigInt(usuarioId)}` : Prisma.empty;
     }
-    buildWhereFilters(filtros, scope) {
+    buildWhereFilters(filtros, scope, tenantId) {
         const { start, end } = normalizeDateRange(filtros.periodoInicio, filtros.periodoFim);
         const termo = trimOrUndefined(filtros.termo);
         return Prisma.sql `
       WHERE e.ativo = TRUE
+        AND e.tenant_id::text = ${tenantId}
         AND e.referencia_data BETWEEN ${start} AND ${end}
         ${this.buildScopeFilter(filtros, scope)}
         ${filtros.unidadeId ? Prisma.sql `AND e.unidade_id = ${BigInt(filtros.unidadeId)}` : Prisma.empty}
@@ -371,9 +405,9 @@ export class ChecklistDiarioRepository {
             : Prisma.empty}
     `;
     }
-    async listarExecucoes(filtros, scope, usuarioAtual) {
-        await this.atualizarStatusAutomatico();
-        await this.garantirSemanaAtualGerada(filtros, scope, usuarioAtual);
+    async listarExecucoes(filtros, scope, tenantId, usuarioAtual) {
+        await this.atualizarStatusAutomatico(tenantId);
+        await this.garantirSemanaAtualGerada(filtros, scope, tenantId, usuarioAtual);
         return prisma.$queryRaw(Prisma.sql `
       SELECT
         e.id,
@@ -419,13 +453,13 @@ export class ChecklistDiarioRepository {
       LEFT JOIN usuarios ud ON ud.id = e.dispensado_por_usuario_id
       LEFT JOIN unidade_assistencial ua ON ua.id = e.unidade_id
       LEFT JOIN checklist_modelos m ON m.id = e.modelo_id
-      ${this.buildWhereFilters(filtros, scope)}
+      ${this.buildWhereFilters(filtros, scope, tenantId)}
       ORDER BY e.referencia_data ASC, e.horario_previsto ASC NULLS LAST, e.id ASC
     `);
     }
-    async obterIndicadores(filtros, scope, usuarioAtual) {
-        await this.atualizarStatusAutomatico();
-        await this.garantirSemanaAtualGerada(filtros, scope, usuarioAtual);
+    async obterIndicadores(filtros, scope, tenantId, usuarioAtual) {
+        await this.atualizarStatusAutomatico(tenantId);
+        await this.garantirSemanaAtualGerada(filtros, scope, tenantId, usuarioAtual);
         const resumo = await prisma.$queryRaw(Prisma.sql `
       SELECT
         COUNT(*)::BIGINT AS total,
@@ -439,7 +473,7 @@ export class ChecklistDiarioRepository {
       LEFT JOIN usuarios u ON u.id = e.usuario_id
       LEFT JOIN unidade_assistencial ua ON ua.id = e.unidade_id
       LEFT JOIN checklist_modelos m ON m.id = e.modelo_id
-      ${this.buildWhereFilters(filtros, scope)}
+      ${this.buildWhereFilters(filtros, scope, tenantId)}
     `);
         const cumprimentoPorUsuario = await prisma.$queryRaw(Prisma.sql `
       SELECT
@@ -452,7 +486,7 @@ export class ChecklistDiarioRepository {
       LEFT JOIN usuarios u ON u.id = e.usuario_id
       LEFT JOIN unidade_assistencial ua ON ua.id = e.unidade_id
       LEFT JOIN checklist_modelos m ON m.id = e.modelo_id
-      ${this.buildWhereFilters(filtros, scope)}
+      ${this.buildWhereFilters(filtros, scope, tenantId)}
       GROUP BY e.usuario_id, usuario_nome
       ORDER BY percentual DESC NULLS LAST, usuario_nome ASC
       LIMIT 10
@@ -466,7 +500,7 @@ export class ChecklistDiarioRepository {
       FROM checklist_execucoes e
       LEFT JOIN unidade_assistencial ua ON ua.id = e.unidade_id
       LEFT JOIN checklist_modelos m ON m.id = e.modelo_id
-      ${this.buildWhereFilters(filtros, scope)}
+      ${this.buildWhereFilters(filtros, scope, tenantId)}
       GROUP BY e.unidade_id, ua.nome_fantasia
       ORDER BY percentual DESC NULLS LAST, unidade_nome ASC NULLS LAST
       LIMIT 10
@@ -478,7 +512,7 @@ export class ChecklistDiarioRepository {
         COUNT(*)::BIGINT AS total
       FROM checklist_execucoes e
       LEFT JOIN checklist_modelos m ON m.id = e.modelo_id
-      ${this.buildWhereFilters(filtros, scope)}
+      ${this.buildWhereFilters(filtros, scope, tenantId)}
       GROUP BY e.setor
       ORDER BY percentual DESC NULLS LAST, e.setor ASC NULLS LAST
       LIMIT 10
@@ -489,7 +523,7 @@ export class ChecklistDiarioRepository {
       LEFT JOIN usuarios u ON u.id = e.usuario_id
       LEFT JOIN unidade_assistencial ua ON ua.id = e.unidade_id
       LEFT JOIN checklist_modelos m ON m.id = e.modelo_id
-      ${this.buildWhereFilters({ ...filtros, status: undefined, somentePendentes: undefined, somenteAtrasados: undefined }, scope)}
+      ${this.buildWhereFilters({ ...filtros, status: undefined, somentePendentes: undefined, somenteAtrasados: undefined }, scope, tenantId)}
         AND e.status = 'ATRASADO'
       GROUP BY e.titulo_atividade
       ORDER BY quantidade DESC, e.titulo_atividade ASC
@@ -501,7 +535,7 @@ export class ChecklistDiarioRepository {
       LEFT JOIN usuarios u ON u.id = e.usuario_id
       LEFT JOIN unidade_assistencial ua ON ua.id = e.unidade_id
       LEFT JOIN checklist_modelos m ON m.id = e.modelo_id
-      ${this.buildWhereFilters({ ...filtros, status: undefined, somentePendentes: undefined, somenteAtrasados: undefined }, scope)}
+      ${this.buildWhereFilters({ ...filtros, status: undefined, somentePendentes: undefined, somenteAtrasados: undefined }, scope, tenantId)}
       GROUP BY e.titulo_atividade
       ORDER BY quantidade DESC, e.titulo_atividade ASC
       LIMIT 10
@@ -515,7 +549,7 @@ export class ChecklistDiarioRepository {
             tarefasMaisRecorrentes
         };
     }
-    async listarHistorico(filtros) {
+    async listarHistorico(filtros, tenantId) {
         await this.ensureEstrutura();
         const limit = filtros.limit && filtros.limit > 0 ? Math.min(filtros.limit, 200) : 100;
         return prisma.$queryRaw(Prisma.sql `
@@ -539,13 +573,14 @@ export class ChecklistDiarioRepository {
       FROM checklist_execucao_historico h
       LEFT JOIN usuarios u ON u.id = h.usuario_responsavel_id
       WHERE 1 = 1
+        AND h.tenant_id::text = ${tenantId}
         ${filtros.execucaoId ? Prisma.sql `AND h.execucao_id = ${BigInt(filtros.execucaoId)}` : Prisma.empty}
         ${filtros.usuarioId ? Prisma.sql `AND h.usuario_responsavel_id = ${BigInt(filtros.usuarioId)}` : Prisma.empty}
       ORDER BY h.criado_em DESC, h.id DESC
       LIMIT ${limit}
     `);
     }
-    async listarModelos() {
+    async listarModelos(tenantId) {
         await this.ensureEstrutura();
         const modelos = await prisma.$queryRaw(Prisma.sql `
       SELECT
@@ -564,6 +599,7 @@ export class ChecklistDiarioRepository {
         m.atualizado_em
       FROM checklist_modelos m
       LEFT JOIN unidade_assistencial ua ON ua.id = m.unidade_id
+      WHERE m.tenant_id::text = ${tenantId}
       ORDER BY m.ativo DESC, m.nome ASC
     `);
         const itens = await prisma.$queryRaw(Prisma.sql `
@@ -584,11 +620,12 @@ export class ChecklistDiarioRepository {
         criado_em,
         atualizado_em
       FROM checklist_modelo_itens
+      WHERE tenant_id::text = ${tenantId}
       ORDER BY modelo_id ASC, dia_semana ASC, ordem ASC, id ASC
     `);
         return { modelos, itens };
     }
-    async salvarModelo(modeloId, input, usuarioAtual) {
+    async salvarModelo(modeloId, input, usuarioAtual, tenantId) {
         await this.ensureEstrutura();
         return prisma.$transaction(async (tx) => {
             let id = modeloId;
@@ -597,6 +634,7 @@ export class ChecklistDiarioRepository {
           SELECT id
           FROM checklist_modelos
           WHERE id = ${id}
+            AND tenant_id::text = ${tenantId}
           LIMIT 1
         `);
                 if (!atual[0]) {
@@ -616,15 +654,18 @@ export class ChecklistDiarioRepository {
             atualizado_por_usuario_id = ${BigInt(usuarioAtual.id)},
             atualizado_em = NOW()
           WHERE id = ${id}
+            AND tenant_id::text = ${tenantId}
         `);
                 await tx.$executeRaw(Prisma.sql `
           DELETE FROM checklist_modelo_itens
           WHERE modelo_id = ${id}
+            AND tenant_id::text = ${tenantId}
         `);
             }
             else {
                 const inserted = await tx.$queryRaw(Prisma.sql `
           INSERT INTO checklist_modelos (
+            tenant_id,
             nome,
             descricao,
             tipo,
@@ -638,6 +679,7 @@ export class ChecklistDiarioRepository {
             criado_em,
             atualizado_em
           ) VALUES (
+            ${tenantId}::uuid,
             ${input.nome},
             ${trimOrUndefined(input.descricao) ?? null},
             ${input.tipo},
@@ -661,6 +703,7 @@ export class ChecklistDiarioRepository {
             for (const [index, item] of input.itens.entries()) {
                 await tx.$executeRaw(Prisma.sql `
           INSERT INTO checklist_modelo_itens (
+            tenant_id,
             modelo_id,
             dia_semana,
             titulo,
@@ -676,6 +719,7 @@ export class ChecklistDiarioRepository {
             criado_em,
             atualizado_em
           ) VALUES (
+            ${tenantId}::uuid,
             ${id},
             ${item.diaSemana},
             ${item.titulo},
@@ -696,6 +740,7 @@ export class ChecklistDiarioRepository {
             await this.registrarHistorico(tx, {
                 referenciaTipo: "MODELO",
                 modeloId: id,
+                tenantId,
                 usuarioResponsavelId: BigInt(usuarioAtual.id),
                 acao: modeloId ? "EDICAO_MODELO" : "CRIACAO_MODELO",
                 statusNovo: input.ativo ?? true ? "ATIVO" : "INATIVO",
@@ -705,8 +750,8 @@ export class ChecklistDiarioRepository {
             return id;
         });
     }
-    async clonarModelo(id, usuarioAtual) {
-        const { modelos, itens } = await this.listarModelos();
+    async clonarModelo(id, usuarioAtual, tenantId) {
+        const { modelos, itens } = await this.listarModelos(tenantId);
         const modelo = modelos.find((item) => item.id === id);
         if (!modelo) {
             throw new AppError("Modelo do checklist não encontrado.", 404);
@@ -734,9 +779,9 @@ export class ChecklistDiarioRepository {
                 ordem: item.ordem,
                 ativo: item.ativo
             }))
-        }, usuarioAtual);
+        }, usuarioAtual, tenantId);
     }
-    async atualizarStatusModelo(id, ativo, usuarioAtual) {
+    async atualizarStatusModelo(id, ativo, usuarioAtual, tenantId) {
         await this.ensureEstrutura();
         const updated = await prisma.$queryRaw(Prisma.sql `
       UPDATE checklist_modelos
@@ -745,6 +790,7 @@ export class ChecklistDiarioRepository {
         atualizado_por_usuario_id = ${BigInt(usuarioAtual.id)},
         atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
       RETURNING id
     `);
         if (!updated[0]) {
@@ -754,6 +800,7 @@ export class ChecklistDiarioRepository {
             await this.registrarHistorico(tx, {
                 referenciaTipo: "MODELO",
                 modeloId: id,
+                tenantId,
                 usuarioResponsavelId: BigInt(usuarioAtual.id),
                 acao: ativo ? "ATIVACAO_MODELO" : "INATIVACAO_MODELO",
                 statusNovo: ativo ? "ATIVO" : "INATIVO",
@@ -761,7 +808,7 @@ export class ChecklistDiarioRepository {
             });
         });
     }
-    async buscarExecucaoPorId(tx, id) {
+    async buscarExecucaoPorId(tx, id, tenantId) {
         const rows = await tx.$queryRaw(Prisma.sql `
       SELECT
         e.id,
@@ -808,25 +855,26 @@ export class ChecklistDiarioRepository {
       LEFT JOIN unidade_assistencial ua ON ua.id = e.unidade_id
       LEFT JOIN checklist_modelos m ON m.id = e.modelo_id
       WHERE e.id = ${id}
+        AND e.tenant_id::text = ${tenantId}
       LIMIT 1
     `);
         return rows[0] ?? null;
     }
-    async obterExecucaoComHistorico(id) {
+    async obterExecucaoComHistorico(id, tenantId) {
         await this.ensureEstrutura();
         return prisma.$transaction(async (tx) => {
-            const execucao = await this.buscarExecucaoPorId(tx, id);
+            const execucao = await this.buscarExecucaoPorId(tx, id, tenantId);
             if (!execucao) {
                 throw new AppError("Execução do checklist não encontrada.", 404);
             }
-            const historico = await this.listarHistorico({ execucaoId: Number(id), limit: 50 });
+            const historico = await this.listarHistorico({ execucaoId: Number(id), limit: 50 }, tenantId);
             return { execucao, historico };
         });
     }
-    async concluirExecucao(id, input, usuarioAtual) {
+    async concluirExecucao(id, input, usuarioAtual, tenantId) {
         await this.ensureEstrutura();
         return prisma.$transaction(async (tx) => {
-            const execucao = await this.buscarExecucaoPorId(tx, id);
+            const execucao = await this.buscarExecucaoPorId(tx, id, tenantId);
             if (!execucao) {
                 throw new AppError("Execução do checklist não encontrada.", 404);
             }
@@ -842,12 +890,14 @@ export class ChecklistDiarioRepository {
           concluido_por_usuario_id = ${BigInt(usuarioAtual.id)},
           atualizado_em = NOW()
         WHERE id = ${id}
+          AND tenant_id::text = ${tenantId}
       `);
             await this.registrarHistorico(tx, {
                 referenciaTipo: "EXECUCAO",
                 execucaoId: id,
                 modeloId: execucao.modelo_id,
                 modeloItemId: execucao.modelo_item_id,
+                tenantId,
                 usuarioResponsavelId: BigInt(usuarioAtual.id),
                 acao: "CONCLUSAO",
                 statusAnterior: execucao.status,
@@ -855,20 +905,20 @@ export class ChecklistDiarioRepository {
                 observacao: trimOrUndefined(input.observacao) ?? null,
                 origem: "INTERFACE"
             });
-            const atualizada = await this.buscarExecucaoPorId(tx, id);
+            const atualizada = await this.buscarExecucaoPorId(tx, id, tenantId);
             if (!atualizada) {
                 throw new AppError("Falha ao concluir execução do checklist.", 500);
             }
             return {
                 execucao: atualizada,
-                historico: await this.listarHistorico({ execucaoId: Number(id), limit: 50 })
+                historico: await this.listarHistorico({ execucaoId: Number(id), limit: 50 }, tenantId)
             };
         });
     }
-    async dispensarExecucao(id, input, usuarioAtual, statusNovo) {
+    async dispensarExecucao(id, input, usuarioAtual, statusNovo, tenantId) {
         await this.ensureEstrutura();
         return prisma.$transaction(async (tx) => {
-            const execucao = await this.buscarExecucaoPorId(tx, id);
+            const execucao = await this.buscarExecucaoPorId(tx, id, tenantId);
             if (!execucao) {
                 throw new AppError("Execução do checklist não encontrada.", 404);
             }
@@ -883,12 +933,14 @@ export class ChecklistDiarioRepository {
           nao_aplicavel_motivo = ${statusNovo === "NAO_SE_APLICA" ? input.motivo : execucao.nao_aplicavel_motivo},
           atualizado_em = NOW()
         WHERE id = ${id}
+          AND tenant_id::text = ${tenantId}
       `);
             await this.registrarHistorico(tx, {
                 referenciaTipo: "EXECUCAO",
                 execucaoId: id,
                 modeloId: execucao.modelo_id,
                 modeloItemId: execucao.modelo_item_id,
+                tenantId,
                 usuarioResponsavelId: BigInt(usuarioAtual.id),
                 acao: statusNovo === "DISPENSADO" ? "DISPENSA" : "NAO_SE_APLICA",
                 statusAnterior: execucao.status,
@@ -897,20 +949,20 @@ export class ChecklistDiarioRepository {
                 motivo: input.motivo,
                 origem: "INTERFACE"
             });
-            const atualizada = await this.buscarExecucaoPorId(tx, id);
+            const atualizada = await this.buscarExecucaoPorId(tx, id, tenantId);
             if (!atualizada) {
                 throw new AppError("Falha ao atualizar execução do checklist.", 500);
             }
             return {
                 execucao: atualizada,
-                historico: await this.listarHistorico({ execucaoId: Number(id), limit: 50 })
+                historico: await this.listarHistorico({ execucaoId: Number(id), limit: 50 }, tenantId)
             };
         });
     }
-    async reabrirExecucao(id, input, usuarioAtual) {
+    async reabrirExecucao(id, input, usuarioAtual, tenantId) {
         await this.ensureEstrutura();
         return prisma.$transaction(async (tx) => {
-            const execucao = await this.buscarExecucaoPorId(tx, id);
+            const execucao = await this.buscarExecucaoPorId(tx, id, tenantId);
             if (!execucao) {
                 throw new AppError("Execução do checklist não encontrada.", 404);
             }
@@ -926,12 +978,14 @@ export class ChecklistDiarioRepository {
           concluido_por_usuario_id = NULL,
           atualizado_em = NOW()
         WHERE id = ${id}
+          AND tenant_id::text = ${tenantId}
       `);
             await this.registrarHistorico(tx, {
                 referenciaTipo: "EXECUCAO",
                 execucaoId: id,
                 modeloId: execucao.modelo_id,
                 modeloItemId: execucao.modelo_item_id,
+                tenantId,
                 usuarioResponsavelId: BigInt(usuarioAtual.id),
                 acao: "REABERTURA",
                 statusAnterior: execucao.status,
@@ -940,31 +994,32 @@ export class ChecklistDiarioRepository {
                 motivo: trimOrUndefined(input.motivo) ?? null,
                 origem: "INTERFACE"
             });
-            const atualizada = await this.buscarExecucaoPorId(tx, id);
+            const atualizada = await this.buscarExecucaoPorId(tx, id, tenantId);
             if (!atualizada) {
                 throw new AppError("Falha ao reabrir execução do checklist.", 500);
             }
             return {
                 execucao: atualizada,
-                historico: await this.listarHistorico({ execucaoId: Number(id), limit: 50 })
+                historico: await this.listarHistorico({ execucaoId: Number(id), limit: 50 }, tenantId)
             };
         });
     }
-    async atualizarConfiguracao(input, usuarioAtual) {
+    async atualizarConfiguracao(input, usuarioAtual, tenantId) {
         await this.ensureEstrutura();
         return prisma.$transaction(async (tx) => {
-            const atual = await this.obterConfiguracao();
+            const atual = await this.obterConfiguracao(tenantId);
             await tx.$executeRaw(Prisma.sql `
         UPDATE checklist_configuracoes
         SET
           sabado_ativo = ${input.sabadoAtivo},
           domingo_ativo = ${input.domingoAtivo},
           atualizado_em = NOW()
-        WHERE id = 1
+        WHERE tenant_id::text = ${tenantId}
       `);
             await this.registrarHistorico(tx, {
                 referenciaTipo: "CONFIGURACAO",
                 configuracaoId: BigInt(1),
+                tenantId,
                 usuarioResponsavelId: BigInt(usuarioAtual.id),
                 acao: "ATUALIZACAO_CONFIGURACAO",
                 origem: "INTERFACE",
@@ -975,7 +1030,7 @@ export class ChecklistDiarioRepository {
                     domingoNovo: input.domingoAtivo
                 }
             });
-            return this.obterConfiguracao();
+            return this.obterConfiguracao(tenantId);
         });
     }
 }

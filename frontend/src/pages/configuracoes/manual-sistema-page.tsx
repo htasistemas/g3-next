@@ -713,6 +713,25 @@ const secoesManual: ManualSecao[] = [
         ]
       },
       {
+        nome: "Termos de parceria",
+        objetivo: "Controlar o ciclo completo de parcerias e recursos públicos, do projeto à prestação de contas.",
+        comoUsar: [
+          "Use o submenu Jurídico e Compliance > Termos de parceria para consultar o dashboard e a listagem do ambiente ativo.",
+          "Ao criar uma parceria, selecione o tipo de instrumento, informe o objeto, o projeto existente e os valores aprovados. O projeto é validado no backend contra o tenant atual.",
+          "Em Dados gerais, registre identificação jurídica, processo, edital, proposta, responsáveis, público-alvo, território, vigência, recursos, parcelas, prazos de prestação de contas, legislação e observações.",
+          "Na seção Plano de trabalho e execução, registre metas e indicadores, rubricas e orçamento, recebimentos e despesas. Saldos, vínculos, vigência e limites financeiros são validados pelo backend.",
+          "As abas Documentos e Aditivos mantêm os comprovantes no storage, o histórico das alterações e a rastreabilidade do instrumento.",
+          "Use Relatório por projeto para emitir a relação consolidada dos termos filtrados por projeto, situação e busca.",
+          "Use Relatório completo após abrir um termo para emitir identificação, objeto, vigência, recursos, metas, rubricas, recebimentos, despesas, documentos, aditivos e linha do tempo.",
+          "O núcleo financeiro e de prestação de contas reutiliza as entidades profissionais existentes; não são criados cadastros paralelos para despesas, receitas ou documentos."
+        ],
+        atencoes: [
+          "Toda parceria deve pertencer ao tenant da sessão e o backend rejeita projeto ou unidade de outro ambiente.",
+          "A soma dos valores destinados às unidades executoras não pode ultrapassar o valor global da parceria.",
+          "A migration é incremental e não remove tabelas, colunas ou dados existentes."
+        ]
+      },
+      {
         nome: "Plano de trabalho",
         objetivo: "Montar e revisar o plano de trabalho por etapas guiadas, com ações de salvamento, validação, envio, aprovação e emissão documental no padrão do G3N.",
         comoUsar: [

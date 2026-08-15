@@ -1,5 +1,5 @@
 import { createReadStream } from "node:fs";
-import { mkdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { env } from "../../../config/env.js";
 import { AppError } from "../../../shared/errors/app-error.js";
@@ -37,7 +37,7 @@ export class LocalStorageProvider {
         }
         return normalizarCaminhoLogico(trimmed);
     }
-    async salvar(caminhoArquivo, conteudo) {
+    async salvar(caminhoArquivo, conteudo, _mimeType) {
         await this.ensureReady();
         const absolutePath = this.resolveAbsolutePath(caminhoArquivo);
         try {
@@ -47,7 +47,14 @@ export class LocalStorageProvider {
         catch (error) {
             throw new AppError(`Nao foi possivel gravar o arquivo em storage. Verifique permissoes de escrita em ${this.rootPath}.`, 500);
         }
-        return absolutePath;
+    }
+    async mover(caminhoOrigem, caminhoDestino) {
+        await this.ensureReady();
+        const origem = this.resolveAbsolutePath(caminhoOrigem);
+        const destino = this.resolveAbsolutePath(caminhoDestino);
+        await mkdir(dirname(destino), { recursive: true });
+        await rm(destino, { force: true });
+        await rename(origem, destino);
     }
     async remover(caminhoArquivo) {
         const absolutePath = this.resolveAbsolutePath(caminhoArquivo);
@@ -66,5 +73,14 @@ export class LocalStorageProvider {
     criarLeitura(caminhoArquivo) {
         const absolutePath = this.resolveAbsolutePath(caminhoArquivo);
         return createReadStream(absolutePath);
+    }
+    async lerBuffer(caminhoArquivo) {
+        const absolutePath = this.resolveAbsolutePath(caminhoArquivo);
+        try {
+            return await readFile(absolutePath);
+        }
+        catch {
+            return undefined;
+        }
     }
 }

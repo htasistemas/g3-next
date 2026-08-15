@@ -3,11 +3,14 @@ import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
 import { calcularEstoqueDisponivelKit, calcularEstoqueMontavelKit, planejarConsumoSaidaKit } from "../almoxarifado-kit.js";
+function tenantSql(alias, tenantId) {
+    return Prisma.sql `${Prisma.raw(alias)}.tenant_id::text = ${tenantId}`;
+}
 function normalizarTipoMovimentacao(tipo) {
     const texto = tipo.trim().toLowerCase();
     if (texto === "entrada")
         return "Entrada";
-    if (texto === "saida" || texto === "saída")
+    if (texto === "saida" || texto === "saÃ­da")
         return "Saida";
     if (texto === "ajuste")
         return "Ajuste";
@@ -18,21 +21,21 @@ function calcularSaldo(estoqueAtual, tipo, quantidade, direcaoAjuste) {
         return estoqueAtual + quantidade;
     if (tipo === "Saida") {
         if (estoqueAtual < quantidade) {
-            throw new AppError("Estoque insuficiente para saída.", 400);
+            throw new AppError("Estoque insuficiente para saÃ­da.", 400);
         }
         return estoqueAtual - quantidade;
     }
     const direcao = (direcaoAjuste ?? "").trim().toLowerCase();
     if (direcao === "decrease" || direcao === "reduzir") {
         if (estoqueAtual < quantidade) {
-            throw new AppError("Estoque insuficiente para ajuste de redução.", 400);
+            throw new AppError("Estoque insuficiente para ajuste de reduÃ§Ã£o.", 400);
         }
         return estoqueAtual - quantidade;
     }
     return estoqueAtual + quantidade;
 }
 export class AlmoxarifadoRepository {
-    async listarItens() {
+    async listarItens(tenantId) {
         const itens = await prisma.$queryRaw(Prisma.sql `
       SELECT
         id,
@@ -52,12 +55,13 @@ export class AlmoxarifadoRepository {
         COALESCE(ignorar_validade, FALSE) AS ignorar_validade,
         observacoes
       FROM almoxarifado_item
+      WHERE tenant_id::text = ${tenantId}
       ORDER BY descricao ASC, codigo ASC
     `);
-        return this.aplicarEstoqueDisponivelKit(itens);
+        return this.aplicarEstoqueDisponivelKit(itens, tenantId);
     }
-    async buscarItemPorId(id) {
-        const rows = await prisma.$queryRaw(Prisma.sql `
+    async buscarItemPorId(id, tenantId, tx = prisma) {
+        const rows = await tx.$queryRaw(Prisma.sql `
       SELECT
         id,
         codigo,
@@ -77,12 +81,13 @@ export class AlmoxarifadoRepository {
         observacoes
       FROM almoxarifado_item
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
         return rows[0] ?? null;
     }
-    async buscarItemPorCodigo(codigo) {
-        const rows = await prisma.$queryRaw(Prisma.sql `
+    async buscarItemPorCodigo(codigo, tenantId, tx = prisma) {
+        const rows = await tx.$queryRaw(Prisma.sql `
       SELECT
         id,
         codigo,
@@ -102,35 +107,38 @@ export class AlmoxarifadoRepository {
         observacoes
       FROM almoxarifado_item
       WHERE codigo = ${codigo}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
         return rows[0] ?? null;
     }
-    async buscarItemPorIdOuFalhar(id) {
-        const item = await this.buscarItemPorId(id);
+    async buscarItemPorIdOuFalhar(id, tenantId, tx = prisma) {
+        const item = await this.buscarItemPorId(id, tenantId, tx);
         if (!item)
-            throw new AppError("Item de almoxarifado não encontrado.", 404);
+            throw new AppError("Item de almoxarifado nÃ£o encontrado.", 404);
         return item;
     }
-    async buscarItemPorCodigoOuFalhar(codigo) {
-        const item = await this.buscarItemPorCodigo(codigo);
+    async buscarItemPorCodigoOuFalhar(codigo, tenantId, tx = prisma) {
+        const item = await this.buscarItemPorCodigo(codigo, tenantId, tx);
         if (!item)
-            throw new AppError("Item de almoxarifado não encontrado.", 404);
+            throw new AppError("Item de almoxarifado nÃ£o encontrado.", 404);
         return item;
     }
-    async obterProximoCodigo() {
-        const rows = await prisma.$queryRaw(Prisma.sql `
+    async obterProximoCodigo(tenantId, tx = prisma) {
+        const rows = await tx.$queryRaw(Prisma.sql `
       SELECT COALESCE(MAX(CAST(codigo AS INTEGER)), 0) + 1 AS proximo
       FROM almoxarifado_item
       WHERE codigo ~ '^[0-9]+$'
+        AND tenant_id::text = ${tenantId}
     `);
         const proximo = rows[0]?.proximo ?? 1;
         return String(proximo).padStart(4, "0");
     }
-    async criarItem(input) {
-        const codigo = trimOrUndefined(input.codigo) ?? (await this.obterProximoCodigo());
+    async criarItem(input, tenantId) {
+        const codigo = trimOrUndefined(input.codigo) ?? (await this.obterProximoCodigo(tenantId));
         const inserted = await prisma.$queryRaw(Prisma.sql `
       INSERT INTO almoxarifado_item (
+        tenant_id,
         codigo,
         codigo_barras,
         descricao,
@@ -149,6 +157,7 @@ export class AlmoxarifadoRepository {
         criado_em,
         atualizado_em
       ) VALUES (
+        ${tenantId}::uuid,
         ${codigo},
         ${trimOrUndefined(input.codigo_barras ?? undefined)},
         ${input.descricao},
@@ -171,11 +180,11 @@ export class AlmoxarifadoRepository {
     `);
         const id = inserted[0]?.id;
         if (!id)
-            throw new AppError("Não foi possível criar o item.", 500);
-        return this.buscarItemPorIdOuFalhar(id);
+            throw new AppError("NÃ£o foi possÃ­vel criar o item.", 500);
+        return this.buscarItemPorIdOuFalhar(id, tenantId);
     }
-    async atualizarItem(id, input) {
-        await this.buscarItemPorIdOuFalhar(id);
+    async atualizarItem(id, input, tenantId) {
+        await this.buscarItemPorIdOuFalhar(id, tenantId);
         const codigo = trimOrUndefined(input.codigo);
         await prisma.$executeRaw(Prisma.sql `
       UPDATE almoxarifado_item
@@ -197,17 +206,19 @@ export class AlmoxarifadoRepository {
         observacoes = ${trimOrUndefined(input.observacoes ?? undefined)},
         atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
-        return this.buscarItemPorIdOuFalhar(id);
+        return this.buscarItemPorIdOuFalhar(id, tenantId);
     }
-    async removerItem(id) {
-        await this.buscarItemPorIdOuFalhar(id);
+    async removerItem(id, tenantId) {
+        await this.buscarItemPorIdOuFalhar(id, tenantId);
         await prisma.$executeRaw(Prisma.sql `
       DELETE FROM almoxarifado_item
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
     }
-    async listarMovimentacoes() {
+    async listarMovimentacoes(tenantId) {
         return prisma.$queryRaw(Prisma.sql `
       SELECT
         m.id,
@@ -224,11 +235,13 @@ export class AlmoxarifadoRepository {
         i.descricao AS descricao_item
       FROM almoxarifado_movimentacao m
       INNER JOIN almoxarifado_item i ON i.id = m.item_id
+      WHERE m.tenant_id::text = ${tenantId}
+        AND i.tenant_id::text = ${tenantId}
       ORDER BY m.data_movimentacao DESC, m.id DESC
     `);
     }
-    async buscarMovimentacaoPorId(id) {
-        const rows = await prisma.$queryRaw(Prisma.sql `
+    async buscarMovimentacaoPorId(id, tenantId, tx = prisma) {
+        const rows = await tx.$queryRaw(Prisma.sql `
       SELECT
         m.id,
         m.item_id,
@@ -245,15 +258,17 @@ export class AlmoxarifadoRepository {
       FROM almoxarifado_movimentacao m
       INNER JOIN almoxarifado_item i ON i.id = m.item_id
       WHERE m.id = ${id}
+        AND m.tenant_id::text = ${tenantId}
+        AND i.tenant_id::text = ${tenantId}
       LIMIT 1
     `);
         return rows[0] ?? null;
     }
-    async registrarMovimentacao(input) {
+    async registrarMovimentacao(input, tenantId) {
         return prisma.$transaction(async (tx) => {
-            const item = await this.buscarItemPorCodigoOuFalhar(input.codigo_item);
+            const item = await this.buscarItemPorCodigoOuFalhar(input.codigo_item, tenantId, tx);
             const composicaoKit = item.is_kit
-                ? await this.listarComposicaoKitComEstoque([item.id], tx)
+                ? await this.listarComposicaoKitComEstoque([item.id], tenantId, tx)
                 : [];
             const tipo = normalizarTipoMovimentacao(input.tipo);
             const quantidade = Number(input.quantidade);
@@ -271,7 +286,7 @@ export class AlmoxarifadoRepository {
             if (consomeKit) {
                 const planoConsumo = planejarConsumoSaidaKit(estoqueFisico, quantidade, composicaoKit);
                 if (!planoConsumo.suficiente) {
-                    throw new AppError("Estoque insuficiente para saída.", 400);
+                    throw new AppError("Estoque insuficiente para saÃ­da.", 400);
                 }
                 estoqueFisicoApos = estoqueFisico - planoConsumo.consumirEstoqueFisico;
                 quantidadeConsumirComponentes = planoConsumo.consumirComponentes;
@@ -287,6 +302,7 @@ export class AlmoxarifadoRepository {
             }
             const inserted = await tx.$queryRaw(Prisma.sql `
         INSERT INTO almoxarifado_movimentacao (
+          tenant_id,
           item_id,
           data_movimentacao,
           tipo,
@@ -298,6 +314,7 @@ export class AlmoxarifadoRepository {
           direcao_ajuste,
           criado_em
         ) VALUES (
+          ${tenantId}::uuid,
           ${item.id},
           ${toOptionalDate(input.data_movimentacao)},
           ${tipo},
@@ -313,7 +330,7 @@ export class AlmoxarifadoRepository {
       `);
             const movimentacaoId = inserted[0]?.id;
             if (!movimentacaoId) {
-                throw new AppError("Não foi possível registrar a movimentação.", 500);
+                throw new AppError("NÃ£o foi possÃ­vel registrar a movimentaÃ§Ã£o.", 500);
             }
             await tx.$executeRaw(Prisma.sql `
         UPDATE almoxarifado_item
@@ -321,6 +338,7 @@ export class AlmoxarifadoRepository {
           estoque_atual = ${estoqueFisicoApos},
           atualizado_em = NOW()
         WHERE id = ${item.id}
+          AND tenant_id::text = ${tenantId}
       `);
             if (item.is_kit && composicaoKit.length && quantidadeConsumirComponentes > 0) {
                 await this.consumirComponentesKit(tx, {
@@ -328,18 +346,20 @@ export class AlmoxarifadoRepository {
                     quantidadeKits: quantidadeConsumirComponentes,
                     composicao: composicaoKit,
                     dataMovimentacao: input.data_movimentacao,
-                    responsavel: input.responsavel ?? undefined
+                    responsavel: input.responsavel ?? undefined,
+                    tenantId
                 });
             }
             if (input.gerar_itens_kit && item.is_kit && !composicaoKit.length) {
-                const composicao = await this.listarComposicaoKit(item.id);
+                const composicao = await this.listarComposicaoKit(item.id, tenantId, tx);
                 for (const componente of composicao) {
-                    const componenteAtual = await this.buscarItemPorIdOuFalhar(componente.produto_item_id);
+                    const componenteAtual = await this.buscarItemPorIdOuFalhar(componente.produto_item_id, tenantId, tx);
                     const quantidadeComponente = Number(componente.quantidade_item) * quantidade;
                     const tipoGerado = tipo === "Entrada" ? "Saida" : tipo;
-                    const saldoGerado = calcularSaldo(componenteAtual.estoque_atual, tipoGerado, quantidadeComponente, null);
+                    const saldoGerado = calcularSaldo(Number(componenteAtual.estoque_atual ?? 0), tipoGerado, quantidadeComponente, null);
                     const gerada = await tx.$queryRaw(Prisma.sql `
             INSERT INTO almoxarifado_movimentacao (
+              tenant_id,
               item_id,
               data_movimentacao,
               tipo,
@@ -351,12 +371,13 @@ export class AlmoxarifadoRepository {
               direcao_ajuste,
               criado_em
             ) VALUES (
+              ${tenantId}::uuid,
               ${componente.produto_item_id},
               ${toOptionalDate(input.data_movimentacao)},
               ${tipoGerado},
               ${quantidadeComponente},
               ${saldoGerado},
-              ${`Movimentação de kit ${item.codigo}`},
+              ${`MovimentaÃ§Ã£o de kit ${item.codigo}`},
               ${trimOrUndefined(input.responsavel ?? undefined)},
               ${`Gerado automaticamente a partir do kit ${item.descricao}`},
               NULL,
@@ -386,19 +407,21 @@ export class AlmoxarifadoRepository {
               estoque_atual = ${saldoGerado},
               atualizado_em = NOW()
             WHERE id = ${componente.produto_item_id}
+              AND tenant_id::text = ${tenantId}
           `);
                 }
             }
-            const movimento = await this.buscarMovimentacaoPorId(movimentacaoId);
-            const itemAtualizado = (await this.aplicarEstoqueDisponivelKit([await this.buscarItemPorIdOuFalhar(item.id)], tx))[0];
+            const movimento = await this.buscarMovimentacaoPorId(movimentacaoId, tenantId, tx);
+            const itemAtualizado = (await this.aplicarEstoqueDisponivelKit([await this.buscarItemPorIdOuFalhar(item.id, tenantId, tx)], tenantId, tx))[0];
             if (!movimento) {
-                throw new AppError("Movimentação não encontrada após registro.", 500);
+                throw new AppError("MovimentaÃ§Ã£o nÃ£o encontrada apÃ³s registro.", 500);
             }
             return { movimentacao: movimento, item: itemAtualizado };
         });
     }
-    async listarComposicaoKit(produtoKitId) {
-        return prisma.$queryRaw(Prisma.sql `
+    async listarComposicaoKit(produtoKitId, tenantId, tx = prisma) {
+        await this.buscarItemPorIdOuFalhar(produtoKitId, tenantId, tx);
+        return tx.$queryRaw(Prisma.sql `
       SELECT
         c.id,
         c.produto_kit_id,
@@ -408,13 +431,16 @@ export class AlmoxarifadoRepository {
         i.descricao AS produto_item_descricao
       FROM produtos_kit_composicao c
       INNER JOIN almoxarifado_item i ON i.id = c.produto_item_id
+      INNER JOIN almoxarifado_item k ON k.id = c.produto_kit_id
       WHERE c.produto_kit_id = ${produtoKitId}
         AND c.ativo = TRUE
+        AND ${tenantSql("i", tenantId)}
+        AND ${tenantSql("k", tenantId)}
       ORDER BY i.descricao ASC
     `);
     }
-    async atualizarComposicaoKit(produtoKitId, itens) {
-        await this.buscarItemPorIdOuFalhar(produtoKitId);
+    async atualizarComposicaoKit(produtoKitId, itens, tenantId) {
+        await this.buscarItemPorIdOuFalhar(produtoKitId, tenantId);
         await prisma.$transaction(async (tx) => {
             await tx.$executeRaw(Prisma.sql `
         UPDATE produtos_kit_composicao
@@ -422,7 +448,7 @@ export class AlmoxarifadoRepository {
         WHERE produto_kit_id = ${produtoKitId}
       `);
             for (const item of itens) {
-                await this.buscarItemPorIdOuFalhar(BigInt(item.produto_item_id));
+                await this.buscarItemPorIdOuFalhar(BigInt(item.produto_item_id), tenantId, tx);
                 await tx.$executeRaw(Prisma.sql `
           INSERT INTO produtos_kit_composicao (
             produto_kit_id,
@@ -447,9 +473,9 @@ export class AlmoxarifadoRepository {
         `);
             }
         });
-        return this.listarComposicaoKit(produtoKitId);
+        return this.listarComposicaoKit(produtoKitId, tenantId);
     }
-    async listarVinculosKit(movimentacaoId) {
+    async listarVinculosKit(movimentacaoId, tenantId) {
         return prisma.$queryRaw(Prisma.sql `
       SELECT
         m.id,
@@ -465,13 +491,17 @@ export class AlmoxarifadoRepository {
         i.codigo AS codigo_item,
         i.descricao AS descricao_item
       FROM movimentacao_vinculo_kit vk
+      INNER JOIN almoxarifado_movimentacao principal ON principal.id = vk.movimentacao_principal_id
       INNER JOIN almoxarifado_movimentacao m ON m.id = vk.movimentacao_gerada_id
       INNER JOIN almoxarifado_item i ON i.id = m.item_id
       WHERE vk.movimentacao_principal_id = ${movimentacaoId}
+        AND principal.tenant_id::text = ${tenantId}
+        AND m.tenant_id::text = ${tenantId}
+        AND i.tenant_id::text = ${tenantId}
       ORDER BY m.id ASC
     `);
     }
-    async listarComposicaoKitComEstoque(produtoKitIds, tx = prisma) {
+    async listarComposicaoKitComEstoque(produtoKitIds, tenantId, tx = prisma) {
         if (!produtoKitIds.length) {
             return [];
         }
@@ -483,11 +513,14 @@ export class AlmoxarifadoRepository {
         COALESCE(i.estoque_atual, 0)::float8 AS estoque_componente
       FROM produtos_kit_composicao c
       INNER JOIN almoxarifado_item i ON i.id = c.produto_item_id
+      INNER JOIN almoxarifado_item k ON k.id = c.produto_kit_id
       WHERE c.ativo = TRUE
         AND c.produto_kit_id IN (${Prisma.join(produtoKitIds)})
+        AND ${tenantSql("i", tenantId)}
+        AND ${tenantSql("k", tenantId)}
     `);
     }
-    async aplicarEstoqueDisponivelKit(itens, tx = prisma) {
+    async aplicarEstoqueDisponivelKit(itens, tenantId, tx = prisma) {
         const idsKit = itens.filter((item) => item.is_kit).map((item) => item.id);
         if (!idsKit.length) {
             return itens.map((item) => ({
@@ -497,7 +530,7 @@ export class AlmoxarifadoRepository {
                 possui_composicao_kit: false
             }));
         }
-        const composicoes = await this.listarComposicaoKitComEstoque(idsKit, tx);
+        const composicoes = await this.listarComposicaoKitComEstoque(idsKit, tenantId, tx);
         const composicaoPorKit = new Map();
         for (const componente of composicoes) {
             const chave = String(componente.produto_kit_id);
@@ -534,10 +567,11 @@ export class AlmoxarifadoRepository {
             quantidadeConsumida: Number(componente.quantidade_item) * Number(payload.quantidadeKits)
         }));
         for (const componente of consumoComponentes) {
-            const componenteAtual = await this.buscarItemPorIdOuFalhar(componente.produto_item_id);
+            const componenteAtual = await this.buscarItemPorIdOuFalhar(componente.produto_item_id, payload.tenantId, tx);
             const saldoGerado = calcularSaldo(Number(componenteAtual.estoque_atual ?? 0), "Saida", componente.quantidadeConsumida, null);
             await tx.$queryRaw(Prisma.sql `
         INSERT INTO almoxarifado_movimentacao (
+          tenant_id,
           item_id,
           data_movimentacao,
           tipo,
@@ -549,6 +583,7 @@ export class AlmoxarifadoRepository {
           direcao_ajuste,
           criado_em
         ) VALUES (
+          ${payload.tenantId}::uuid,
           ${componente.produto_item_id},
           ${toOptionalDate(payload.dataMovimentacao)},
           ${"Saida"},
@@ -568,6 +603,7 @@ export class AlmoxarifadoRepository {
           estoque_atual = ${saldoGerado},
           atualizado_em = NOW()
         WHERE id = ${componente.produto_item_id}
+          AND tenant_id::text = ${payload.tenantId}
       `);
         }
     }

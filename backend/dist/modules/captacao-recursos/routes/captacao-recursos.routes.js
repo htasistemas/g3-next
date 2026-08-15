@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../../../shared/http/async-handler.js";
+import { rateLimit } from "../../../shared/http/rate-limit.js";
 import { ensureAuthenticated, ensurePermissions } from "../../auth/middlewares/auth.middleware.js";
 import { CaptacaoRecursosController } from "../controllers/captacao-recursos.controller.js";
 const controller = new CaptacaoRecursosController();
@@ -19,12 +20,21 @@ const permissaoCampanhasPausar = ["ADMINISTRADOR", "CAPTACAO_CAMPANHAS_PAUSAR", 
 const permissaoComprovantes = ["ADMINISTRADOR", "CAPTACAO_COMPROVANTES_EMITIR"];
 const permissaoConfig = ["ADMINISTRADOR", "CAPTACAO_CONFIGURAR"];
 const permissaoRelatorios = ["ADMINISTRADOR", "CAPTACAO_RELATORIOS_VISUALIZAR", "CAPTACAO_RELATORIOS_EXPORTAR"];
+const portalLoginRateLimit = rateLimit({
+    keyPrefix: "captacao-portal-login",
+    windowMs: 15 * 60 * 1000,
+    max: 8,
+    key: (request) => String(request.body?.email ?? request.body?.documento ?? "")
+});
 captacaoRecursosRoutes.get("/dashboard", ensureAuthenticated, ensurePermissions(permissaoDashboard), asyncHandler(controller.dashboard.bind(controller)));
 captacaoRecursosRoutes.get("/doadores", ensureAuthenticated, ensurePermissions(permissaoDoadoresView), asyncHandler(controller.listarDoadores.bind(controller)));
 captacaoRecursosRoutes.post("/doadores", ensureAuthenticated, ensurePermissions(permissaoDoadoresEdit), asyncHandler(controller.salvarDoador.bind(controller)));
 captacaoRecursosRoutes.get("/doadores/:id", ensureAuthenticated, ensurePermissions(permissaoDoadoresView), asyncHandler(controller.buscarDoador.bind(controller)));
 captacaoRecursosRoutes.put("/doadores/:id", ensureAuthenticated, ensurePermissions(permissaoDoadoresEdit), asyncHandler(controller.salvarDoador.bind(controller)));
 captacaoRecursosRoutes.patch("/doadores/:id/inativar", ensureAuthenticated, ensurePermissions(permissaoDoadoresInativar), asyncHandler(controller.inativarDoador.bind(controller)));
+captacaoRecursosRoutes.get("/doadores/:id/tarefas", ensureAuthenticated, ensurePermissions(permissaoDoadoresView), asyncHandler(controller.listarTarefasRelacionamento.bind(controller)));
+captacaoRecursosRoutes.post("/doadores/:id/tarefas", ensureAuthenticated, ensurePermissions(permissaoDoadoresEdit), asyncHandler(controller.salvarTarefaRelacionamento.bind(controller)));
+captacaoRecursosRoutes.patch("/tarefas-relacionamento/:id/concluir", ensureAuthenticated, ensurePermissions(permissaoDoadoresEdit), asyncHandler(controller.concluirTarefaRelacionamento.bind(controller)));
 captacaoRecursosRoutes.get("/campanhas", ensureAuthenticated, ensurePermissions(permissaoDashboard), asyncHandler(controller.listarCampanhas.bind(controller)));
 captacaoRecursosRoutes.post("/campanhas", ensureAuthenticated, ensurePermissions(permissaoCampanhasEdit), asyncHandler(controller.salvarCampanha.bind(controller)));
 captacaoRecursosRoutes.get("/campanhas/:id", ensureAuthenticated, ensurePermissions(permissaoDashboard), asyncHandler(controller.buscarCampanha.bind(controller)));
@@ -45,7 +55,7 @@ captacaoRecursosRoutes.get("/configuracoes", ensureAuthenticated, ensurePermissi
 captacaoRecursosRoutes.put("/configuracoes", ensureAuthenticated, ensurePermissions(permissaoConfig), asyncHandler(controller.salvarConfiguracoes.bind(controller)));
 captacaoRecursosRoutes.get("/logs", ensureAuthenticated, ensurePermissions(permissaoRelatorios), asyncHandler(controller.logs.bind(controller)));
 captacaoRecursosRoutes.get("/relatorios/exportar", ensureAuthenticated, ensurePermissions(permissaoRelatorios), asyncHandler(controller.exportar.bind(controller)));
-captacaoRecursosRoutes.post("/portal/login", asyncHandler(controller.portalLogin.bind(controller)));
+captacaoRecursosRoutes.post("/portal/login", portalLoginRateLimit, asyncHandler(controller.portalLogin.bind(controller)));
 captacaoRecursosRoutes.get("/portal/painel", asyncHandler(controller.portalPainel.bind(controller)));
 captacaoRecursosRoutes.put("/portal/meus-dados", asyncHandler(controller.portalAtualizarDados.bind(controller)));
 captacaoRecursosRoutes.post("/portal/doacoes", asyncHandler(controller.portalCriarDoacao.bind(controller)));

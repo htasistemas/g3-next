@@ -14,82 +14,132 @@ function responderRelatorio(response, resultado, formato) {
 export class ReportsController {
     async relacaoUnidadesAssistenciais(request, response) {
         const formato = formatoRelatorioSchema.parse(request.query.formato);
-        const resultado = await service.gerarRelacaoUnidadesAssistenciais(request.body);
+        const resultado = await service.gerarRelacaoUnidadesAssistenciais(request.body, request.authUser);
         return responderRelatorio(response, resultado, formato);
     }
     async relacaoBeneficiarios(request, response) {
         const formato = formatoRelatorioSchema.parse(request.query.formato);
-        const resultado = await service.gerarRelacaoBeneficiarios(request.body);
+        const resultado = await service.gerarRelacaoBeneficiarios(request.body, request.authUser);
         return responderRelatorio(response, resultado, formato);
     }
     async fichaBeneficiario(request, response) {
         const formato = formatoRelatorioSchema.parse(request.query.formato);
-        const resultado = await service.gerarFichaBeneficiario(request.body);
+        const resultado = await service.gerarFichaBeneficiario(request.body, request.authUser);
         return responderRelatorio(response, resultado, formato);
     }
     async termoAutorizacao(request, response) {
         const formato = formatoRelatorioSchema.parse(request.query.formato);
-        const resultado = await service.gerarTermoAutorizacao(request.body);
+        const resultado = await service.gerarTermoAutorizacao(request.body, request.authUser);
         return responderRelatorio(response, resultado, formato);
     }
     async relacaoProfissionais(request, response) {
         const formato = formatoRelatorioSchema.parse(request.query.formato);
-        const resultado = await service.gerarRelacaoProfissionais(request.body);
+        const resultado = await service.gerarRelacaoProfissionais(request.body, request.authUser);
         return responderRelatorio(response, resultado, formato);
     }
     async fichaProfissional(request, response) {
         const formato = formatoRelatorioSchema.parse(request.query.formato);
-        const resultado = await service.gerarFichaProfissional(request.body);
+        const resultado = await service.gerarFichaProfissional(request.body, request.authUser);
         return responderRelatorio(response, resultado, formato);
     }
     async relacaoVoluntarios(request, response) {
         const formato = formatoRelatorioSchema.parse(request.query.formato);
-        const resultado = await service.gerarRelacaoVoluntarios(request.body);
+        const resultado = await service.gerarRelacaoVoluntarios(request.body, request.authUser);
         return responderRelatorio(response, resultado, formato);
     }
     async fichaVoluntario(request, response) {
         const formato = formatoRelatorioSchema.parse(request.query.formato);
-        const resultado = await service.gerarFichaVoluntario(request.body);
+        const resultado = await service.gerarFichaVoluntario(request.body, request.authUser);
+        return responderRelatorio(response, resultado, formato);
+    }
+    async termoVoluntariado(request, response) {
+        const formato = formatoRelatorioSchema.parse(request.query.formato);
+        const resultado = await service.gerarTermoVoluntariado(request.body, request.authUser);
+        return responderRelatorio(response, resultado, formato);
+    }
+    async relacaoLivrosBiblioteca(request, response) {
+        const formato = formatoRelatorioSchema.parse(request.query.formato);
+        const resultado = await service.gerarRelacaoLivrosBiblioteca(request.body, request.authUser);
+        return responderRelatorio(response, resultado, formato);
+    }
+    async fichaLivroBiblioteca(request, response) {
+        const formato = formatoRelatorioSchema.parse(request.query.formato);
+        const resultado = await service.gerarFichaLivroBiblioteca(request.body, request.authUser);
+        return responderRelatorio(response, resultado, formato);
+    }
+    async relacaoEmprestimosBiblioteca(request, response) {
+        const formato = formatoRelatorioSchema.parse(request.query.formato);
+        const resultado = await service.gerarRelacaoEmprestimosBiblioteca(request.body, request.authUser);
+        return responderRelatorio(response, resultado, formato);
+    }
+    async devolucoesPendentesBiblioteca(request, response) {
+        const formato = formatoRelatorioSchema.parse(request.query.formato);
+        const resultado = await service.gerarDevolucoesPendentesBiblioteca(request.body, request.authUser);
+        return responderRelatorio(response, resultado, formato);
+    }
+    async livrosDisponiveisBiblioteca(request, response) {
+        const formato = formatoRelatorioSchema.parse(request.query.formato);
+        const resultado = await service.gerarLivrosDisponiveisBiblioteca(request.body, request.authUser);
+        return responderRelatorio(response, resultado, formato);
+    }
+    async alertasBiblioteca(request, response) {
+        const formato = formatoRelatorioSchema.parse(request.query.formato);
+        const resultado = await service.gerarAlertasBiblioteca(request.body, request.authUser);
+        return responderRelatorio(response, resultado, formato);
+    }
+    async painelBiblioteca(request, response) {
+        const formato = formatoRelatorioSchema.parse(request.query.formato);
+        const resultado = await service.gerarPainelBiblioteca(request.body, request.authUser);
         return responderRelatorio(response, resultado, formato);
     }
     async relacaoMatriculas(request, response) {
         const formato = formatoRelatorioSchema.parse(request.query.formato);
-        const resultado = await service.gerarRelacaoMatriculas(request.body);
+        const resultado = await service.gerarRelacaoMatriculas(request.body, request.authUser);
         return responderRelatorio(response, resultado, formato);
     }
     async listaPresencaMatricula(request, response) {
         const formato = formatoRelatorioSchema.parse(request.query.formato);
-        const resultado = await service.gerarListaPresencaMatricula(request.body);
+        const resultado = await service.gerarListaPresencaMatricula(request.body, request.authUser);
         return responderRelatorio(response, resultado, formato);
     }
     async comprovanteMatricula(request, response) {
         const formato = formatoRelatorioSchema.parse(request.query.formato);
-        const resultado = await service.gerarComprovanteMatricula(request.body);
+        const resultado = await service.gerarComprovanteMatricula(request.body, request.authUser);
         return responderRelatorio(response, resultado, formato);
     }
     async comprovantePreMatriculaEspera(request, response) {
         const formato = formatoRelatorioSchema.parse(request.query.formato);
-        const resultado = await service.gerarComprovantePreMatriculaEspera(request.body);
+        const resultado = await service.gerarComprovantePreMatriculaEspera(request.body, request.authUser);
         return responderRelatorio(response, resultado, formato);
     }
     async relacaoRegistroDoacao(request, response) {
         const formato = formatoRelatorioSchema.parse(request.query.formato);
-        const resultado = await service.gerarRelacaoRegistroDoacao(request.body);
+        const resultado = await service.gerarRelacaoRegistroDoacao(request.body, request.authUser);
         return responderRelatorio(response, resultado, formato);
     }
     async relacaoDoacoesRealizadas(request, response) {
         const formato = formatoRelatorioSchema.parse(request.query.formato);
-        const resultado = await service.gerarRelacaoDoacoesRealizadas(request.body);
+        const resultado = await service.gerarRelacaoDoacoesRealizadas(request.body, request.authUser);
         return responderRelatorio(response, resultado, formato);
     }
     async reciboDoacaoRealizada(request, response) {
         const formato = formatoRelatorioSchema.parse(request.query.formato);
-        const resultado = await service.gerarReciboDoacaoRealizada(request.body);
+        const resultado = await service.gerarReciboDoacaoRealizada(request.body, request.authUser);
         return responderRelatorio(response, resultado, formato);
     }
     async espelhoPonto(request, response) {
         const formato = formatoRelatorioSchema.parse(request.query.formato);
         const resultado = await service.gerarEspelhoPonto(request.body, request.authUser);
+        return responderRelatorio(response, resultado, formato);
+    }
+    async relacaoTermosParceria(request, response) {
+        const formato = formatoRelatorioSchema.parse(request.query.formato);
+        const resultado = await service.gerarRelacaoTermosParceria(request.body, request.authUser);
+        return responderRelatorio(response, resultado, formato);
+    }
+    async termoParceriaCompleto(request, response) {
+        const formato = formatoRelatorioSchema.parse(request.query.formato);
+        const resultado = await service.gerarTermoParceriaCompleto(request.body, request.authUser);
         return responderRelatorio(response, resultado, formato);
     }
 }

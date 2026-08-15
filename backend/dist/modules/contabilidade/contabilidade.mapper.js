@@ -11,6 +11,7 @@ export function mapContaBancariaToResponse(row) {
         tipo: normalizarTipoConta(row.tipo),
         titular: row.titular ?? undefined,
         projetoVinculado: row.projeto_vinculado ?? undefined,
+        fontePagamento: row.fonte_pagamento ?? undefined,
         pixVinculado: row.pix_vinculado,
         tipoChavePix: row.tipo_chave_pix ?? undefined,
         chavePix: row.chave_pix ?? undefined,
@@ -78,6 +79,7 @@ export function mapLancamentoToResponse(row) {
         conciliado: row.conciliado,
         bloqueadoOrigem: row.bloqueado_origem,
         contaBancariaNome: row.conta_bancaria_nome ?? undefined,
+        contaBancariaFontePagamento: row.conta_bancaria_fonte_pagamento ?? undefined,
         categoriaNome: row.categoria_nome ?? undefined,
         centroCustoNome: row.centro_custo_nome ?? undefined
     };
@@ -190,5 +192,31 @@ export function mapEmendaToResponse(row) {
         diasAlerta: row.dias_alerta,
         status: row.status,
         observacoes: row.observacoes ?? undefined
+    };
+}
+export function mapFechamentoMensalToResponse(row) {
+    const contas = Array.isArray(row.contas_snapshot)
+        ? row.contas_snapshot.map((item) => ({
+            contaId: Number(item.contaId),
+            banco: item.banco ?? undefined,
+            nomeConta: item.nomeConta,
+            tipo: item.tipo,
+            saldo: Number(item.saldo ?? 0)
+        }))
+        : [];
+    const [ano, mes] = row.competencia.split("-");
+    const proximo = new Date(Number(ano), Number(mes) - 1, 1);
+    proximo.setMonth(proximo.getMonth() + 1);
+    return {
+        id: Number(row.id),
+        competencia: row.competencia,
+        proximaCompetencia: `${proximo.getFullYear()}-${String(proximo.getMonth() + 1).padStart(2, "0")}`,
+        dataFechamento: row.criado_em.toISOString(),
+        saldoTotal: row.saldo_total ?? 0,
+        saldoBancos: row.saldo_bancos ?? 0,
+        saldoCaixa: row.saldo_caixa ?? 0,
+        observacao: row.observacao ?? undefined,
+        usuarioNome: row.usuario_nome ?? undefined,
+        contas
     };
 }

@@ -9,3 +9,11 @@ export const registroPontoOcorrenciaTipos = [
     "CORRECAO_ADMINISTRATIVA",
     "OBSERVACAO_OPERACIONAL"
 ];
+export const registroPontoHoraExtraStatusTipos = [
+    "SEM_EXTRA",
+    "EXTRA_PENDENTE_AUTORIZACAO",
+    "EXTRA_AUTORIZADA",
+    "EXTRA_NEGADA",
+    "EXTRA_COMPENSADA_BANCO",
+    "EXTRA_PAGA_FOLHA"
+];

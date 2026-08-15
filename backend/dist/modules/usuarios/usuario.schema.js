@@ -84,6 +84,9 @@ const baseUsuarioSchemaShape = {
     permissoes: optionalPermissoesArray,
     status: z.enum(usuarioStatusValues).default("ATIVO"),
     exigir_troca_senha: optionalBoolean.default(false),
+    exigir_autenticacao_segura: optionalBoolean.default(false),
+    permitir_biometria_facial_login: optionalBoolean.default(false),
+    exigir_biometria_facial_login: optionalBoolean.default(false),
     origem_tipo: optionalUsuarioOrigemTipo,
     origem_id: optionalTrimmedString,
     origem_nome: optionalTrimmedString
@@ -137,6 +140,9 @@ export const resetarSenhaUsuarioSchema = z
             message: "As senhas nao conferem."
         });
     }
+});
+export const usuarioFaceSchema = z.object({
+    face_imagem: z.string().trim().min(1, "Capture a face do usuario.")
 });
 export const usuarioFiltersSchema = z.object({
     nome: optionalTrimmedString,

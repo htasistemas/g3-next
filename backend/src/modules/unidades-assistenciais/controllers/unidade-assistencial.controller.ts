@@ -6,17 +6,17 @@ const service = new UnidadeAssistencialService();
 
 export class UnidadeAssistencialController {
   async listar(request: AuthenticatedRequest, response: Response) {
-    const unidades = await service.listar(request.query, request.authUser?.tenant_id);
+    const unidades = await service.listar(request.query, request.authUser?.tenant_id, request.authUser?.contexto);
     return response.json({ unidades });
   }
 
   async buscarPorId(request: AuthenticatedRequest, response: Response) {
-    const unidade = await service.buscarPorId(request.params.id, request.authUser?.tenant_id);
+    const unidade = await service.buscarPorId(request.params.id, request.authUser?.tenant_id, request.authUser?.contexto);
     return response.json({ unidade });
   }
 
   async buscarAtual(request: AuthenticatedRequest, response: Response) {
-    const unidade = await service.buscarAtual(request.authUser?.tenant_id);
+    const unidade = await service.buscarAtual(request.authUser?.tenant_id, request.authUser?.contexto);
     return response.json({ unidade });
   }
 
@@ -39,13 +39,14 @@ export class UnidadeAssistencialController {
       request.params.id,
       request.body,
       request.authUser?.id,
-      request.authUser?.tenant_id
+      request.authUser?.tenant_id,
+      request.authUser?.contexto
     );
     return response.json({ unidade });
   }
 
   async remover(request: AuthenticatedRequest, response: Response) {
-    await service.remover(request.params.id, request.authUser?.id, request.authUser?.tenant_id);
+    await service.remover(request.params.id, request.authUser?.id, request.authUser?.tenant_id, request.authUser?.contexto);
     return response.status(204).send();
   }
 }

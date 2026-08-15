@@ -115,7 +115,11 @@ export class StorageService {
     }
 
     const caminhoArquivo = this.provider.normalizePath(rawPath);
-    const arquivo = await this.repository.buscarAtivoPorCaminho(caminhoArquivo, tenantId);
+    const tenantObrigatorio = this.requireTenantId(tenantId);
+    if (!this.caminhoPertenceAoTenant(caminhoArquivo, tenantObrigatorio)) {
+      throw new AppError("Arquivo nao encontrado ou sem permissao de acesso.", 404);
+    }
+    const arquivo = await this.repository.buscarAtivoPorCaminho(caminhoArquivo, tenantObrigatorio);
     if (!arquivo) {
       throw new AppError("Arquivo nao encontrado ou sem permissao de acesso.", 404);
     }
@@ -441,6 +445,17 @@ export class StorageService {
       throw new AppError("Identificador de arquivo invalido.", 400);
     }
     return BigInt(parsed);
+  }
+
+  private requireTenantId(rawTenantId?: string) {
+    const tenantId = rawTenantId?.trim();
+    if (!tenantId) throw new AppError("Tenant da sessao nao identificado.", 401);
+    return tenantId;
+  }
+
+  private caminhoPertenceAoTenant(caminho: string, tenantId: string) {
+    const prefixo = `${STORAGE_TENANTS_ROOT}/${normalizarCaminhoLogico(tenantId)}/`;
+    return caminho.startsWith(prefixo);
   }
 
   private obterPolicyDoArquivo(arquivo: ArquivoMetadataRow) {

@@ -9,7 +9,7 @@ export const bancoEmpregosUploadMiddleware = multer({
 }).single("arquivo");
 export class BancoEmpregosController {
     async dashboard(request, response) {
-        const resultado = await service.listarDashboard(request.query);
+        const resultado = await service.listarDashboard(request.query, request.authUser?.tenant_id);
         return response.json(resultado);
     }
     async exportar(request, response) {
@@ -17,7 +17,7 @@ export class BancoEmpregosController {
             ? request.params.tipo
             : "vagas";
         const formato = request.query.formato === "pdf" ? "pdf" : "csv";
-        const resultado = await service.exportar(request.query, tipo, formato);
+        const resultado = await service.exportar(request.query, tipo, formato, request.authUser?.tenant_id);
         return response
             .status(200)
             .type(resultado.contentType)
@@ -39,11 +39,11 @@ export class BancoEmpregosController {
             .send(resultado.buffer);
     }
     async listar(request, response) {
-        const vagas = await service.listar(request.query);
+        const vagas = await service.listar(request.query, request.authUser?.tenant_id);
         return response.json(vagas);
     }
     async obter(request, response) {
-        const vaga = await service.obter(request.params.id);
+        const vaga = await service.obter(request.params.id, request.authUser?.tenant_id);
         return response.json(vaga);
     }
     async criar(request, response) {
@@ -59,11 +59,11 @@ export class BancoEmpregosController {
         return response.status(204).send();
     }
     async listarCandidatos(request, response) {
-        const candidatos = await service.listarCandidatos(request.query);
+        const candidatos = await service.listarCandidatos(request.query, request.authUser?.tenant_id);
         return response.json(candidatos);
     }
     async buscarCandidato(request, response) {
-        const candidato = await service.buscarCandidato(request.params.candidatoId);
+        const candidato = await service.buscarCandidato(request.params.candidatoId, request.authUser?.tenant_id);
         return response.json(candidato);
     }
     async criarCandidato(request, response) {
@@ -79,7 +79,7 @@ export class BancoEmpregosController {
         return response.status(204).send();
     }
     async listarDocumentos(request, response) {
-        const documentos = await service.listarDocumentos(request.params.candidatoId);
+        const documentos = await service.listarDocumentos(request.params.candidatoId, request.authUser?.tenant_id);
         return response.json(documentos);
     }
     async adicionarDocumento(request, response) {
@@ -91,11 +91,11 @@ export class BancoEmpregosController {
         return response.status(204).send();
     }
     async listarProcessos(request, response) {
-        const processos = await service.listarProcessos(request.query);
+        const processos = await service.listarProcessos(request.query, request.authUser?.tenant_id);
         return response.json(processos);
     }
     async buscarProcesso(request, response) {
-        const processo = await service.buscarProcesso(request.params.processoId);
+        const processo = await service.buscarProcesso(request.params.processoId, request.authUser?.tenant_id);
         return response.json(processo);
     }
     async vincularCandidato(request, response) {
@@ -111,7 +111,7 @@ export class BancoEmpregosController {
         return response.json(avaliacao);
     }
     async listarHistorico(request, response) {
-        const historico = await service.listarHistorico(request.query);
+        const historico = await service.listarHistorico(request.query, request.authUser?.tenant_id);
         return response.json(historico);
     }
 }

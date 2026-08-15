@@ -9,7 +9,10 @@ import { maintenanceModeMiddleware } from "./middlewares/maintenance-mode.js";
 import { notFoundHandler } from "./middlewares/not-found.js";
 import { appRoutes } from "./routes/index.js";
 export const app = express();
-app.use(helmet());
+app.set("trust proxy", 1);
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 app.use(cors({
     origin: (requestOrigin, callback) => {
         if (!requestOrigin) {

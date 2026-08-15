@@ -20,6 +20,16 @@ const optionalBoolean = z.preprocess((value) => {
     return value;
 }, z.boolean().optional());
 export const formatoRelatorioSchema = z.enum(["pdf", "html"]).default("pdf");
+export const termosParceriaRelacaoRequestSchema = z.object({
+    projetoId: optionalString,
+    status: optionalString,
+    busca: optionalString,
+    usuarioEmissor: optionalString
+});
+export const termoParceriaCompletoRequestSchema = z.object({
+    termoId: z.string().trim().regex(/^\d+$/, "termoId deve ser numérico."),
+    usuarioEmissor: optionalString
+});
 export const beneficiarioRelacaoRequestSchema = z.object({
     nome: optionalString,
     cpf: optionalString,
@@ -81,6 +91,21 @@ export const voluntarioFichaRequestSchema = z.object({
     voluntarioId: z.string().trim().min(1, "voluntarioId e obrigatorio."),
     usuarioEmissor: optionalString
 });
+export const bibliotecaLivroRelacaoRequestSchema = z.object({
+    termo: optionalString,
+    usuarioEmissor: optionalString
+});
+export const bibliotecaLivroFichaRequestSchema = z.object({
+    livroId: z.string().trim().min(1, "livroId e obrigatorio."),
+    usuarioEmissor: optionalString
+});
+export const bibliotecaEmprestimoRelacaoRequestSchema = z.object({
+    termo: optionalString,
+    usuarioEmissor: optionalString
+});
+export const bibliotecaRelatorioRequestSchema = z.object({
+    usuarioEmissor: optionalString
+});
 export const matriculasRelacaoRequestSchema = z.object({
     nome: optionalString,
     tipo: optionalString,
@@ -92,6 +117,8 @@ export const matriculasRelacaoRequestSchema = z.object({
 export const matriculaListaPresencaRequestSchema = z.object({
     matriculaId: z.string().trim().min(1, "matriculaId e obrigatorio."),
     dataAula: optionalString,
+    periodoInicio: optionalString,
+    periodoFim: optionalString,
     exibirCpf: optionalBoolean,
     usuarioEmissor: optionalString
 });

@@ -22,6 +22,15 @@ export type AuthenticatedRequest = Request & {
     perfil?: string;
     is_superadmin?: boolean;
     permissoes: string[];
+    contexto?: {
+      identidade_id?: string;
+      acesso_id?: string;
+      instituicao_id?: string;
+      entidade_juridica_id?: string;
+      unidade_id?: string;
+      projeto_id?: string;
+      escopo?: string;
+    };
   };
 };
 
@@ -61,6 +70,7 @@ export function ensureAuthenticated(
         perfil: payload.perfil,
         is_superadmin: payload.is_superadmin,
         permissoes: payload.permissoes ?? []
+        ,contexto: payload.contexto
       };
       return next();
     } catch {
@@ -95,6 +105,7 @@ export function hydrateAuthenticatedUser(
         perfil: payload.perfil,
         is_superadmin: payload.is_superadmin,
         permissoes: payload.permissoes ?? []
+        ,contexto: payload.contexto
       };
     } catch {
       request.authUser = undefined;

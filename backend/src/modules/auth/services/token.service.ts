@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import { env } from "../../../config/env.js";
-import type { JwtPayload, UsuarioAutenticado } from "../auth.types.js";
+import type { ContextoOrganizacional, JwtPayload, UsuarioAutenticado } from "../auth.types.js";
 
 export class TokenService {
   gerarToken(usuario: UsuarioAutenticado): string {
@@ -17,6 +17,7 @@ export class TokenService {
       perfil: usuario.perfil,
       is_superadmin: usuario.is_superadmin,
       permissoes: usuario.permissoes
+      ,contexto: usuario.contexto
     };
 
     return jwt.sign(payload, env.APP_AUTH_TOKEN_SECRET, {
@@ -27,5 +28,20 @@ export class TokenService {
 
   validarToken(token: string): JwtPayload {
     return jwt.verify(token, env.APP_AUTH_TOKEN_SECRET) as JwtPayload;
+  }
+
+  gerarTicketSelecao(identidadeId: string, usuarioIds: string[]) {
+    return jwt.sign({ sub: identidadeId, tipo: "SELECAO_AMBIENTE", usuario_ids: usuarioIds }, env.APP_AUTH_TOKEN_SECRET, {
+      algorithm: "HS256",
+      expiresIn: "5m"
+    });
+  }
+
+  validarTicketSelecao(token: string) {
+    const payload = jwt.verify(token, env.APP_AUTH_TOKEN_SECRET) as { sub: string; tipo?: string; usuario_ids?: string[] };
+    if (payload.tipo !== "SELECAO_AMBIENTE" || !payload.sub || !Array.isArray(payload.usuario_ids)) {
+      throw new Error("Ticket de selecao invalido");
+    }
+    return payload;
   }
 }

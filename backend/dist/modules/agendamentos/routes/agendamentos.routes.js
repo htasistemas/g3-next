@@ -32,7 +32,9 @@ agendamentosRoutes.get("/:id", ensurePermissions(permissoesVisualizacao), asyncH
 agendamentosRoutes.post("/", ensurePermissions(permissoesEdicao), asyncHandler(controller.criar.bind(controller)));
 agendamentosRoutes.put("/:id", ensurePermissions(permissoesEdicao), asyncHandler(controller.atualizar.bind(controller)));
 agendamentosRoutes.post("/:id/cancelar", ensurePermissions(["ADMINISTRADOR", "OPERADOR", "AGENDAMENTOS_CANCELAR"]), asyncHandler(controller.cancelar.bind(controller)));
+agendamentosRoutes.delete("/:id", ensurePermissions(["ADMINISTRADOR", "OPERADOR", "AGENDAMENTOS_CANCELAR"]), asyncHandler(controller.excluir.bind(controller)));
 agendamentosRoutes.post("/:id/remarcar", ensurePermissions(["ADMINISTRADOR", "OPERADOR", "AGENDAMENTOS_REMARCAR"]), asyncHandler(controller.remarcar.bind(controller)));
+agendamentosRoutes.post("/:id/copiar", ensurePermissions(permissoesEdicao), asyncHandler(controller.copiar.bind(controller)));
 agendamentosRoutes.post("/:id/confirmar", ensurePermissions(["ADMINISTRADOR", "OPERADOR", "AGENDAMENTOS_CONFIRMAR"]), asyncHandler(controller.confirmar.bind(controller)));
 agendamentosRoutes.post("/:id/check-in", ensurePermissions(["ADMINISTRADOR", "OPERADOR", "AGENDAMENTOS_CHECKIN"]), asyncHandler(controller.checkIn.bind(controller)));
 agendamentosRoutes.post("/:id/concluir", ensurePermissions(["ADMINISTRADOR", "OPERADOR", "AGENDAMENTOS_CONCLUIR"]), asyncHandler(controller.concluir.bind(controller)));

@@ -118,3 +118,24 @@ export type UsuarioPayload = {
   origem_id?: string;
   origem_nome?: string;
 };
+export type UsuarioAcesso = {
+  acesso_id: string;
+  instituicao_id: string;
+  tenant_id: string;
+  entidade_juridica_id?: string | null;
+  unidade_id?: string | null;
+  projeto_id?: string | null;
+  perfil_nome?: string | null;
+  escopo: "INSTITUICAO" | "ENTIDADE_JURIDICA" | "UNIDADE" | "PROJETO";
+  ativo: boolean;
+  entidade_nome?: string | null;
+  unidade_nome?: string | null;
+  projeto_nome?: string | null;
+};
+
+export type UsuarioAcessoInput = Pick<UsuarioAcesso, "instituicao_id" | "entidade_juridica_id" | "unidade_id" | "projeto_id" | "perfil_nome" | "escopo" | "ativo">;
+export type UsuarioAcessoCatalogo = {
+  entidades: Array<{ id: string; nome: string; cnpj?: string }>;
+  unidades: Array<{ id: string; nome: string; entidade_juridica_id?: string | null }>;
+  projetos: Array<{ id: string; nome: string; unidade_organizacional_id?: string | null }>;
+};

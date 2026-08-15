@@ -3,11 +3,48 @@ import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { ensureArquivosEstrutura } from "./arquivos-estrutura.repository.js";
 export class ArquivosRepository {
+    montarClausulaTenantLegado(tenantId) {
+        return Prisma.sql `
+      OR (
+        tenant_id IS NULL
+        AND (
+          (
+            entidade_tipo = 'beneficiario'
+            AND EXISTS (
+              SELECT 1
+              FROM cadastro_beneficiario b
+              WHERE b.id = arquivos.entidade_id
+                AND b.tenant_id::text = ${tenantId}
+            )
+          )
+          OR (
+            entidade_tipo IN ('instituicao', 'unidade_assistencial')
+            AND EXISTS (
+              SELECT 1
+              FROM unidade_assistencial u
+              WHERE u.id = arquivos.entidade_id
+                AND u.tenant_id::text = ${tenantId}
+            )
+          )
+          OR (
+            entidade_tipo = 'instituicao'
+            AND EXISTS (
+              SELECT 1
+              FROM documentos_instituicao d
+              WHERE d.id = arquivos.entidade_id
+                AND d.tenant_id::text = ${tenantId}
+            )
+          )
+        )
+      )
+    `;
+    }
     async criar(input) {
         await ensureArquivosEstrutura(prisma);
         const usuarioUploadId = await this.resolverUsuarioUploadId(input.usuarioUploadId ?? undefined);
         const rows = await prisma.$queryRaw(Prisma.sql `
       INSERT INTO arquivos (
+        tenant_id,
         entidade_tipo,
         entidade_id,
         categoria,
@@ -26,6 +63,7 @@ export class ArquivosRepository {
         criado_em,
         atualizado_em
       ) VALUES (
+        ${input.tenantId ? Prisma.sql `${input.tenantId}::uuid` : Prisma.sql `NULL`},
         ${input.entidadeTipo},
         ${input.entidadeId ?? null},
         ${input.categoria},
@@ -46,6 +84,7 @@ export class ArquivosRepository {
       )
       RETURNING
         id,
+        tenant_id::text AS tenant_id,
         entidade_tipo,
         entidade_id,
         categoria,
@@ -91,6 +130,14 @@ export class ArquivosRepository {
     async listar(filters) {
         await ensureArquivosEstrutura(prisma);
         const clauses = [Prisma.sql `1 = 1`];
+        if (filters.tenantId) {
+            clauses.push(Prisma.sql `
+        (
+          tenant_id::text = ${filters.tenantId}
+          ${this.montarClausulaTenantLegado(filters.tenantId)}
+        )
+      `);
+        }
         if (filters.entidadeTipo) {
             clauses.push(Prisma.sql `entidade_tipo = ${filters.entidadeTipo}`);
         }
@@ -106,6 +153,7 @@ export class ArquivosRepository {
         return prisma.$queryRaw(Prisma.sql `
       SELECT
         id,
+        tenant_id::text AS tenant_id,
         entidade_tipo,
         entidade_id,
         categoria,
@@ -129,11 +177,20 @@ export class ArquivosRepository {
       ORDER BY data_upload DESC, id DESC
     `);
     }
-    async buscarPorId(id) {
+    async buscarPorId(id, tenantId) {
         await ensureArquivosEstrutura(prisma);
+        const tenantClause = tenantId
+            ? Prisma.sql `
+        AND (
+          tenant_id::text = ${tenantId}
+          ${this.montarClausulaTenantLegado(tenantId)}
+        )
+      `
+            : Prisma.empty;
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT
         id,
+        tenant_id::text AS tenant_id,
         entidade_tipo,
         entidade_id,
         categoria,
@@ -154,22 +211,32 @@ export class ArquivosRepository {
         excluido_em
       FROM arquivos
       WHERE id = ${id}
+        ${tenantClause}
       LIMIT 1
     `);
         return rows[0] ?? null;
     }
-    async buscarPorIdOuFalhar(id) {
-        const arquivo = await this.buscarPorId(id);
+    async buscarPorIdOuFalhar(id, tenantId) {
+        const arquivo = await this.buscarPorId(id, tenantId);
         if (!arquivo) {
             throw new AppError("Arquivo nao encontrado.", 404);
         }
         return arquivo;
     }
-    async buscarAtivoPorCaminho(caminhoArquivo) {
+    async buscarAtivoPorCaminho(caminhoArquivo, tenantId) {
         await ensureArquivosEstrutura(prisma);
+        const tenantClause = tenantId
+            ? Prisma.sql `
+        AND (
+          tenant_id::text = ${tenantId}
+          ${this.montarClausulaTenantLegado(tenantId)}
+        )
+      `
+            : Prisma.empty;
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT
         id,
+        tenant_id::text AS tenant_id,
         entidade_tipo,
         entidade_id,
         categoria,
@@ -191,15 +258,19 @@ export class ArquivosRepository {
       FROM arquivos
       WHERE caminho_arquivo = ${caminhoArquivo}
         AND ativo = TRUE
+        ${tenantClause}
       LIMIT 1
     `);
         return rows[0] ?? null;
     }
-    async vincularEntidadePorCaminho(caminhoArquivo, entidadeId) {
+    async vincularEntidadePorCaminho(caminhoArquivo, entidadeId, tenantId, novoCaminhoArquivo, novoThumbnailCaminho) {
         await ensureArquivosEstrutura(prisma);
         await prisma.$executeRaw(Prisma.sql `
       UPDATE arquivos
       SET entidade_id = ${entidadeId},
+          tenant_id = COALESCE(tenant_id, ${tenantId ? Prisma.sql `${tenantId}::uuid` : Prisma.sql `NULL`}),
+          ${novoCaminhoArquivo ? Prisma.sql `caminho_arquivo = ${novoCaminhoArquivo},` : Prisma.empty}
+          ${novoThumbnailCaminho !== undefined ? Prisma.sql `thumbnail_caminho = ${novoThumbnailCaminho},` : Prisma.empty}
           atualizado_em = NOW()
       WHERE caminho_arquivo = ${caminhoArquivo}
     `);

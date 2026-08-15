@@ -3,6 +3,7 @@ export function mapUnidadeAssistencialToResponse(record) {
     return {
         id_unidade: toStringId(record.id),
         nome_fantasia: record.nomeFantasia,
+        tipo_unidade: record.tipoUnidade,
         razao_social: record.razaoSocial ?? undefined,
         cnpj: record.cnpj ?? undefined,
         telefone: record.telefone ?? undefined,
@@ -42,7 +43,9 @@ export function mapUnidadeAssistencialToResponse(record) {
         })),
         salas: record.salas.map((sala) => ({
             id: toStringId(sala.id),
-            nome: sala.nome
+            nome: sala.nome,
+            capacidade_maxima: sala.capacidadeMaxima ?? 0,
+            ativo: sala.ativo ?? true
         })),
         data_cadastro: record.criadoEm.toISOString(),
         data_atualizacao: record.atualizadoEm.toISOString()

@@ -25,46 +25,53 @@ export class OficiosService {
         month: "long",
         year: "numeric"
     });
-    async listar() {
-        const registros = await this.repository.listar();
+    async listar(rawTenantId) {
+        const tenantId = this.parseTenant(rawTenantId);
+        const registros = await this.repository.listar(tenantId);
         return registros.map((item) => mapOficioToResponse(item.oficio, item.tramites));
     }
-    async obter(rawId) {
+    async obter(rawId, rawTenantId) {
         const id = this.parseId(rawId);
-        const registro = await this.repository.buscarPorIdOuFalhar(id);
+        const tenantId = this.parseTenant(rawTenantId);
+        const registro = await this.repository.buscarPorIdOuFalhar(id, tenantId);
         return mapOficioToResponse(registro.oficio, registro.tramites);
     }
-    async obterProximoNumero(rawData) {
+    async obterProximoNumero(rawData, rawTenantId) {
         const dataReferencia = this.parseDataReferencia(rawData);
-        return this.repository.obterProximoNumero(dataReferencia);
+        const tenantId = this.parseTenant(rawTenantId);
+        return this.repository.obterProximoNumero(dataReferencia, tenantId);
     }
-    async criar(rawInput, rawUsuarioId) {
-        const input = oficioInputSchema.parse(await this.prepararPayloadCriacao(rawInput, rawUsuarioId));
-        const registro = await this.repository.criar(input);
+    async criar(rawInput, rawUsuarioId, rawTenantId) {
+        const tenantId = this.parseTenant(rawTenantId);
+        const input = oficioInputSchema.parse(await this.prepararPayloadCriacao(rawInput, rawUsuarioId, tenantId));
+        const registro = await this.repository.criar(input, tenantId);
         return mapOficioToResponse(registro.oficio, registro.tramites);
     }
-    async atualizar(rawId, rawInput, rawUsuarioId) {
+    async atualizar(rawId, rawInput, rawUsuarioId, rawTenantId) {
         const id = this.parseId(rawId);
-        const input = oficioInputSchema.parse(await this.prepararPayloadAtualizacao(id, rawInput, rawUsuarioId));
-        const registro = await this.repository.atualizar(id, input);
+        const tenantId = this.parseTenant(rawTenantId);
+        const input = oficioInputSchema.parse(await this.prepararPayloadAtualizacao(id, rawInput, rawUsuarioId, tenantId));
+        const registro = await this.repository.atualizar(id, input, tenantId);
         return mapOficioToResponse(registro.oficio, registro.tramites);
     }
-    async remover(rawId, rawUsuarioId) {
+    async remover(rawId, rawUsuarioId, rawTenantId) {
         const id = this.parseId(rawId);
         const usuarioId = this.parseUsuarioId(rawUsuarioId);
-        const registro = await this.repository.buscarPorIdOuFalhar(id);
-        const imagens = await this.repository.listarImagens(id);
-        await this.repository.remover(id);
+        const tenantId = this.parseTenant(rawTenantId);
+        const registro = await this.repository.buscarPorIdOuFalhar(id, tenantId);
+        const imagens = await this.repository.listarImagens(id, tenantId);
+        await this.repository.remover(id, tenantId);
         await this.limparArquivo(registro.oficio.pdf_assinado_conteudo, usuarioId);
         for (const imagem of imagens) {
             await this.limparArquivo(imagem.conteudo_base64, usuarioId);
         }
     }
-    async salvarPdfAssinado(rawId, rawInput, rawUsuarioId) {
+    async salvarPdfAssinado(rawId, rawInput, rawUsuarioId, rawTenantId) {
         const id = this.parseId(rawId);
         const input = oficioPdfAssinadoInputSchema.parse(this.normalizarPayload(rawInput));
         const usuarioId = this.parseUsuarioId(rawUsuarioId);
-        const existente = await this.repository.buscarPorIdOuFalhar(id);
+        const tenantId = this.parseTenant(rawTenantId);
+        const existente = await this.repository.buscarPorIdOuFalhar(id, tenantId);
         const arquivo = await storageService.salvarArquivo({
             scope: "oficio_documento",
             conteudo: input.conteudoBase64,
@@ -79,7 +86,7 @@ export class OficiosService {
                 ...input,
                 conteudoBase64: arquivo.caminhoArquivo,
                 tipoMime: arquivo.registro.mime_type
-            });
+            }, tenantId);
             await storageService.vincularEntidade(arquivo.caminhoArquivo, id);
             await this.limparArquivo(existente.oficio.pdf_assinado_conteudo, usuarioId, arquivo.caminhoArquivo);
             return mapOficioToResponse(registro.oficio, registro.tramites);
@@ -89,30 +96,34 @@ export class OficiosService {
             throw error;
         }
     }
-    async obterPdfAssinado(rawId) {
+    async obterPdfAssinado(rawId, rawTenantId) {
         const id = this.parseId(rawId);
-        const pdf = await this.repository.obterPdfAssinado(id);
+        const tenantId = this.parseTenant(rawTenantId);
+        const pdf = await this.repository.obterPdfAssinado(id, tenantId);
         if (!pdf.nome || !pdf.tipo || !pdf.conteudo) {
             throw new AppError("Oficio nao possui PDF assinado.", 404);
         }
         return pdf;
     }
-    async removerPdfAssinado(rawId, rawUsuarioId) {
+    async removerPdfAssinado(rawId, rawUsuarioId, rawTenantId) {
         const id = this.parseId(rawId);
         const usuarioId = this.parseUsuarioId(rawUsuarioId);
-        const pdf = await this.repository.obterPdfAssinado(id);
-        await this.repository.removerPdfAssinado(id);
+        const tenantId = this.parseTenant(rawTenantId);
+        const pdf = await this.repository.obterPdfAssinado(id, tenantId);
+        await this.repository.removerPdfAssinado(id, tenantId);
         await this.limparArquivo(pdf.conteudo, usuarioId);
     }
-    async listarImagens(rawId) {
+    async listarImagens(rawId, rawTenantId) {
         const id = this.parseId(rawId);
-        const imagens = await this.repository.listarImagens(id);
+        const tenantId = this.parseTenant(rawTenantId);
+        const imagens = await this.repository.listarImagens(id, tenantId);
         return imagens.map(mapOficioImagemToResponse);
     }
-    async adicionarImagem(rawId, rawInput, rawUsuarioId) {
+    async adicionarImagem(rawId, rawInput, rawUsuarioId, rawTenantId) {
         const id = this.parseId(rawId);
         const input = oficioImagemInputSchema.parse(this.normalizarPayload(rawInput));
         const usuarioId = this.parseUsuarioId(rawUsuarioId);
+        const tenantId = this.parseTenant(rawTenantId);
         const arquivo = await storageService.salvarArquivo({
             scope: "oficio_documento",
             conteudo: input.conteudoBase64,
@@ -127,7 +138,7 @@ export class OficiosService {
                 ...input,
                 conteudoBase64: arquivo.caminhoArquivo,
                 tipoMime: arquivo.registro.mime_type
-            });
+            }, tenantId);
             await storageService.vincularEntidade(arquivo.caminhoArquivo, id);
             return mapOficioImagemToResponse(imagem);
         }
@@ -136,19 +147,21 @@ export class OficiosService {
             throw error;
         }
     }
-    async removerImagem(rawId, rawImagemId, rawUsuarioId) {
+    async removerImagem(rawId, rawImagemId, rawUsuarioId, rawTenantId) {
         const id = this.parseId(rawId);
         const imagemId = this.parseId(rawImagemId);
         const usuarioId = this.parseUsuarioId(rawUsuarioId);
-        const imagens = await this.repository.listarImagens(id);
+        const tenantId = this.parseTenant(rawTenantId);
+        const imagens = await this.repository.listarImagens(id, tenantId);
         const imagem = imagens.find((item) => item.id === imagemId);
-        await this.repository.removerImagem(id, imagemId);
+        await this.repository.removerImagem(id, imagemId, tenantId);
         await this.limparArquivo(imagem?.conteudo_base64, usuarioId);
     }
-    async gerarDocumento(rawId) {
+    async gerarDocumento(rawId, rawTenantId) {
         const id = this.parseId(rawId);
-        const registro = await this.repository.buscarPorIdOuFalhar(id);
-        const contexto = await this.montarContextoInstitucional();
+        const tenantId = this.parseTenant(rawTenantId);
+        const registro = await this.repository.buscarPorIdOuFalhar(id, tenantId);
+        const contexto = await this.montarContextoInstitucional(tenantId);
         const documento = this.montarDocumentoOficio(registro.oficio, contexto);
         const pdf = await this.renderer.render(documento);
         return {
@@ -156,8 +169,9 @@ export class OficiosService {
             pdf
         };
     }
-    async obterContextoDocumento() {
-        const contexto = await this.montarContextoInstitucional();
+    async obterContextoDocumento(rawTenantId) {
+        const tenantId = this.parseTenant(rawTenantId);
+        const contexto = await this.montarContextoInstitucional(tenantId);
         return {
             cidadeUf: this.formatarCidadeUf(contexto),
             instituicao: contexto.instituicao
@@ -179,12 +193,19 @@ export class OficiosService {
         }
         return BigInt(parsed);
     }
+    parseTenant(rawTenantId) {
+        const tenantId = rawTenantId?.trim();
+        if (!tenantId) {
+            throw new AppError("Tenant da sessao nao identificado.", 401);
+        }
+        return tenantId;
+    }
     normalizarPayload(rawInput) {
         if (!rawInput || typeof rawInput !== "object")
             return rawInput;
         return normalizarObjetoTexto(rawInput, mapaCamposTextoOficios);
     }
-    async prepararPayloadCriacao(rawInput, rawUsuarioId) {
+    async prepararPayloadCriacao(rawInput, rawUsuarioId, tenantId) {
         const payload = this.normalizarPayload(rawInput);
         if (!payload || typeof payload !== "object") {
             return payload;
@@ -194,7 +215,7 @@ export class OficiosService {
             ? registro.identificacao
             : {};
         const dataReferencia = this.parseDataReferencia(identificacaoBase.data);
-        const numero = await this.repository.obterProximoNumero(dataReferencia);
+        const numero = await this.repository.obterProximoNumero(dataReferencia, tenantId);
         const criadoPor = this.parseUsuarioIdNumber(rawUsuarioId);
         return {
             ...registro,
@@ -205,12 +226,12 @@ export class OficiosService {
             }
         };
     }
-    async prepararPayloadAtualizacao(id, rawInput, rawUsuarioId) {
+    async prepararPayloadAtualizacao(id, rawInput, rawUsuarioId, rawTenantId) {
         const payload = this.normalizarPayload(rawInput);
         if (!payload || typeof payload !== "object") {
             return payload;
         }
-        const existente = await this.repository.buscarPorIdOuFalhar(id);
+        const existente = await this.repository.buscarPorIdOuFalhar(id, rawTenantId);
         const registro = payload;
         const identificacaoBase = registro.identificacao && typeof registro.identificacao === "object"
             ? registro.identificacao
@@ -272,8 +293,8 @@ export class OficiosService {
         }
         return parsed;
     }
-    async montarContextoInstitucional() {
-        const instituicao = await this.reportsRepository.obterInstituicaoRelatorio();
+    async montarContextoInstitucional(tenantId) {
+        const instituicao = await this.reportsRepository.obterInstituicaoRelatorio(tenantId);
         return {
             instituicao: {
                 nomeCompleto: this.normalizarTexto(instituicao.razaoSocial) ?? "Instituição não cadastrada",

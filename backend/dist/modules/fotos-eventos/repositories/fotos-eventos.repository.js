@@ -25,12 +25,145 @@ function montarArquivoPersistido(upload) {
         return upload.conteudo;
     return `data:${upload.contentType};base64,${upload.conteudo}`;
 }
+const estruturaSql = [
+    "ALTER TABLE fotos_eventos ADD COLUMN IF NOT EXISTS tenant_id UUID",
+    "ALTER TABLE fotos_eventos_itens ADD COLUMN IF NOT EXISTS tenant_id UUID",
+    "ALTER TABLE fotos_eventos_tags ADD COLUMN IF NOT EXISTS tenant_id UUID",
+    "CREATE INDEX IF NOT EXISTS fotos_eventos_tenant_idx ON fotos_eventos(tenant_id, data_evento DESC, id DESC)",
+    "CREATE INDEX IF NOT EXISTS fotos_eventos_itens_tenant_idx ON fotos_eventos_itens(tenant_id, evento_id, ordem, id)",
+    "CREATE INDEX IF NOT EXISTS fotos_eventos_tags_tenant_idx ON fotos_eventos_tags(tenant_id, evento_id, tag)",
+    `
+    UPDATE fotos_eventos AS e
+    SET tenant_id = ua.tenant_id
+    FROM unidade_assistencial ua
+    WHERE e.unidade_id = ua.id
+      AND ua.tenant_id IS NOT NULL
+      AND (e.tenant_id IS NULL OR e.tenant_id <> ua.tenant_id)
+  `,
+    `
+    UPDATE fotos_eventos AS e
+    SET tenant_id = ref.tenant_id
+    FROM (
+      SELECT tenant_id
+      FROM instituicoes
+      ORDER BY criado_em ASC
+      LIMIT 1
+    ) ref
+    WHERE e.tenant_id IS NULL
+  `,
+    `
+    UPDATE arquivos AS a
+    SET tenant_id = e.tenant_id
+    FROM fotos_eventos e
+    WHERE a.entidade_tipo = 'evento'
+      AND a.entidade_id = e.id
+      AND e.tenant_id IS NOT NULL
+      AND (a.tenant_id IS NULL OR a.tenant_id <> e.tenant_id)
+  `,
+    `
+    UPDATE fotos_eventos_itens AS fi
+    SET tenant_id = e.tenant_id
+    FROM fotos_eventos e
+    WHERE e.id = fi.evento_id
+      AND e.tenant_id IS NOT NULL
+      AND (fi.tenant_id IS NULL OR fi.tenant_id <> e.tenant_id)
+  `,
+    `
+    UPDATE fotos_eventos_itens AS fi
+    SET tenant_id = e.tenant_id
+    FROM fotos_eventos e
+    WHERE fi.tenant_id IS NULL
+      AND e.id = fi.evento_id
+      AND e.tenant_id IS NOT NULL
+  `,
+    `
+    UPDATE fotos_eventos_tags AS ft
+    SET tenant_id = e.tenant_id
+    FROM fotos_eventos e
+    WHERE e.id = ft.evento_id
+      AND e.tenant_id IS NOT NULL
+      AND (ft.tenant_id IS NULL OR ft.tenant_id <> e.tenant_id)
+  `,
+    `
+    UPDATE fotos_eventos_tags AS ft
+    SET tenant_id = e.tenant_id
+    FROM fotos_eventos e
+    WHERE ft.tenant_id IS NULL
+      AND e.id = ft.evento_id
+      AND e.tenant_id IS NOT NULL
+  `
+];
+let estruturaPromise = null;
 export class FotosEventosRepository {
-    async listar(filtros) {
-        const where = [];
+    async ensureEstrutura() {
+        if (!estruturaPromise) {
+            estruturaPromise = (async () => {
+                for (const sql of estruturaSql) {
+                    await prisma.$executeRawUnsafe(sql);
+                }
+            })().catch((error) => {
+                estruturaPromise = null;
+                throw error;
+            });
+        }
+        await estruturaPromise;
+    }
+    async repararFotosPrincipaisAusentes(tenantId) {
+        await prisma.$executeRaw(Prisma.sql `
+      UPDATE fotos_eventos e
+      SET foto_principal_id = (
+            SELECT fi.id
+            FROM fotos_eventos_itens fi
+            WHERE fi.evento_id = e.id
+              AND fi.tenant_id::text = ${tenantId}
+            ORDER BY COALESCE(fi.ordem, 9999) ASC, fi.id ASC
+            LIMIT 1
+          ),
+          atualizado_em = NOW()
+      WHERE e.tenant_id::text = ${tenantId}
+        AND e.foto_principal_id IS NULL
+        AND EXISTS (
+          SELECT 1
+          FROM fotos_eventos_itens fi
+          WHERE fi.evento_id = e.id
+            AND fi.tenant_id::text = ${tenantId}
+        )
+    `);
+        await prisma.$executeRaw(Prisma.sql `
+      UPDATE fotos_eventos e
+      SET foto_principal_id = (
+            SELECT fi.id
+            FROM fotos_eventos_itens fi
+            WHERE fi.evento_id = e.id
+              AND fi.tenant_id::text = ${tenantId}
+            ORDER BY COALESCE(fi.ordem, 9999) ASC, fi.id ASC
+            LIMIT 1
+          ),
+          atualizado_em = NOW()
+      WHERE e.tenant_id::text = ${tenantId}
+        AND e.foto_principal_id IS NOT NULL
+        AND EXISTS (
+          SELECT 1
+          FROM fotos_eventos_itens fi
+          WHERE fi.evento_id = e.id
+            AND fi.tenant_id::text = ${tenantId}
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM fotos_eventos_itens atual
+          WHERE atual.id = e.foto_principal_id
+            AND atual.evento_id = e.id
+            AND atual.tenant_id::text = ${tenantId}
+        )
+    `);
+    }
+    async listar(filtros, tenantId) {
+        await this.ensureEstrutura();
+        await this.repararFotosPrincipaisAusentes(tenantId);
+        const where = [Prisma.sql `e.tenant_id::text = ${tenantId}`];
         const busca = trimOrUndefined(filtros.busca);
         if (busca) {
-            where.push(Prisma.sql `AND (
+            where.push(Prisma.sql `(
           e.titulo ILIKE ${`%${busca}%`}
           OR COALESCE(e.descricao, '') ILIKE ${`%${busca}%`}
           OR COALESCE(e.local, '') ILIKE ${`%${busca}%`}
@@ -38,29 +171,25 @@ export class FotosEventosRepository {
         }
         const dataInicio = toOptionalDate(filtros.dataInicio);
         if (dataInicio) {
-            where.push(Prisma.sql `AND e.data_evento >= ${dataInicio}`);
+            where.push(Prisma.sql `e.data_evento >= ${dataInicio}`);
         }
         const dataFim = toOptionalDate(filtros.dataFim);
         if (dataFim) {
-            where.push(Prisma.sql `AND e.data_evento <= ${dataFim}`);
+            where.push(Prisma.sql `e.data_evento <= ${dataFim}`);
         }
         const unidadeId = Number(filtros.unidadeId);
         if (Number.isInteger(unidadeId) && unidadeId > 0) {
-            where.push(Prisma.sql `AND e.unidade_id = ${BigInt(unidadeId)}`);
+            where.push(Prisma.sql `e.unidade_id = ${BigInt(unidadeId)}`);
         }
         const status = trimOrUndefined(filtros.status);
         if (status) {
-            where.push(Prisma.sql `AND e.status = ${status}`);
+            where.push(Prisma.sql `e.status = ${status}`);
         }
         const tags = normalizarTags(filtros.tags);
         for (const tag of tags) {
-            where.push(Prisma.sql `AND COALESCE(e.tags, '') ILIKE ${`%${tag}%`}`);
+            where.push(Prisma.sql `COALESCE(e.tags, '') ILIKE ${`%${tag}%`}`);
         }
-        const whereClause = where.length === 0
-            ? Prisma.empty
-            : where.length === 1
-                ? where[0]
-                : Prisma.sql `${Prisma.join(where, " ")}`;
+        const whereClause = Prisma.join(where, " AND ");
         const tamanho = Math.max(1, Math.min(Number(filtros.tamanho) || 12, 50));
         const pagina = Math.max(0, Number(filtros.pagina) || 0);
         const offset = pagina * tamanho;
@@ -77,8 +206,7 @@ export class FotosEventosRepository {
         const totalRows = await prisma.$queryRaw(Prisma.sql `
       SELECT COUNT(*)::bigint AS total
       FROM fotos_eventos e
-      WHERE 1 = 1
-      ${whereClause}
+      WHERE ${whereClause}
     `);
         const total = Number(totalRows[0]?.total ?? 0);
         const eventos = await prisma.$queryRaw(Prisma.sql `
@@ -98,19 +226,53 @@ export class FotosEventosRepository {
           SELECT COUNT(*)::bigint
           FROM fotos_eventos_itens fi
           WHERE fi.evento_id = e.id
+            AND fi.tenant_id::text = ${tenantId}
         ), 0) AS total_fotos,
-        principal.arquivo AS foto_principal_url
+        COALESCE(principal.arquivo, primeira_foto.arquivo) AS foto_principal_url
       FROM fotos_eventos e
-      LEFT JOIN fotos_eventos_itens principal ON principal.id = e.foto_principal_id
-      WHERE 1 = 1
-      ${whereClause}
+      LEFT JOIN fotos_eventos_itens principal
+        ON principal.id = e.foto_principal_id
+       AND principal.tenant_id::text = ${tenantId}
+      LEFT JOIN LATERAL (
+        SELECT fi.arquivo
+        FROM fotos_eventos_itens fi
+        WHERE fi.evento_id = e.id
+          AND fi.tenant_id::text = ${tenantId}
+        ORDER BY COALESCE(fi.ordem, 9999) ASC, fi.id ASC
+        LIMIT 1
+      ) primeira_foto ON TRUE
+      WHERE ${whereClause}
       ${orderClause}
       LIMIT ${tamanho}
       OFFSET ${offset}
     `);
         return { eventos, total, pagina, tamanho };
     }
-    async buscarPorId(id) {
+    async resumo(tenantId) {
+        await this.ensureEstrutura();
+        await this.repararFotosPrincipaisAusentes(tenantId);
+        const rows = await prisma.$queryRaw(Prisma.sql `
+      SELECT
+        COUNT(*)::bigint AS total_albuns,
+        COALESCE((
+          SELECT COUNT(*)::bigint
+          FROM fotos_eventos_itens fi
+          INNER JOIN fotos_eventos e ON e.id = fi.evento_id
+          WHERE e.tenant_id::text = ${tenantId}
+            AND fi.tenant_id::text = ${tenantId}
+        ), 0::bigint) AS total_fotos
+      FROM fotos_eventos e
+      WHERE e.tenant_id::text = ${tenantId}
+    `);
+        const row = rows[0];
+        return {
+            totalAlbuns: Number(row?.total_albuns ?? 0n),
+            totalFotos: Number(row?.total_fotos ?? 0n)
+        };
+    }
+    async buscarPorId(id, tenantId) {
+        await this.ensureEstrutura();
+        await this.repararFotosPrincipaisAusentes(tenantId);
         const eventos = await prisma.$queryRaw(Prisma.sql `
       SELECT
         id,
@@ -126,25 +288,28 @@ export class FotosEventosRepository {
         atualizado_em
       FROM fotos_eventos
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
         const evento = eventos[0];
         if (!evento)
             return null;
-        const fotos = await this.listarFotosEvento(id);
+        const fotos = await this.listarFotosEvento(id, tenantId);
         return { evento, fotos };
     }
-    async buscarPorIdOuFalhar(id) {
-        const registro = await this.buscarPorId(id);
+    async buscarPorIdOuFalhar(id, tenantId) {
+        const registro = await this.buscarPorId(id, tenantId);
         if (!registro) {
             throw new AppError("Evento de fotos nao encontrado.", 404);
         }
         return registro;
     }
-    async criar(input) {
+    async criar(input, tenantId) {
+        await this.ensureEstrutura();
         const id = await prisma.$transaction(async (tx) => {
             const inserted = await tx.$queryRaw(Prisma.sql `
         INSERT INTO fotos_eventos (
+          tenant_id,
           unidade_id,
           titulo,
           descricao,
@@ -155,6 +320,7 @@ export class FotosEventosRepository {
           criado_em,
           atualizado_em
         ) VALUES (
+          CAST(${tenantId} AS UUID),
           ${input.unidadeId ? BigInt(input.unidadeId) : null},
           ${input.titulo},
           ${trimOrUndefined(input.descricao ?? undefined)},
@@ -171,28 +337,30 @@ export class FotosEventosRepository {
             if (!eventoId) {
                 throw new AppError("Nao foi possivel criar o evento de fotos.", 500);
             }
-            await this.salvarTags(tx, eventoId, normalizarTags(input.tags));
+            await this.salvarTags(tx, eventoId, normalizarTags(input.tags), tenantId);
             if (input.fotoPrincipalUpload) {
-                const foto = await this.inserirFoto(tx, eventoId, {
+                const foto = await this.inserirFoto(tx, eventoId, input.fotoPrincipalUpload ? {
                     arquivo: input.fotoPrincipalUpload,
                     legenda: "Foto principal",
                     ordem: 0
-                });
+                } : undefined, tenantId);
                 await tx.$executeRaw(Prisma.sql `
           UPDATE fotos_eventos
           SET foto_principal_id = ${foto.id}
           WHERE id = ${eventoId}
+            AND tenant_id::text = ${tenantId}
         `);
             }
             else if (input.fotoPrincipalId) {
-                await this.definirFotoPrincipal(tx, eventoId, BigInt(input.fotoPrincipalId));
+                await this.definirFotoPrincipal(tx, eventoId, BigInt(input.fotoPrincipalId), tenantId);
             }
             return eventoId;
         });
-        return this.buscarPorIdOuFalhar(id);
+        return this.buscarPorIdOuFalhar(id, tenantId);
     }
-    async atualizar(id, input) {
-        await this.buscarPorIdOuFalhar(id);
+    async atualizar(id, input, tenantId) {
+        await this.ensureEstrutura();
+        await this.buscarPorIdOuFalhar(id, tenantId);
         await prisma.$transaction(async (tx) => {
             await tx.$executeRaw(Prisma.sql `
         UPDATE fotos_eventos
@@ -206,34 +374,39 @@ export class FotosEventosRepository {
           tags = ${normalizarTags(input.tags).join(",")},
           atualizado_em = NOW()
         WHERE id = ${id}
+          AND tenant_id::text = ${tenantId}
       `);
-            await this.salvarTags(tx, id, normalizarTags(input.tags));
+            await this.salvarTags(tx, id, normalizarTags(input.tags), tenantId);
             if (input.fotoPrincipalUpload) {
                 const foto = await this.inserirFoto(tx, id, {
                     arquivo: input.fotoPrincipalUpload,
                     legenda: "Foto principal",
                     ordem: 0
-                });
+                }, tenantId);
                 await tx.$executeRaw(Prisma.sql `
           UPDATE fotos_eventos
           SET foto_principal_id = ${foto.id}
           WHERE id = ${id}
+            AND tenant_id::text = ${tenantId}
         `);
             }
             else if (input.fotoPrincipalId) {
-                await this.definirFotoPrincipal(tx, id, BigInt(input.fotoPrincipalId));
+                await this.definirFotoPrincipal(tx, id, BigInt(input.fotoPrincipalId), tenantId);
             }
         });
-        return this.buscarPorIdOuFalhar(id);
+        return this.buscarPorIdOuFalhar(id, tenantId);
     }
-    async remover(id) {
-        await this.buscarPorIdOuFalhar(id);
+    async remover(id, tenantId) {
+        await this.ensureEstrutura();
+        await this.buscarPorIdOuFalhar(id, tenantId);
         await prisma.$executeRaw(Prisma.sql `
       DELETE FROM fotos_eventos
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
     }
-    async listarFotosEvento(eventoId) {
+    async listarFotosEvento(eventoId, tenantId) {
+        await this.ensureEstrutura();
         return prisma.$queryRaw(Prisma.sql `
       SELECT
         id,
@@ -252,10 +425,12 @@ export class FotosEventosRepository {
         atualizado_em
       FROM fotos_eventos_itens
       WHERE evento_id = ${eventoId}
+        AND tenant_id::text = ${tenantId}
       ORDER BY COALESCE(ordem, 9999) ASC, id ASC
     `);
     }
-    async buscarFotoPorId(eventoId, fotoId) {
+    async buscarFotoPorId(eventoId, fotoId, tenantId) {
+        await this.ensureEstrutura();
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT
         id,
@@ -275,34 +450,36 @@ export class FotosEventosRepository {
       FROM fotos_eventos_itens
       WHERE evento_id = ${eventoId}
         AND id = ${fotoId}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
         return rows[0] ?? null;
     }
-    async buscarFotoPorIdOuFalhar(eventoId, fotoId) {
-        const foto = await this.buscarFotoPorId(eventoId, fotoId);
+    async buscarFotoPorIdOuFalhar(eventoId, fotoId, tenantId) {
+        const foto = await this.buscarFotoPorId(eventoId, fotoId, tenantId);
         if (!foto) {
             throw new AppError("Foto do evento nao encontrada.", 404);
         }
         return foto;
     }
-    async adicionarFoto(eventoId, input) {
-        await this.buscarPorIdOuFalhar(eventoId);
-        const foto = await prisma.$transaction(async (tx) => this.inserirFoto(tx, eventoId, input));
-        return this.buscarFotoPorIdOuFalhar(eventoId, foto.id);
+    async adicionarFoto(eventoId, input, tenantId) {
+        await this.buscarPorIdOuFalhar(eventoId, tenantId);
+        const foto = await prisma.$transaction(async (tx) => this.inserirFoto(tx, eventoId, input, tenantId));
+        return this.buscarFotoPorIdOuFalhar(eventoId, foto.id, tenantId);
     }
-    async adicionarFotosLote(eventoId, input) {
-        await this.buscarPorIdOuFalhar(eventoId);
+    async adicionarFotosLote(eventoId, input, tenantId) {
+        await this.buscarPorIdOuFalhar(eventoId, tenantId);
         return prisma.$transaction(async (tx) => {
             const eventoRows = await tx.$queryRaw(Prisma.sql `
         SELECT foto_principal_id
         FROM fotos_eventos
         WHERE id = ${eventoId}
+          AND tenant_id::text = ${tenantId}
         LIMIT 1
       `);
             const fotosInseridas = [];
             for (const fotoInput of input.fotos) {
-                const foto = await this.inserirFoto(tx, eventoId, fotoInput);
+                const foto = await this.inserirFoto(tx, eventoId, fotoInput, tenantId);
                 fotosInseridas.push(foto.id);
             }
             const indiceCapa = typeof input.fotoPrincipalIndex === "number" &&
@@ -316,7 +493,7 @@ export class FotosEventosRepository {
                     ? fotosInseridas[0]
                     : null;
             if (fotoPrincipalId) {
-                await this.definirFotoPrincipal(tx, eventoId, fotoPrincipalId);
+                await this.definirFotoPrincipal(tx, eventoId, fotoPrincipalId, tenantId);
             }
             if (!fotosInseridas.length) {
                 return [];
@@ -339,13 +516,14 @@ export class FotosEventosRepository {
           atualizado_em
         FROM fotos_eventos_itens
         WHERE evento_id = ${eventoId}
+          AND tenant_id::text = ${tenantId}
           AND id IN (${Prisma.join(fotosInseridas)})
         ORDER BY COALESCE(ordem, 9999) ASC, id ASC
       `);
         });
     }
-    async atualizarFoto(eventoId, fotoId, input) {
-        await this.buscarFotoPorIdOuFalhar(eventoId, fotoId);
+    async atualizarFoto(eventoId, fotoId, input, tenantId) {
+        await this.buscarFotoPorIdOuFalhar(eventoId, fotoId, tenantId);
         await prisma.$executeRaw(Prisma.sql `
       UPDATE fotos_eventos_itens
       SET
@@ -356,41 +534,45 @@ export class FotosEventosRepository {
         atualizado_em = NOW()
       WHERE evento_id = ${eventoId}
         AND id = ${fotoId}
+        AND tenant_id::text = ${tenantId}
     `);
-        return this.buscarFotoPorIdOuFalhar(eventoId, fotoId);
+        return this.buscarFotoPorIdOuFalhar(eventoId, fotoId, tenantId);
     }
-    async removerFoto(eventoId, fotoId) {
-        await this.buscarFotoPorIdOuFalhar(eventoId, fotoId);
+    async removerFoto(eventoId, fotoId, tenantId) {
+        await this.buscarFotoPorIdOuFalhar(eventoId, fotoId, tenantId);
         await prisma.$transaction(async (tx) => {
             await tx.$executeRaw(Prisma.sql `
         DELETE FROM fotos_eventos_itens
         WHERE evento_id = ${eventoId}
           AND id = ${fotoId}
+          AND tenant_id::text = ${tenantId}
       `);
             await tx.$executeRaw(Prisma.sql `
         UPDATE fotos_eventos
         SET foto_principal_id = NULL
         WHERE id = ${eventoId}
+          AND tenant_id::text = ${tenantId}
           AND foto_principal_id = ${fotoId}
       `);
         });
     }
-    async definirFotoPrincipalPorId(eventoId, fotoId) {
-        await this.buscarPorIdOuFalhar(eventoId);
+    async definirFotoPrincipalPorId(eventoId, fotoId, tenantId) {
+        await this.buscarPorIdOuFalhar(eventoId, tenantId);
         await prisma.$transaction(async (tx) => {
-            await this.definirFotoPrincipal(tx, eventoId, fotoId);
+            await this.definirFotoPrincipal(tx, eventoId, fotoId, tenantId);
             await tx.$executeRaw(Prisma.sql `
         UPDATE fotos_eventos
         SET atualizado_em = NOW()
         WHERE id = ${eventoId}
+          AND tenant_id::text = ${tenantId}
       `);
         });
-        return this.buscarFotoPorIdOuFalhar(eventoId, fotoId);
+        return this.buscarFotoPorIdOuFalhar(eventoId, fotoId, tenantId);
     }
-    async reordenarFotos(eventoId, fotoIds) {
-        await this.buscarPorIdOuFalhar(eventoId);
+    async reordenarFotos(eventoId, fotoIds, tenantId) {
+        await this.buscarPorIdOuFalhar(eventoId, tenantId);
         const ids = fotoIds.map((item) => BigInt(item));
-        const fotos = await this.listarFotosEvento(eventoId);
+        const fotos = await this.listarFotosEvento(eventoId, tenantId);
         const fotosEventoIds = new Set(fotos.map((item) => Number(item.id)));
         if (ids.some((item) => !fotosEventoIds.has(Number(item)))) {
             throw new AppError("A ordem informada contem fotos que nao pertencem ao evento.", 400);
@@ -403,16 +585,18 @@ export class FotosEventosRepository {
               atualizado_em = NOW()
           WHERE evento_id = ${eventoId}
             AND id = ${ids[index]}
+            AND tenant_id::text = ${tenantId}
         `);
             }
         });
-        return this.listarFotosEvento(eventoId);
+        return this.listarFotosEvento(eventoId, tenantId);
     }
-    async inserirFoto(tx, eventoId, input) {
+    async inserirFoto(tx, eventoId, input, tenantId) {
         const arquivo = montarArquivoPersistido(input.arquivo);
         const tamanhoBytes = input.arquivo.tamanhoBytes ?? calcularTamanhoBytes(input.arquivo.conteudo);
         const inserted = await tx.$queryRaw(Prisma.sql `
       INSERT INTO fotos_eventos_itens (
+        tenant_id,
         evento_id,
         arquivo,
         nome_arquivo,
@@ -425,6 +609,7 @@ export class FotosEventosRepository {
         criado_em,
         atualizado_em
       ) VALUES (
+        CAST(${tenantId} AS UUID),
         ${eventoId},
         ${arquivo},
         ${input.arquivo.nomeArquivo},
@@ -445,12 +630,13 @@ export class FotosEventosRepository {
         }
         return { id: fotoId };
     }
-    async definirFotoPrincipal(tx, eventoId, fotoPrincipalId) {
+    async definirFotoPrincipal(tx, eventoId, fotoPrincipalId, tenantId) {
         const rows = await tx.$queryRaw(Prisma.sql `
       SELECT id
       FROM fotos_eventos_itens
       WHERE id = ${fotoPrincipalId}
         AND evento_id = ${eventoId}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
         if (!rows.length) {
@@ -460,19 +646,23 @@ export class FotosEventosRepository {
       UPDATE fotos_eventos
       SET foto_principal_id = ${fotoPrincipalId}
       WHERE id = ${eventoId}
+        AND tenant_id::text = ${tenantId}
     `);
     }
-    async salvarTags(tx, eventoId, tags) {
+    async salvarTags(tx, eventoId, tags, tenantId) {
         await tx.$executeRaw(Prisma.sql `
       DELETE FROM fotos_eventos_tags
       WHERE evento_id = ${eventoId}
+        AND tenant_id::text = ${tenantId}
     `);
         for (const tag of tags) {
             await tx.$executeRaw(Prisma.sql `
         INSERT INTO fotos_eventos_tags (
+          tenant_id,
           evento_id,
           tag
         ) VALUES (
+          CAST(${tenantId} AS UUID),
           ${eventoId},
           ${tag}
         )

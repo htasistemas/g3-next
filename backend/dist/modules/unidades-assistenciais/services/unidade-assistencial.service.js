@@ -7,7 +7,7 @@ import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
 import { storageService } from "../../arquivos/services/storage-instance.js";
 export class UnidadeAssistencialService {
     repository = new UnidadeAssistencialRepository();
-    async listar(rawFilters) {
+    async listar(rawFilters, tenantId, contexto) {
         const filtersNormalizados = rawFilters && typeof rawFilters === "object"
             ? normalizarObjetoTexto(rawFilters, {
                 nome_fantasia: "instituicao",
@@ -15,57 +15,70 @@ export class UnidadeAssistencialService {
             })
             : rawFilters;
         const filters = unidadeAssistencialFiltersSchema.parse(filtersNormalizados);
-        const unidades = await this.repository.listar(filters);
+        const unidades = await this.repository.listar(filters, tenantId?.trim(), contexto);
         return unidades.map(mapUnidadeAssistencialToResponse);
     }
-    async buscarPorId(rawId) {
+    async buscarPorId(rawId, tenantId, contexto) {
         const id = this.parseId(rawId);
-        const unidade = await this.repository.buscarPorIdOuFalhar(id);
+        const unidade = await this.repository.buscarPorIdOuFalhar(id, tenantId?.trim(), contexto);
         return mapUnidadeAssistencialToResponse(unidade);
     }
-    async buscarAtual() {
-        const unidade = await this.repository.buscarAtual();
+    async buscarAtual(tenantId, contexto) {
+        const unidade = await this.repository.buscarAtual(tenantId?.trim(), contexto);
         return unidade ? mapUnidadeAssistencialToResponse(unidade) : null;
     }
-    async criar(rawInput, rawUsuarioId) {
+    async criar(rawInput, rawUsuarioId, tenantId) {
         const inputNormalizado = this.normalizarPayload(rawInput);
         const input = unidadeAssistencialInputSchema.parse(inputNormalizado);
         const usuarioId = this.parseUsuarioId(rawUsuarioId);
-        const preparado = await this.prepararImagens(input, usuarioId);
+        const tenantIdNormalizado = tenantId?.trim();
+        const preparado = await this.prepararImagens(input, usuarioId, undefined, tenantIdNormalizado);
         try {
-            const unidade = await this.repository.criar(preparado.input);
-            await this.vincularArquivos(preparado.novosCaminhos, unidade.id);
+            const unidade = await this.repository.criar(preparado.input, tenantIdNormalizado);
+            if (!unidade) {
+                throw new AppError("Unidade assistencial nao encontrada apos o salvamento.", 500);
+            }
+            await this.vincularArquivos(preparado.novosCaminhos, unidade.id, tenantIdNormalizado);
             return mapUnidadeAssistencialToResponse(unidade);
         }
         catch (error) {
-            await storageService.rollbackArquivos(preparado.novosCaminhos);
+            await storageService.rollbackArquivos(preparado.novosCaminhos, tenantIdNormalizado);
             throw error;
         }
     }
-    async atualizar(rawId, rawInput, rawUsuarioId) {
+    async atualizar(rawId, rawInput, rawUsuarioId, tenantId, contexto) {
         const id = this.parseId(rawId);
         const inputNormalizado = this.normalizarPayload(rawInput);
         const input = unidadeAssistencialInputSchema.parse(inputNormalizado);
         const usuarioId = this.parseUsuarioId(rawUsuarioId);
-        const existente = await this.repository.buscarPorIdOuFalhar(id);
-        const preparado = await this.prepararImagens(input, usuarioId, id);
+        const tenantIdNormalizado = tenantId?.trim();
+        const existente = await this.repository.buscarPorIdOuFalhar(id, tenantIdNormalizado, contexto);
+        const preparado = await this.prepararImagens(input, usuarioId, id, tenantIdNormalizado);
         try {
-            const unidade = await this.repository.atualizar(id, preparado.input);
-            await this.vincularArquivos(preparado.novosCaminhos, id);
-            await this.limparArquivosSubstituidos([existente.imagemUnidade?.logomarca, existente.imagemUnidade?.logomarcaRelatorio].filter((item) => this.isManagedStoragePath(item)), [unidade.imagemUnidade?.logomarca, unidade.imagemUnidade?.logomarcaRelatorio].filter((item) => this.isManagedStoragePath(item)), usuarioId);
+            const unidade = await this.repository.atualizar(id, preparado.input, tenantIdNormalizado);
+            if (!unidade) {
+                throw new AppError("Unidade assistencial nao encontrada apos a atualizacao.", 500);
+            }
+            await this.vincularArquivos(preparado.novosCaminhos, id, tenantIdNormalizado);
+            await this.limparArquivosSubstituidos([existente.imagemUnidade?.logomarca, existente.imagemUnidade?.logomarcaRelatorio].filter((item) => this.isManagedStoragePath(item)), [unidade.imagemUnidade?.logomarca, unidade.imagemUnidade?.logomarcaRelatorio].filter((item) => this.isManagedStoragePath(item)), usuarioId, tenantIdNormalizado);
             return mapUnidadeAssistencialToResponse(unidade);
         }
         catch (error) {
-            await storageService.rollbackArquivos(preparado.novosCaminhos);
+            await storageService.rollbackArquivos(preparado.novosCaminhos, tenantIdNormalizado);
             throw error;
         }
     }
-    async remover(rawId, rawUsuarioId) {
+    async remover(rawId, rawUsuarioId, tenantId, contexto) {
         const id = this.parseId(rawId);
         const usuarioId = this.parseUsuarioId(rawUsuarioId);
-        const existente = await this.repository.buscarPorIdOuFalhar(id);
-        await this.repository.remover(id);
-        await this.limparArquivosSubstituidos([existente.imagemUnidade?.logomarca, existente.imagemUnidade?.logomarcaRelatorio].filter((item) => this.isManagedStoragePath(item)), [], usuarioId);
+        const tenantIdNormalizado = tenantId?.trim();
+        const existente = await this.repository.buscarPorIdOuFalhar(id, tenantIdNormalizado, contexto);
+        await this.repository.remover(id, tenantIdNormalizado);
+        await this.limparArquivosSubstituidos([existente.imagemUnidade?.logomarca, existente.imagemUnidade?.logomarcaRelatorio].filter((item) => this.isManagedStoragePath(item)), [], usuarioId, tenantIdNormalizado);
+    }
+    async verificarVinculosSala(rawSalaId, tenantId) {
+        const salaId = this.parseId(rawSalaId);
+        return this.repository.verificarVinculosSala(salaId, tenantId?.trim());
     }
     parseId(rawId) {
         const id = Number(rawId);
@@ -95,7 +108,7 @@ export class UnidadeAssistencialService {
         }
         return inputBase;
     }
-    async prepararImagens(input, usuarioId, entidadeId) {
+    async prepararImagens(input, usuarioId, entidadeId, tenantId) {
         const novosCaminhos = [];
         const logomarca = await storageService.persistirCampo({
             scope: "instituicao_imagem",
@@ -103,6 +116,7 @@ export class UnidadeAssistencialService {
             nomeOriginal: `${input.nome_fantasia.replace(/\s+/g, "-").toLowerCase()}-logomarca.jpg`,
             mimeType: "image/jpeg",
             entidadeId,
+            tenantId,
             usuarioUploadId: usuarioId,
             observacao: "Logomarca da instituicao"
         });
@@ -115,6 +129,7 @@ export class UnidadeAssistencialService {
             nomeOriginal: `${input.nome_fantasia.replace(/\s+/g, "-").toLowerCase()}-logomarca-relatorio.jpg`,
             mimeType: "image/jpeg",
             entidadeId,
+            tenantId,
             usuarioUploadId: usuarioId,
             observacao: "Logomarca de relatorio da instituicao"
         });
@@ -130,16 +145,16 @@ export class UnidadeAssistencialService {
             novosCaminhos
         };
     }
-    async vincularArquivos(caminhos, entidadeId) {
+    async vincularArquivos(caminhos, entidadeId, tenantId) {
         for (const caminho of caminhos) {
-            await storageService.vincularEntidade(caminho, entidadeId);
+            await storageService.vincularEntidade(caminho, entidadeId, tenantId);
         }
     }
-    async limparArquivosSubstituidos(caminhosAntigos, caminhosAtuais, usuarioId) {
+    async limparArquivosSubstituidos(caminhosAntigos, caminhosAtuais, usuarioId, tenantId) {
         const atuais = new Set(caminhosAtuais);
         for (const caminho of caminhosAntigos) {
             if (!atuais.has(caminho)) {
-                await storageService.desativarPorCaminho(caminho, usuarioId);
+                await storageService.desativarPorCaminho(caminho, usuarioId, tenantId);
             }
         }
     }

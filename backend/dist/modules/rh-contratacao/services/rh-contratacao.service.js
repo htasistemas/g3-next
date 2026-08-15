@@ -7,98 +7,100 @@ import { RhContratacaoRepository } from "../repositories/rh-contratacao.reposito
 import { storageService } from "../../arquivos/services/storage-instance.js";
 export class RhContratacaoService {
     repository = new RhContratacaoRepository();
-    async listarCandidatos(termo) {
-        const rows = await this.repository.listarCandidatos(termo);
+    async listarCandidatos(termo, rawTenantId) {
+        const tenantId = this.parseTenant(rawTenantId);
+        const rows = await this.repository.listarCandidatos(termo, tenantId);
         return rows.map(mapResumoCandidato);
     }
-    async buscarCandidato(rawId) {
+    async buscarCandidato(rawId, rawTenantId) {
         const id = this.parseId(rawId);
-        const candidato = await this.repository.buscarCandidatoOuFalhar(id);
+        const candidato = await this.repository.buscarCandidatoOuFalhar(id, this.parseTenant(rawTenantId));
         return mapCandidatoDetalhe(candidato);
     }
-    async criarCandidato(rawInput, rawUsuarioId) {
+    async criarCandidato(rawInput, rawUsuarioId, rawTenantId) {
         const input = rhCandidatoInputSchema.parse(this.normalizarPayload(rawInput));
         const usuarioId = this.parseOptionalId(rawUsuarioId);
-        const processo = await this.repository.criarCandidato(input, usuarioId);
+        const processo = await this.repository.criarCandidato(input, usuarioId, this.parseTenant(rawTenantId));
         if (!processo)
             throw new AppError("Nao foi possivel criar processo de contratacao.", 500);
         return mapProcesso(processo);
     }
-    async atualizarCandidato(rawId, rawInput, rawUsuarioId) {
+    async atualizarCandidato(rawId, rawInput, rawUsuarioId, rawTenantId) {
         const id = this.parseId(rawId);
         const input = rhCandidatoInputSchema.parse(this.normalizarPayload(rawInput));
         const usuarioId = this.parseOptionalId(rawUsuarioId);
-        const processo = await this.repository.atualizarCandidato(id, input, usuarioId);
+        const processo = await this.repository.atualizarCandidato(id, input, usuarioId, this.parseTenant(rawTenantId));
         if (!processo)
             throw new AppError("Processo nao encontrado para o candidato.", 404);
         return mapProcesso(processo);
     }
-    async inativarCandidato(rawId, rawUsuarioId) {
+    async inativarCandidato(rawId, rawUsuarioId, rawTenantId) {
         const id = this.parseId(rawId);
         const usuarioId = this.parseOptionalId(rawUsuarioId);
-        await this.repository.inativarCandidato(id, usuarioId);
+        await this.repository.inativarCandidato(id, usuarioId, this.parseTenant(rawTenantId));
     }
-    async buscarProcessoPorCandidato(rawCandidatoId) {
+    async buscarProcessoPorCandidato(rawCandidatoId, rawTenantId) {
         const candidatoId = this.parseId(rawCandidatoId);
-        const processo = await this.repository.buscarProcessoPorCandidato(candidatoId);
+        const processo = await this.repository.buscarProcessoPorCandidato(candidatoId, this.parseTenant(rawTenantId));
         if (!processo)
             throw new AppError("Processo de contratacao nao encontrado.", 404);
         return mapProcesso(processo);
     }
-    async atualizarStatus(rawProcessoId, rawInput, rawUsuarioId) {
+    async atualizarStatus(rawProcessoId, rawInput, rawUsuarioId, rawTenantId) {
         const processoId = this.parseId(rawProcessoId);
         const { status } = rhStatusProcessoInputSchema.parse(this.normalizarPayload(rawInput));
         const usuarioId = this.parseOptionalId(rawUsuarioId);
-        const processo = await this.repository.atualizarStatusProcesso(processoId, status, usuarioId);
+        const processo = await this.repository.atualizarStatusProcesso(processoId, status, usuarioId, this.parseTenant(rawTenantId));
         return mapProcesso(processo);
     }
-    async listarEntrevistas(rawProcessoId) {
+    async listarEntrevistas(rawProcessoId, rawTenantId) {
         const processoId = this.parseId(rawProcessoId);
-        const rows = await this.repository.listarEntrevistas(processoId);
+        const rows = await this.repository.listarEntrevistas(processoId, this.parseTenant(rawTenantId));
         return rows.map(mapEntrevista);
     }
-    async salvarEntrevista(rawProcessoId, rawInput, rawUsuarioId) {
+    async salvarEntrevista(rawProcessoId, rawInput, rawUsuarioId, rawTenantId) {
         const processoId = this.parseId(rawProcessoId);
         const input = rhEntrevistaInputSchema.parse(this.normalizarPayload(rawInput));
         const usuarioId = this.parseOptionalId(rawUsuarioId);
-        const row = await this.repository.salvarEntrevista(processoId, input, usuarioId);
+        const row = await this.repository.salvarEntrevista(processoId, input, usuarioId, this.parseTenant(rawTenantId));
         return mapEntrevista(row);
     }
-    async buscarFicha(rawProcessoId) {
+    async buscarFicha(rawProcessoId, rawTenantId) {
         const processoId = this.parseId(rawProcessoId);
-        const row = await this.repository.buscarFicha(processoId);
+        const row = await this.repository.buscarFicha(processoId, this.parseTenant(rawTenantId));
         return mapFicha(row);
     }
-    async salvarFicha(rawProcessoId, rawInput, rawUsuarioId) {
+    async salvarFicha(rawProcessoId, rawInput, rawUsuarioId, rawTenantId) {
         const processoId = this.parseId(rawProcessoId);
         const input = rhFichaInputSchema.parse(this.normalizarPayload(rawInput));
         const usuarioId = this.parseOptionalId(rawUsuarioId);
-        const row = await this.repository.salvarFicha(processoId, input, usuarioId);
+        const row = await this.repository.salvarFicha(processoId, input, usuarioId, this.parseTenant(rawTenantId));
         return mapFicha(row);
     }
-    async listarDocumentos(rawProcessoId) {
+    async listarDocumentos(rawProcessoId, rawTenantId) {
         const processoId = this.parseId(rawProcessoId);
-        const rows = await this.repository.listarDocumentos(processoId);
+        const rows = await this.repository.listarDocumentos(processoId, this.parseTenant(rawTenantId));
         return rows.map(mapDocumento);
     }
-    async atualizarDocumento(rawId, rawInput, rawUsuarioId) {
+    async atualizarDocumento(rawId, rawInput, rawUsuarioId, rawTenantId) {
         const id = this.parseId(rawId);
         const input = rhDocumentoInputSchema.parse(this.normalizarPayload(rawInput));
         const usuarioId = this.parseOptionalId(rawUsuarioId);
-        const row = await this.repository.atualizarDocumento(id, input, usuarioId);
+        const row = await this.repository.atualizarDocumento(id, input, usuarioId, this.parseTenant(rawTenantId));
         if (!row)
             throw new AppError("Documento de contratacao nao encontrado.", 404);
         return mapDocumento(row);
     }
-    async listarArquivos(rawProcessoId) {
+    async listarArquivos(rawProcessoId, rawTenantId) {
         const processoId = this.parseId(rawProcessoId);
-        const rows = await this.repository.listarArquivos(processoId);
+        const rows = await this.repository.listarArquivos(processoId, this.parseTenant(rawTenantId));
         return rows.map(mapArquivo);
     }
-    async adicionarArquivo(rawProcessoId, rawInput, rawUsuarioId) {
+    async adicionarArquivo(rawProcessoId, rawInput, rawUsuarioId, rawTenantId) {
         const processoId = this.parseId(rawProcessoId);
         const input = rhArquivoInputSchema.parse(this.normalizarPayload(rawInput));
         const usuarioId = this.parseOptionalId(rawUsuarioId);
+        const tenantId = this.parseTenant(rawTenantId);
         if (input.conteudoBase64) {
             const arquivo = await storageService.salvarArquivo({
                 scope: "colaborador_documento",
@@ -117,7 +119,7 @@ export class RhContratacaoService {
                     conteudoBase64: null,
                     mimeType: arquivo.registro.mime_type,
                     tamanhoBytes: Number(arquivo.registro.tamanho_bytes)
-                }, usuarioId);
+                }, usuarioId, tenantId);
                 await storageService.vincularEntidade(arquivo.caminhoArquivo, processoId);
                 return mapArquivo(row);
             }
@@ -126,48 +128,48 @@ export class RhContratacaoService {
                 throw error;
             }
         }
-        const row = await this.repository.adicionarArquivo(processoId, input, usuarioId);
+        const row = await this.repository.adicionarArquivo(processoId, input, usuarioId, tenantId);
         return mapArquivo(row);
     }
-    async listarTermos(rawProcessoId) {
+    async listarTermos(rawProcessoId, rawTenantId) {
         const processoId = this.parseId(rawProcessoId);
-        const rows = await this.repository.listarTermos(processoId);
+        const rows = await this.repository.listarTermos(processoId, this.parseTenant(rawTenantId));
         return rows.map(mapTermo);
     }
-    async salvarTermo(rawProcessoId, rawInput, rawUsuarioId) {
+    async salvarTermo(rawProcessoId, rawInput, rawUsuarioId, rawTenantId) {
         const processoId = this.parseId(rawProcessoId);
         const input = rhTermoInputSchema.parse(this.normalizarPayload(rawInput));
         const usuarioId = this.parseOptionalId(rawUsuarioId);
-        const row = await this.repository.salvarTermo(processoId, input, usuarioId);
+        const row = await this.repository.salvarTermo(processoId, input, usuarioId, this.parseTenant(rawTenantId));
         return mapTermo(row);
     }
-    async buscarPpd(rawProcessoId) {
+    async buscarPpd(rawProcessoId, rawTenantId) {
         const processoId = this.parseId(rawProcessoId);
-        const row = await this.repository.buscarPpd(processoId);
+        const row = await this.repository.buscarPpd(processoId, this.parseTenant(rawTenantId));
         return mapPpd(row);
     }
-    async salvarPpd(rawProcessoId, rawInput, rawUsuarioId) {
+    async salvarPpd(rawProcessoId, rawInput, rawUsuarioId, rawTenantId) {
         const processoId = this.parseId(rawProcessoId);
         const input = rhPpdInputSchema.parse(rawInput);
         const usuarioId = this.parseOptionalId(rawUsuarioId);
-        const row = await this.repository.salvarPpd(processoId, input, usuarioId);
+        const row = await this.repository.salvarPpd(processoId, input, usuarioId, this.parseTenant(rawTenantId));
         return mapPpd(row);
     }
-    async buscarCartaBanco(rawProcessoId) {
+    async buscarCartaBanco(rawProcessoId, rawTenantId) {
         const processoId = this.parseId(rawProcessoId);
-        const row = await this.repository.buscarCartaBanco(processoId);
+        const row = await this.repository.buscarCartaBanco(processoId, this.parseTenant(rawTenantId));
         return mapCartaBanco(row);
     }
-    async salvarCartaBanco(rawProcessoId, rawInput, rawUsuarioId) {
+    async salvarCartaBanco(rawProcessoId, rawInput, rawUsuarioId, rawTenantId) {
         const processoId = this.parseId(rawProcessoId);
         const input = rhCartaBancoInputSchema.parse(rawInput);
         const usuarioId = this.parseOptionalId(rawUsuarioId);
-        const row = await this.repository.salvarCartaBanco(processoId, input, usuarioId);
+        const row = await this.repository.salvarCartaBanco(processoId, input, usuarioId, this.parseTenant(rawTenantId));
         return mapCartaBanco(row);
     }
-    async listarAuditoria(rawProcessoId) {
+    async listarAuditoria(rawProcessoId, rawTenantId) {
         const processoId = this.parseId(rawProcessoId);
-        const rows = await this.repository.listarAuditoria(processoId);
+        const rows = await this.repository.listarAuditoria(processoId, this.parseTenant(rawTenantId));
         return rows.map(mapAuditoria);
     }
     parseId(rawId) {
@@ -184,6 +186,13 @@ export class RhContratacaoService {
         if (!Number.isInteger(parsed) || parsed <= 0)
             return null;
         return BigInt(parsed);
+    }
+    parseTenant(rawTenantId) {
+        const tenantId = rawTenantId?.trim();
+        if (!tenantId) {
+            throw new AppError("Tenant da sessao nao identificado.", 401);
+        }
+        return tenantId;
     }
     normalizarPayload(rawInput) {
         if (!rawInput || typeof rawInput !== "object")

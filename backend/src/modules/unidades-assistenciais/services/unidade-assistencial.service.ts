@@ -12,11 +12,12 @@ import {
 } from "../../../utils/text-format-config.js";
 import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
 import { storageService } from "../../arquivos/services/storage-instance.js";
+import type { ContextoOrganizacional } from "../../auth/auth.types.js";
 
 export class UnidadeAssistencialService {
   private readonly repository = new UnidadeAssistencialRepository();
 
-  async listar(rawFilters: unknown, tenantId?: string) {
+  async listar(rawFilters: unknown, tenantId?: string, contexto?: ContextoOrganizacional) {
     const filtersNormalizados =
       rawFilters && typeof rawFilters === "object"
         ? normalizarObjetoTexto(
@@ -29,18 +30,18 @@ export class UnidadeAssistencialService {
         : rawFilters;
 
     const filters = unidadeAssistencialFiltersSchema.parse(filtersNormalizados);
-    const unidades = await this.repository.listar(filters, tenantId?.trim());
+    const unidades = await this.repository.listar(filters, tenantId?.trim(), contexto);
     return unidades.map(mapUnidadeAssistencialToResponse);
   }
 
-  async buscarPorId(rawId: string, tenantId?: string) {
+  async buscarPorId(rawId: string, tenantId?: string, contexto?: ContextoOrganizacional) {
     const id = this.parseId(rawId);
-    const unidade = await this.repository.buscarPorIdOuFalhar(id, tenantId?.trim());
+    const unidade = await this.repository.buscarPorIdOuFalhar(id, tenantId?.trim(), contexto);
     return mapUnidadeAssistencialToResponse(unidade);
   }
 
-  async buscarAtual(tenantId?: string) {
-    const unidade = await this.repository.buscarAtual(tenantId?.trim());
+  async buscarAtual(tenantId?: string, contexto?: ContextoOrganizacional) {
+    const unidade = await this.repository.buscarAtual(tenantId?.trim(), contexto);
     return unidade ? mapUnidadeAssistencialToResponse(unidade) : null;
   }
 
@@ -64,13 +65,13 @@ export class UnidadeAssistencialService {
     }
   }
 
-  async atualizar(rawId: string, rawInput: unknown, rawUsuarioId?: string, tenantId?: string) {
+  async atualizar(rawId: string, rawInput: unknown, rawUsuarioId?: string, tenantId?: string, contexto?: ContextoOrganizacional) {
     const id = this.parseId(rawId);
     const inputNormalizado = this.normalizarPayload(rawInput);
     const input = unidadeAssistencialInputSchema.parse(inputNormalizado);
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
     const tenantIdNormalizado = tenantId?.trim();
-    const existente = await this.repository.buscarPorIdOuFalhar(id, tenantIdNormalizado);
+    const existente = await this.repository.buscarPorIdOuFalhar(id, tenantIdNormalizado, contexto);
     const preparado = await this.prepararImagens(input, usuarioId, id, tenantIdNormalizado);
 
     try {
@@ -96,11 +97,11 @@ export class UnidadeAssistencialService {
     }
   }
 
-  async remover(rawId: string, rawUsuarioId?: string, tenantId?: string) {
+  async remover(rawId: string, rawUsuarioId?: string, tenantId?: string, contexto?: ContextoOrganizacional) {
     const id = this.parseId(rawId);
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
     const tenantIdNormalizado = tenantId?.trim();
-    const existente = await this.repository.buscarPorIdOuFalhar(id, tenantIdNormalizado);
+    const existente = await this.repository.buscarPorIdOuFalhar(id, tenantIdNormalizado, contexto);
     await this.repository.remover(id, tenantIdNormalizado);
     await this.limparArquivosSubstituidos(
       [existente.imagemUnidade?.logomarca, existente.imagemUnidade?.logomarcaRelatorio].filter((item) =>

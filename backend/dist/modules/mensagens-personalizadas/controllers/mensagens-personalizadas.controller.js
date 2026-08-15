@@ -2,15 +2,15 @@ import { MensagensPersonalizadasService } from "../services/mensagens-personaliz
 const service = new MensagensPersonalizadasService();
 export class MensagensPersonalizadasController {
     async obterSuporte(request, response) {
-        const suporte = await service.obterSuporte();
+        const suporte = await service.obterSuporte(request.authUser?.tenant_id);
         return response.json(suporte);
     }
     async listarModelos(request, response) {
-        const modelos = await service.listarModelos(request.query);
+        const modelos = await service.listarModelos(request.query, request.authUser);
         return response.json({ modelos });
     }
     async obterModelo(request, response) {
-        const modelo = await service.obterModelo(request.params.id);
+        const modelo = await service.obterModelo(request.params.id, request.authUser);
         return response.json({ modelo });
     }
     async criarModelo(request, response) {
@@ -34,7 +34,7 @@ export class MensagensPersonalizadasController {
         return response.status(204).send();
     }
     async listarTaxonomias(_request, response) {
-        const taxonomias = await service.listarTaxonomias();
+        const taxonomias = await service.listarTaxonomias(_request.authUser);
         return response.json({ taxonomias });
     }
     async criarTaxonomia(request, response) {
@@ -50,11 +50,15 @@ export class MensagensPersonalizadasController {
         return response.status(204).send();
     }
     async listarHistorico(request, response) {
-        const historico = await service.listarHistorico(request.query);
+        const historico = await service.listarHistorico(request.query, request.authUser);
         return response.json({ historico });
     }
     async buscarDestinatarios(request, response) {
-        const destinatarios = await service.buscarDestinatarios(request.query);
+        const destinatarios = await service.buscarDestinatarios(request.query, request.authUser);
+        return response.json({ destinatarios });
+    }
+    async buscarTodosDestinatarios(request, response) {
+        const destinatarios = await service.buscarTodosDestinatarios(request.query, request.authUser);
         return response.json({ destinatarios });
     }
     async gerarPreview(request, response) {

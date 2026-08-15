@@ -29,8 +29,30 @@ export type LoginAuthResult =
   | {
       token: string;
       usuario: UsuarioAutenticado;
+  }
+  | {
+      selecaoAmbienteRequired: true;
+      loginTicket: string;
+      ambientes: AmbienteAutorizado[];
     }
   | LoginMfaRequired;
+
+export type AmbienteAutorizado = {
+  acesso_id: string;
+  instituicao_id: string;
+  tenant_id: string;
+  nome_instituicao: string;
+  nome_fantasia?: string;
+  cnpj?: string;
+  unidade_nome?: string;
+  perfil?: string;
+  status: string;
+};
+
+export type OpcoesContexto = {
+  unidades: Array<{ id: string; nome: string }>;
+  projetos: Array<{ id: string; nome: string; unidade_id?: string | null }>;
+};
 
 export type TenantContextoLogin = {
   id: string;

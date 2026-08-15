@@ -1,4 +1,5 @@
 import { toIsoDate, toStringId } from "../../utils/string-utils.js";
+import { calcularResumoExibicaoRegistroPonto } from "./registro-ponto-calculos.js";
 function toNumber(value) {
     if (typeof value === "number")
         return value;
@@ -9,8 +10,7 @@ function toNumber(value) {
 function normalizarHora(value) {
     if (!value)
         return undefined;
-    const normalized = value.slice(0, 8);
-    return normalized;
+    return value.slice(0, 8);
 }
 function pad2(value) {
     return String(value).padStart(2, "0");
@@ -40,6 +40,22 @@ export function mapRegistroPontoRowToResponse(row) {
     const saida_1 = normalizarHora(row.saida_1);
     const entrada_2 = normalizarHora(row.entrada_2);
     const saida_2 = normalizarHora(row.saida_2);
+    const resumoExibicao = calcularResumoExibicaoRegistroPonto({
+        previsto: {
+            entrada_1: row.horario_entrada_1,
+            saida_1: row.horario_saida_1,
+            entrada_2: row.horario_entrada_2,
+            saida_2: row.horario_saida_2
+        },
+        real: {
+            entrada_1,
+            saida_1,
+            entrada_2,
+            saida_2
+        },
+        dataReferencia: row.data_referencia,
+        hoje: new Date()
+    });
     return {
         id: toStringId(row.id),
         usuario_id: toStringId(row.usuario_id),
@@ -51,16 +67,22 @@ export function mapRegistroPontoRowToResponse(row) {
         saida_1,
         entrada_2,
         saida_2,
-        horas_extras_minutos: toNumber(row.horas_extras_minutos),
-        banco_horas_minutos: toNumber(row.banco_horas_minutos),
-        faltas_minutos: toNumber(row.faltas_minutos),
-        atrasos_minutos: toNumber(row.atrasos_minutos),
+        horas_extras_minutos: resumoExibicao.horas_extras_minutos,
+        horas_extras_pendentes_minutos: toNumber(row.horas_extras_pendentes_minutos),
+        horas_extras_autorizadas_minutos: toNumber(row.horas_extras_autorizadas_minutos),
+        horas_extras_negadas_minutos: toNumber(row.horas_extras_negadas_minutos),
+        horas_extras_compensadas_minutos: toNumber(row.horas_extras_compensadas_minutos),
+        horas_extras_pagas_minutos: toNumber(row.horas_extras_pagas_minutos),
+        banco_horas_minutos: resumoExibicao.banco_horas_minutos,
+        faltas_minutos: resumoExibicao.faltas_minutos,
+        atrasos_minutos: resumoExibicao.atrasos_minutos,
         observacoes: row.observacoes ?? undefined,
         ocorrencias: row.ocorrencias?.filter(Boolean) ?? [],
+        ocorrencias_descricao: row.ocorrencias_descricao?.filter(Boolean) ?? [],
         alterado_manualmente: !!row.alterado_manualmente,
         status: row.status_registro,
         proxima_batida: obterProximaBatida({ entrada_1, saida_1, entrada_2, saida_2 }),
-        total_trabalhado_minutos: toNumber(row.total_trabalhado_minutos),
+        total_trabalhado_minutos: resumoExibicao.total_trabalhado_minutos,
         criado_em: formatarTimestampLocalBrasilia(row.criado_em),
         atualizado_em: formatarTimestampLocalBrasilia(row.atualizado_em)
     };

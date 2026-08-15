@@ -11,22 +11,23 @@ function getActor(request: AuthenticatedRequest) {
     id: request.authUser?.id,
     nome: request.authUser?.nome ?? request.authUser?.nomeUsuario ?? "Usuário",
     tenant_id: request.authUser?.tenant_id
+    ,contexto: request.authUser?.contexto
   };
 }
 
 export class ProjetoController {
   async listar(request: AuthenticatedRequest, response: Response) {
-    const projetos = await service.listar(request.query, request.authUser?.tenant_id);
+    const projetos = await service.listar(request.query, request.authUser?.tenant_id, request.authUser?.contexto);
     return response.json({ projetos });
   }
 
   async dashboard(request: AuthenticatedRequest, response: Response) {
-    const dashboard = await service.dashboard(request.query, request.authUser?.tenant_id);
+    const dashboard = await service.dashboard(request.query, request.authUser?.tenant_id, request.authUser?.contexto);
     return response.json(dashboard);
   }
 
   async buscarPorId(request: AuthenticatedRequest, response: Response) {
-    const projeto = await service.buscarPorId(request.params.id, request.authUser?.tenant_id);
+    const projeto = await service.buscarPorId(request.params.id, request.authUser?.tenant_id, request.authUser?.contexto);
     return response.json({ projeto });
   }
 
@@ -46,7 +47,7 @@ export class ProjetoController {
   }
 
   async listarHistorico(request: AuthenticatedRequest, response: Response) {
-    const historico = await service.listarHistorico(request.params.id, request.authUser?.tenant_id);
+    const historico = await service.listarHistorico(request.params.id, request.authUser?.tenant_id, request.authUser?.contexto);
     return response.json({ historico });
   }
 

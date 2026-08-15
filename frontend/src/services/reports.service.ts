@@ -1,6 +1,16 @@
 import { httpClient } from "./http-client";
 
 export const reportsService = {
+  async gerarRelacaoTermosParceria(payload: Record<string, unknown>) {
+    const { data } = await httpClient.post("/api/reports/termos-parceria/relacao", payload, { responseType: "blob" });
+    return data as Blob;
+  },
+
+  async gerarTermoParceriaCompleto(payload: { termoId: string; usuarioEmissor?: string }) {
+    const { data } = await httpClient.post("/api/reports/termos-parceria/completo", payload, { responseType: "blob" });
+    return data as Blob;
+  },
+
   async gerarRelacaoUnidadesAssistenciais(payload: Record<string, unknown>) {
     const { data } = await httpClient.post("/api/reports/unidades-assistenciais/relacao", payload, {
       responseType: "blob"

@@ -22,6 +22,11 @@ const recuperacaoSenhaRateLimit = rateLimit({
 });
 
 authRoutes.post("/login", loginRateLimit, asyncHandler(controller.login.bind(controller)));
+authRoutes.post("/selecionar-ambiente", loginRateLimit, asyncHandler(controller.selecionarAmbiente.bind(controller)));
+authRoutes.get("/ambientes", ensureAuthenticated, asyncHandler(controller.listarAmbientes.bind(controller)));
+authRoutes.post("/trocar-ambiente", ensureAuthenticated, asyncHandler(controller.trocarAmbiente.bind(controller)));
+authRoutes.get("/contexto-opcoes", ensureAuthenticated, asyncHandler(controller.listarOpcoesContexto.bind(controller)));
+authRoutes.post("/contexto", ensureAuthenticated, asyncHandler(controller.trocarContexto.bind(controller)));
 authRoutes.post("/google", loginRateLimit, asyncHandler(controller.loginGoogle.bind(controller)));
 authRoutes.post("/mfa/verificar", loginRateLimit, asyncHandler(controller.verificarMfa.bind(controller)));
 authRoutes.post("/face/verificar", loginRateLimit, asyncHandler(controller.verificarFace.bind(controller)));

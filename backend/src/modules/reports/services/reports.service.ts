@@ -36,6 +36,8 @@ import {
   registroPontoEspelhoRequestSchema,
   registroDoacaoRelacaoRequestSchema,
   termoAutorizacaoRequestSchema,
+  termoParceriaCompletoRequestSchema,
+  termosParceriaRelacaoRequestSchema,
   unidadeAssistencialRelacaoRequestSchema,
   voluntarioFichaRequestSchema,
   voluntarioRelacaoRequestSchema
@@ -89,6 +91,79 @@ export class ReportsService {
     second: "2-digit"
   });
 
+  async gerarRelacaoTermosParceria(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
+    const payload = termosParceriaRelacaoRequestSchema.parse(rawPayload);
+    const tenantId = this.parseTenant(authUser?.tenant_id);
+    const registros = await this.repository.listarTermosParceriaRelatorio(tenantId, payload);
+    const contexto = await this.montarContextoInstitucional(tenantId);
+    const moeda = (valor: unknown) => Number(valor ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    const data = (valor: unknown) => this.formatarData(valor ? String(valor) : undefined);
+    const totalGlobal = registros.reduce((soma, item) => soma + Number(item.valor_global ?? 0), 0);
+    const totalRecebido = registros.reduce((soma, item) => soma + Number(item.valor_recebido ?? 0), 0);
+    const totalExecutado = registros.reduce((soma, item) => soma + Number(item.valor_executado ?? 0), 0);
+    const relatorioInput: RelatorioHtmlInput = {
+      titulo: "Relatório consolidado de termos de parceria",
+      subtitulo: "Projetos, instrumentos, vigência e execução financeira",
+      descricao: "Relatório agrupado por projeto para acompanhamento gerencial das parcerias do ambiente atual.",
+      metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
+      blocos: [
+        { titulo: "Resumo do período consultado", colunas: 3, destaque: true, campos: [this.campo("Termos encontrados", registros.length), this.campo("Valor global", moeda(totalGlobal)), this.campo("Total recebido", moeda(totalRecebido)), this.campo("Total executado", moeda(totalExecutado)), this.campo("Saldo calculado", moeda(totalRecebido - totalExecutado)), this.campo("Filtros", [payload.projetoId ? `Projeto ${payload.projetoId}` : "Todos os projetos", payload.status ? this.formatarValorEnumerado(payload.status) : "Todas as situações", payload.busca ? `Busca: ${payload.busca}` : "Sem busca"].join(" | "))] }
+      ],
+      tabelas: [{
+        colunas: [
+          { titulo: "Projeto", largura: "18%" }, { titulo: "Número / tipo", largura: "17%" }, { titulo: "Vigência", largura: "15%" }, { titulo: "Situação", largura: "12%" }, { titulo: "Valor global", largura: "13%", classe: "coluna-sem-quebra" }, { titulo: "Recebido", largura: "12%", classe: "coluna-sem-quebra" }, { titulo: "Executado", largura: "13%", classe: "coluna-sem-quebra" }
+        ],
+        linhas: registros.map((item) => [String(item.projeto_nome ?? "Sem projeto"), `${item.numero_instrumento ?? "Sem número"} / ${this.formatarValorEnumerado(String(item.tipo_instrumento ?? ""))}`, `${data(item.inicio_vigencia)} a ${data(item.termino_vigencia)}`, this.formatarValorEnumerado(String(item.situacao ?? "")), moeda(item.valor_global), moeda(item.valor_recebido), moeda(item.valor_executado)])
+      }],
+      cabecalho: contexto.cabecalho,
+      rodape: contexto.rodape
+    };
+    const html = this.template.montarHtml(relatorioInput);
+    const pdf = await this.renderizarPdfComFallback(html, contexto.rodape, relatorioInput, "relacao-termos-parceria");
+    return { html, pdf, filename: "relatorio-consolidado-termos-parceria.pdf" };
+  }
+
+  async gerarTermoParceriaCompleto(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
+    const payload = termoParceriaCompletoRequestSchema.parse(rawPayload);
+    const tenantId = this.parseTenant(authUser?.tenant_id);
+    const dados = await this.repository.obterTermoParceriaRelatorio(tenantId, payload.termoId);
+    if (!dados) throw new AppError("Termo de parceria não encontrado no ambiente atual.", 404);
+    const item = dados.instrumento;
+    const contexto = await this.montarContextoInstitucional(tenantId);
+    const moeda = (valor: unknown) => Number(valor ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    const data = (valor: unknown) => this.formatarData(valor ? String(valor) : undefined);
+    const soma = (campo: string, lista: Array<Record<string, unknown>>) => lista.reduce((total, registro) => total + Number(registro[campo] ?? 0), 0);
+    const recebido = soma("valor_recebido", dados.receitas);
+    const executado = soma("valor_liquido", dados.despesas);
+    const saldo = recebido - executado;
+    const relatorioInput: RelatorioHtmlInput = {
+      titulo: "Relatório completo do termo de parceria",
+      subtitulo: `${item.numero_instrumento ?? "Sem número"} — ${item.projeto_nome ?? "Sem projeto"}`,
+      descricao: "Documento detalhado para acompanhamento jurídico, operacional, financeiro e de prestação de contas.",
+      metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
+      blocos: [
+        { titulo: "Identificação do instrumento", colunas: 3, destaque: true, campos: [this.campo("Tipo", this.formatarValorEnumerado(String(item.tipo_instrumento ?? ""))), this.campo("Número", item.numero_instrumento), this.campo("Ano", item.ano), this.campo("Projeto", item.projeto_nome), this.campo("Órgão concedente", item.concedente_nome), this.campo("Situação", this.formatarValorEnumerado(String(item.situacao ?? ""))), this.campo("Processo", item.numero_processo), this.campo("Proposta / programa", [item.numero_proposta, item.numero_programa].filter(Boolean).join(" / ")), this.campo("Edital / SEI", [item.numero_edital, item.numero_sei].filter(Boolean).join(" / "))] },
+        { titulo: "Objeto, responsabilidades e território", colunas: 2, campos: [this.campo("Objeto", item.objeto), this.campo("Justificativa", item.justificativa), this.campo("Público-alvo", item.publico_alvo), this.campo("Território", item.territorio), this.campo("Gestor", item.gestor_parceria), this.campo("Fiscal", item.fiscal_parceria), this.campo("Responsável da organização", item.responsavel_organizacao), this.campo("Órgão responsável", item.orgao_responsavel)] },
+        { titulo: "Vigência e recursos", colunas: 3, destaque: true, campos: [this.campo("Assinatura", data(item.data_assinatura)), this.campo("Início", data(item.inicio_vigencia)), this.campo("Fim", data(item.termino_vigencia)), this.campo("Valor global", moeda(item.valor_global)), this.campo("Repasse", moeda(item.valor_repasse)), this.campo("Contrapartida", moeda(Number(item.contrapartida_financeira ?? 0) + Number(item.contrapartida_bens_servicos ?? 0))), this.campo("Parcelas", item.quantidade_parcelas), this.campo("Recebido", moeda(recebido)), this.campo("Executado", moeda(executado)), this.campo("Saldo calculado", moeda(saldo)), this.campo("Prorrogação", item.permite_prorrogacao ? "Sim" : "Não"), this.campo("Fonte", item.fonte_recurso)] }
+      ],
+      secoes: [{ titulo: "Base legal e observações", conteudo: [item.base_legal, item.legislacao_aplicavel, item.regulamento, item.observacoes].filter(Boolean).join("\n\n") || "Não informado." }],
+      tabelas: [
+        { colunas: [{ titulo: "Meta / indicador", largura: "35%" }, { titulo: "Previsto", largura: "15%" }, { titulo: "Realizado", largura: "15%" }, { titulo: "Alcance", largura: "15%" }, { titulo: "Situação", largura: "20%" }], linhas: dados.metas.map((meta) => [String(meta.descricao ?? "—"), String(meta.quantidade_prevista ?? "—"), String(meta.quantidade_realizada ?? "—"), `${meta.percentual_alcancado ?? 0}%`, this.formatarValorEnumerado(String(meta.situacao ?? ""))]) },
+        { colunas: [{ titulo: "Rubrica", largura: "34%" }, { titulo: "Previsto", largura: "16%", classe: "coluna-sem-quebra" }, { titulo: "Reservado", largura: "16%", classe: "coluna-sem-quebra" }, { titulo: "Comprometido", largura: "17%", classe: "coluna-sem-quebra" }, { titulo: "Pago", largura: "17%", classe: "coluna-sem-quebra" }], linhas: dados.rubricas.map((rubrica) => [String(rubrica.categoria ?? rubrica.descricao ?? "—"), moeda(rubrica.valor_total), moeda(rubrica.valor_reservado), moeda(rubrica.valor_comprometido), moeda(rubrica.valor_pago)]) },
+        { colunas: [{ titulo: "Parcela", largura: "20%" }, { titulo: "Previsto", largura: "20%", classe: "coluna-sem-quebra" }, { titulo: "Recebido", largura: "20%", classe: "coluna-sem-quebra" }, { titulo: "Data", largura: "20%" }, { titulo: "Situação", largura: "20%" }], linhas: dados.receitas.map((receita) => [String(receita.parcela ?? "—"), moeda(receita.valor_previsto), moeda(receita.valor_recebido), data(receita.data_recebida), this.formatarValorEnumerado(String(receita.situacao ?? ""))]) },
+        { colunas: [{ titulo: "Data", largura: "13%" }, { titulo: "Fornecedor", largura: "22%" }, { titulo: "Documento", largura: "17%" }, { titulo: "Descrição", largura: "28%" }, { titulo: "Rubrica", largura: "10%" }, { titulo: "Valor", largura: "10%", classe: "coluna-sem-quebra" }], linhas: dados.despesas.map((despesa) => [data(despesa.data_pagamento ?? despesa.data_emissao), String(despesa.fornecedor ?? "—"), String(despesa.numero_documento ?? "—"), String(despesa.descricao ?? "—"), String(despesa.rubrica_id ?? "—"), moeda(despesa.valor_liquido)]) },
+        { colunas: [{ titulo: "Documento", largura: "40%" }, { titulo: "Categoria", largura: "20%" }, { titulo: "Validade", largura: "20%" }, { titulo: "Situação", largura: "20%" }], linhas: dados.documentos.map((documento) => [String(documento.nome_original ?? documento.descricao ?? "Documento"), String(documento.categoria ?? "—"), data(documento.validade), this.formatarValorEnumerado(String(documento.situacao ?? ""))]) },
+        { colunas: [{ titulo: "Número", largura: "18%" }, { titulo: "Tipo", largura: "20%" }, { titulo: "Data", largura: "15%" }, { titulo: "Novo valor", largura: "17%", classe: "coluna-sem-quebra" }, { titulo: "Justificativa", largura: "30%" }], linhas: dados.aditivos.map((aditivo) => [String(aditivo.numero ?? "—"), String(aditivo.tipo ?? "—"), data(aditivo.data_aditivo), moeda(aditivo.novo_valor), String(aditivo.justificativa ?? "—")]) },
+        { colunas: [{ titulo: "Data", largura: "18%" }, { titulo: "Evento", largura: "20%" }, { titulo: "Título", largura: "42%" }, { titulo: "Usuário", largura: "20%" }], linhas: dados.timeline.map((evento) => [this.formatarDataHora(String(evento.data_evento ?? "")), String(evento.tipo_evento ?? "—"), String(evento.titulo ?? "—"), String(evento.usuario_nome ?? "Sistema")]) }
+      ],
+      cabecalho: contexto.cabecalho,
+      rodape: contexto.rodape
+    };
+    const html = this.template.montarHtml(relatorioInput);
+    const pdf = await this.renderizarPdfComFallback(html, contexto.rodape, relatorioInput, "termo-parceria-completo");
+    return { html, pdf, filename: `termo-parceria-completo-${payload.termoId}.pdf` };
+  }
+
   private readonly dateTimeFormatter = new Intl.DateTimeFormat("pt-BR", {
     timeZone: "America/Sao_Paulo",
     day: "2-digit",
@@ -128,7 +203,7 @@ export class ReportsService {
     return tenantId;
   }
 
-  private normalizarTexto(valor?: string | number | null): string | undefined {
+  private normalizarTexto(valor?: unknown): string | undefined {
     if (valor === null || valor === undefined) {
       return undefined;
     }
@@ -281,14 +356,14 @@ export class ReportsService {
     ];
   }
 
-  private campo(rotulo: string, valor?: string | number | null): RelatorioBlocoCampo {
+  private campo(rotulo: string, valor?: unknown): RelatorioBlocoCampo {
     return {
       rotulo,
       valor: this.normalizarTexto(valor) ?? "---"
     };
   }
 
-  private campoPreenchido(rotulo: string, valor?: string | number | null): RelatorioBlocoCampo | null {
+  private campoPreenchido(rotulo: string, valor?: unknown): RelatorioBlocoCampo | null {
     const texto = this.normalizarTexto(valor);
     if (!texto || texto === "---") return null;
 

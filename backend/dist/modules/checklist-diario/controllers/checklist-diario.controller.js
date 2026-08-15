@@ -28,8 +28,8 @@ export class ChecklistDiarioController {
     async reabrir(request, response) {
         return response.json(await service.reabrir(request.params.id, request.body, request.authUser));
     }
-    async listarModelos(_request, response) {
-        return response.json(await service.listarModelos());
+    async listarModelos(request, response) {
+        return response.json(await service.listarModelos(request.authUser));
     }
     async criarModelo(request, response) {
         return response.status(201).json(await service.salvarModelo(undefined, request.body, request.authUser));
@@ -47,8 +47,8 @@ export class ChecklistDiarioController {
     async gerarSemana(request, response) {
         return response.json(await service.gerarSemana(request.body, request.authUser));
     }
-    async obterConfiguracao(_request, response) {
-        return response.json(await service.obterConfiguracao());
+    async obterConfiguracao(request, response) {
+        return response.json(await service.obterConfiguracao(request.authUser));
     }
     async atualizarConfiguracao(request, response) {
         return response.json(await service.atualizarConfiguracao(request.body, request.authUser));

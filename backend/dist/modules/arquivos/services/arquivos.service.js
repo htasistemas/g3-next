@@ -2,8 +2,9 @@ import { AppError } from "../../../shared/errors/app-error.js";
 import { storageService } from "./storage-instance.js";
 import { storagePolicies } from "./storage-policy.js";
 export class ArquivosService {
-    async listar(rawQuery) {
+    async listar(rawQuery, tenantId) {
         return storageService.listar({
+            tenantId: this.requireTenantId(tenantId),
             entidadeTipo: this.toOptionalString(rawQuery.entidadeTipo),
             entidadeId: this.toOptionalString(rawQuery.entidadeId),
             categoria: this.toOptionalString(rawQuery.categoria),
@@ -21,20 +22,21 @@ export class ArquivosService {
             entidadeTipo: this.toOptionalString(body.entidadeTipo),
             entidadeId: this.toOptionalBigInt(body.entidadeId),
             usuarioUploadId: this.toOptionalBigInt(request.authUser?.id),
+            tenantId: this.requireTenantId(request.authUser?.tenant_id),
             observacao: this.toOptionalString(body.observacao)
         });
     }
-    async obterPorId(rawId) {
-        return storageService.obterPorId(rawId);
+    async obterPorId(rawId, tenantId) {
+        return storageService.obterPorId(rawId, this.requireTenantId(tenantId));
     }
-    async obterConteudoPorId(rawId, usuarioId) {
-        return storageService.obterConteudoPorId(rawId, this.toOptionalBigInt(usuarioId));
+    async obterConteudoPorId(rawId, usuarioId, tenantId, auditar = true) {
+        return storageService.obterConteudoPorId(rawId, this.toOptionalBigInt(usuarioId), this.requireTenantId(tenantId), auditar);
     }
-    async obterConteudoPorCaminho(rawPath, usuarioId) {
-        return storageService.obterConteudoPorCaminho(rawPath, this.toOptionalBigInt(usuarioId));
+    async obterConteudoPorCaminho(rawPath, usuarioId, tenantId, auditar = true) {
+        return storageService.obterConteudoPorCaminho(rawPath, this.toOptionalBigInt(usuarioId), this.requireTenantId(tenantId), auditar);
     }
-    async excluir(rawId, usuarioId) {
-        await storageService.excluirLogico(rawId, this.toOptionalBigInt(usuarioId));
+    async excluir(rawId, usuarioId, tenantId) {
+        await storageService.excluirLogico(rawId, this.toOptionalBigInt(usuarioId), this.requireTenantId(tenantId));
     }
     parseScope(rawScope) {
         if (typeof rawScope !== "string" || !rawScope.trim()) {
@@ -48,6 +50,13 @@ export class ArquivosService {
     }
     toOptionalString(rawValue) {
         return typeof rawValue === "string" && rawValue.trim() ? rawValue.trim() : undefined;
+    }
+    requireTenantId(rawTenantId) {
+        const tenantId = rawTenantId?.trim();
+        if (!tenantId) {
+            throw new AppError("Tenant da sessao nao identificado.", 401);
+        }
+        return tenantId;
     }
     toOptionalBigInt(rawValue) {
         if (typeof rawValue !== "string" || !rawValue.trim()) {

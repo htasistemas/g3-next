@@ -222,8 +222,15 @@ let basePromise = null;
 export class MensagensPersonalizadasService {
     repository = new MensagensPersonalizadasRepository();
     emailService = new EmailService();
-    async obterSuporte() {
-        await this.garantirBase();
+    parseTenant(rawTenantId) {
+        const tenantId = String(rawTenantId ?? "").trim();
+        if (!tenantId) {
+            throw new AppError("Tenant da sessao nao identificado.", 401);
+        }
+        return tenantId;
+    }
+    async obterSuporte(rawTenantId) {
+        await this.garantirBase(rawTenantId);
         return {
             placeholders: placeholdersDisponiveis,
             canais: [
@@ -250,49 +257,57 @@ export class MensagensPersonalizadasService {
             }
         };
     }
-    async listarTaxonomias() {
-        await this.garantirBase();
-        const rows = await this.repository.listarTaxonomias();
+    async listarTaxonomias(actor) {
+        const tenantId = this.parseTenant(actor?.tenant_id);
+        await this.garantirBase(tenantId);
+        const rows = await this.repository.listarTaxonomias(tenantId);
         return rows.map(mapTaxonomia);
     }
     async criarTaxonomia(rawInput, actor) {
-        await this.garantirBase();
+        const tenantId = this.parseTenant(actor?.tenant_id);
+        await this.garantirBase(tenantId);
         const input = mensagemTaxonomiaInputSchema.parse(rawInput);
-        const row = await this.repository.criarTaxonomia(input);
+        const row = await this.repository.criarTaxonomia(input, tenantId);
         await this.repository.registrarAuditoria({
             acao: "CRIAR_TAXONOMIA",
             usuarioId: actor?.id ?? null,
             usuarioNome: actor?.nomeUsuario ?? null,
+            tenantId,
             dadosJson: serializarSeguro(input)
         });
         return mapTaxonomia(row);
     }
     async atualizarTaxonomia(rawId, rawInput, actor) {
-        await this.garantirBase();
+        const tenantId = this.parseTenant(actor?.tenant_id);
+        await this.garantirBase(tenantId);
         const input = mensagemTaxonomiaInputSchema.parse(rawInput);
-        const row = await this.repository.atualizarTaxonomia(this.parseId(rawId), input);
+        const row = await this.repository.atualizarTaxonomia(this.parseId(rawId), input, tenantId);
         await this.repository.registrarAuditoria({
             acao: "ATUALIZAR_TAXONOMIA",
             usuarioId: actor?.id ?? null,
             usuarioNome: actor?.nomeUsuario ?? null,
+            tenantId,
             dadosJson: serializarSeguro({ id: rawId, ...input })
         });
         return mapTaxonomia(row);
     }
     async excluirTaxonomia(rawId, actor) {
-        await this.garantirBase();
-        await this.repository.removerTaxonomia(this.parseId(rawId));
+        const tenantId = this.parseTenant(actor?.tenant_id);
+        await this.garantirBase(tenantId);
+        await this.repository.removerTaxonomia(this.parseId(rawId), tenantId);
         await this.repository.registrarAuditoria({
             acao: "EXCLUIR_TAXONOMIA",
             usuarioId: actor?.id ?? null,
             usuarioNome: actor?.nomeUsuario ?? null,
+            tenantId,
             dadosJson: serializarSeguro({ id: rawId })
         });
     }
-    async listarModelos(rawFiltros) {
-        await this.garantirBase();
+    async listarModelos(rawFiltros, actor) {
+        const tenantId = this.parseTenant(actor?.tenant_id);
+        await this.garantirBase(tenantId);
         const filtros = mensagemModeloFiltrosSchema.parse(rawFiltros);
-        const rows = await this.repository.listarModelos(filtros);
+        const rows = await this.repository.listarModelos(filtros, tenantId);
         return rows
             .map(mapModelo)
             .filter((modelo) => {
@@ -305,16 +320,18 @@ export class MensagensPersonalizadasService {
             return true;
         });
     }
-    async obterModelo(rawId) {
-        await this.garantirBase();
-        const row = await this.repository.obterModeloPorId(this.parseId(rawId));
+    async obterModelo(rawId, actor) {
+        const tenantId = this.parseTenant(actor?.tenant_id);
+        await this.garantirBase(tenantId);
+        const row = await this.repository.obterModeloPorId(this.parseId(rawId), tenantId);
         if (!row) {
             throw new AppError("Mensagem nao encontrada.", 404);
         }
         return mapModelo(row);
     }
     async criarModelo(rawInput, actor) {
-        await this.garantirBase();
+        const tenantId = this.parseTenant(actor?.tenant_id);
+        await this.garantirBase(tenantId);
         const input = mensagemModeloInputSchema.parse(rawInput);
         const row = await this.repository.criarModelo(input, actor);
         await this.repository.registrarAuditoria({
@@ -322,12 +339,14 @@ export class MensagensPersonalizadasService {
             modeloId: row.id,
             usuarioId: actor?.id ?? null,
             usuarioNome: actor?.nomeUsuario ?? null,
+            tenantId,
             dadosJson: serializarSeguro(input)
         });
         return mapModelo(row);
     }
     async atualizarModelo(rawId, rawInput, actor) {
-        await this.garantirBase();
+        const tenantId = this.parseTenant(actor?.tenant_id);
+        await this.garantirBase(tenantId);
         const input = mensagemModeloInputSchema.parse(rawInput);
         const row = await this.repository.atualizarModelo(this.parseId(rawId), input, actor);
         await this.repository.registrarAuditoria({
@@ -335,13 +354,15 @@ export class MensagensPersonalizadasService {
             modeloId: row.id,
             usuarioId: actor?.id ?? null,
             usuarioNome: actor?.nomeUsuario ?? null,
+            tenantId,
             dadosJson: serializarSeguro(input)
         });
         return mapModelo(row);
     }
     async duplicarModelo(rawId, actor) {
-        await this.garantirBase();
-        const original = await this.obterModelo(rawId);
+        const tenantId = this.parseTenant(actor?.tenant_id);
+        await this.garantirBase(tenantId);
+        const original = await this.obterModelo(rawId, actor);
         const input = {
             titulo: `${original.titulo} (cópia)`,
             assunto: original.assunto,
@@ -365,12 +386,14 @@ export class MensagensPersonalizadasService {
             modeloId: row.id,
             usuarioId: actor?.id ?? null,
             usuarioNome: actor?.nomeUsuario ?? null,
+            tenantId,
             dadosJson: serializarSeguro({ origem: rawId })
         });
         return mapModelo(row);
     }
     async atualizarStatusModelo(rawId, rawStatus, actor) {
-        await this.garantirBase();
+        const tenantId = this.parseTenant(actor?.tenant_id);
+        await this.garantirBase(tenantId);
         const status = typeof rawStatus === "string" ? rawStatus.trim().toUpperCase() : "";
         if (status !== "ATIVA" && status !== "INATIVA") {
             throw new AppError("Informe um status valido.", 422);
@@ -381,41 +404,53 @@ export class MensagensPersonalizadasService {
             modeloId: row.id,
             usuarioId: actor?.id ?? null,
             usuarioNome: actor?.nomeUsuario ?? null,
+            tenantId,
             dadosJson: serializarSeguro({ status })
         });
         return mapModelo(row);
     }
     async excluirModelo(rawId, actor) {
-        await this.garantirBase();
-        const modelo = await this.obterModelo(rawId);
+        const tenantId = this.parseTenant(actor?.tenant_id);
+        await this.garantirBase(tenantId);
+        const modelo = await this.obterModelo(rawId, actor);
         if (modelo.mensagemPadraoSistema) {
             throw new AppError("Mensagens padrao do sistema devem ser inativadas, nao excluidas.", 409);
         }
-        await this.repository.removerModelo(this.parseId(rawId));
+        await this.repository.removerModelo(this.parseId(rawId), tenantId);
         await this.repository.registrarAuditoria({
             acao: "EXCLUIR_MODELO",
             modeloId: BigInt(rawId),
             usuarioId: actor?.id ?? null,
             usuarioNome: actor?.nomeUsuario ?? null,
+            tenantId,
             dadosJson: serializarSeguro({ id: rawId, titulo: modelo.titulo })
         });
     }
-    async listarHistorico(rawFiltros) {
-        await this.garantirBase();
+    async listarHistorico(rawFiltros, actor) {
+        const tenantId = this.parseTenant(actor?.tenant_id);
+        await this.garantirBase(tenantId);
         const filtros = mensagemHistoricoFiltrosSchema.parse(rawFiltros);
-        const rows = await this.repository.listarHistorico(filtros);
+        const rows = await this.repository.listarHistorico(filtros, tenantId);
         return rows.map(mapHistorico);
     }
-    async buscarDestinatarios(rawQuery) {
-        await this.garantirBase();
+    async buscarDestinatarios(rawQuery, actor) {
+        const tenantId = this.parseTenant(actor?.tenant_id);
+        await this.garantirBase(tenantId);
         const query = mensagemDestinatarioBuscaSchema.parse(rawQuery);
-        return this.repository.buscarDestinatarios(query.tipo, query.termo, query.somenteAtivos);
+        return this.repository.buscarDestinatarios(query.tipo, query.termo, query.somenteAtivos, tenantId);
+    }
+    async buscarTodosDestinatarios(rawQuery, actor) {
+        const tenantId = this.parseTenant(actor?.tenant_id);
+        await this.garantirBase(tenantId);
+        const query = mensagemDestinatarioBuscaSchema.pick({ tipo: true }).parse(rawQuery);
+        return this.repository.listarTodosDestinatarios(query.tipo, tenantId);
     }
     async gerarPreview(rawInput, actor) {
-        await this.garantirBase();
+        const tenantId = this.parseTenant(actor?.tenant_id);
+        await this.garantirBase(tenantId);
         const input = mensagemPreviewInputSchema.parse(rawInput);
-        const modelo = await this.resolverModeloPreview(input.modeloId, input);
-        const destinatario = await this.resolverDestinatario(input.destinatarioTipo, input.destinatarioId);
+        const modelo = await this.resolverModeloPreview(input.modeloId, input, tenantId, actor);
+        const destinatario = await this.resolverDestinatario(input.destinatarioTipo, input.destinatarioId, tenantId);
         const contexto = this.montarContexto(destinatario, actor, input.contextoExtra);
         const assuntoBase = input.assuntoEditado?.trim() || modelo.assunto || modelo.titulo;
         const corpoBase = input.mensagemEditada?.trim() || modelo.mensagemBase;
@@ -443,16 +478,27 @@ export class MensagensPersonalizadasService {
         };
     }
     async enviarMensagem(rawInput, actor) {
-        await this.garantirBase();
+        const tenantId = this.parseTenant(actor?.tenant_id);
+        await this.garantirBase(tenantId);
         const input = mensagemEnvioInputSchema.parse(rawInput);
-        const modelo = await this.resolverModeloPreview(input.modeloId, input);
-        if (input.tipoEnvio === "LOTE" && input.destinatarioIds.length < 2) {
+        const modelo = await this.resolverModeloPreview(input.modeloId, input, tenantId, actor);
+        const destinatariosTodos = Boolean(input.destinatariosTodos);
+        const idsSolicitados = destinatariosTodos
+            ? (await this.repository.listarTodosDestinatarios(input.destinatarioTipo, tenantId)).map((item) => item.id)
+            : input.destinatarioIds;
+        if (!idsSolicitados.length) {
+            throw new AppError("Nenhum destinatário ativo e autorizado para comunicação foi encontrado.", 422);
+        }
+        if (input.tipoEnvio === "LOTE" && idsSolicitados.length < 2) {
             throw new AppError("Envio em lote requer ao menos dois destinatarios.", 422);
         }
-        const idsUnicos = deduplicarStrings(input.destinatarioIds);
+        const idsUnicos = deduplicarStrings(idsSolicitados);
         const itens = [];
         for (const destinatarioId of idsUnicos) {
-            const destinatario = await this.resolverDestinatario(input.destinatarioTipo, destinatarioId);
+            const destinatario = await this.resolverDestinatario(input.destinatarioTipo, destinatarioId, tenantId);
+            if (input.destinatarioTipo === "BENEFICIARIO" && destinatario.aceitaComunicacao === false) {
+                throw new AppError(`O beneficiário ${destinatario.nome} não autorizou o recebimento de mensagens.`, 422);
+            }
             const contexto = this.montarContexto(destinatario, actor, input.contextoExtra);
             const assuntoBase = input.assuntoEditado?.trim() || modelo.assunto || modelo.titulo;
             const corpoBase = input.mensagemEditada?.trim() || modelo.mensagemBase;
@@ -479,7 +525,7 @@ export class MensagensPersonalizadasService {
                         mensagemFinal: corpoFinal,
                         erroObservacao: erro,
                         detalhesJson: serializarSeguro({ saudacao, assinatura })
-                    });
+                    }, tenantId);
                     itens.push({
                         destinatarioId,
                         destinatarioNome: destinatario.nome,
@@ -511,7 +557,7 @@ export class MensagensPersonalizadasService {
                         assuntoFinal,
                         mensagemFinal,
                         detalhesJson: serializarSeguro({ saudacao, assinatura })
-                    });
+                    }, tenantId);
                     itens.push({
                         destinatarioId,
                         destinatarioNome: destinatario.nome,
@@ -538,7 +584,7 @@ export class MensagensPersonalizadasService {
                         mensagemFinal,
                         erroObservacao: erro,
                         detalhesJson: serializarSeguro({ saudacao, assinatura })
-                    });
+                    }, tenantId);
                     itens.push({
                         destinatarioId,
                         destinatarioNome: destinatario.nome,
@@ -567,7 +613,7 @@ export class MensagensPersonalizadasService {
                     assuntoFinal,
                     mensagemFinal: corpoFinal,
                     erroObservacao: erro
-                });
+                }, tenantId);
                 itens.push({
                     destinatarioId,
                     destinatarioNome: destinatario.nome,
@@ -594,7 +640,7 @@ export class MensagensPersonalizadasService {
                 mensagemFinal: corpoFinal,
                 urlWhatsapp,
                 detalhesJson: serializarSeguro({ modo: "LINK_PREPARADO" })
-            });
+            }, tenantId);
             itens.push({
                 destinatarioId,
                 destinatarioNome: destinatario.nome,
@@ -609,6 +655,7 @@ export class MensagensPersonalizadasService {
             modeloId: BigInt(modelo.id),
             usuarioId: actor?.id ?? null,
             usuarioNome: actor?.nomeUsuario ?? null,
+            tenantId,
             dadosJson: serializarSeguro({
                 canal: input.canal,
                 destinatarioTipo: input.destinatarioTipo,
@@ -627,23 +674,23 @@ export class MensagensPersonalizadasService {
             itens
         };
     }
-    async garantirBase() {
-        await ensureMensagensPersonalizadasBase();
+    async garantirBase(rawTenantId) {
+        await ensureMensagensPersonalizadasBase(this.parseTenant(rawTenantId));
     }
-    async resolverModeloPreview(modeloId, input) {
+    async resolverModeloPreview(modeloId, input, tenantId, actor) {
         if (!modeloId) {
             const candidatos = await this.repository.listarModelos({
                 somenteAtivas: true,
                 destinatario: input.destinatarioTipo,
                 canal: input.canal
-            });
+            }, tenantId);
             const primeiroCompativel = candidatos.map(mapModelo).find((modelo) => destinatarioPermiteCanal(modelo, input.destinatarioTipo, input.canal));
             if (!primeiroCompativel) {
                 throw new AppError("Nao existe mensagem ativa compatível para o canal e destinatário informados.", 404);
             }
             return primeiroCompativel;
         }
-        const modelo = await this.obterModelo(modeloId);
+        const modelo = await this.obterModelo(modeloId, actor ?? { tenant_id: tenantId });
         if (!destinatarioPermiteCanal(modelo, input.destinatarioTipo, input.canal)) {
             throw new AppError("A mensagem selecionada nao e compativel com o canal ou destinatario.", 422);
         }
@@ -652,8 +699,8 @@ export class MensagensPersonalizadasService {
         }
         return modelo;
     }
-    async resolverDestinatario(tipo, id) {
-        const destinatario = await this.repository.obterDestinatarioPorId(tipo, id);
+    async resolverDestinatario(tipo, id, tenantId) {
+        const destinatario = await this.repository.obterDestinatarioPorId(tipo, id, tenantId);
         if (!destinatario) {
             throw new AppError("Destinatario nao encontrado.", 404);
         }
@@ -697,25 +744,28 @@ export class MensagensPersonalizadasService {
         return BigInt(parsed);
     }
 }
-export async function ensureMensagensPersonalizadasBase() {
+export async function ensureMensagensPersonalizadasBase(rawTenantId) {
+    const tenantId = String(rawTenantId ?? "").trim();
+    if (!tenantId) {
+        throw new AppError("Tenant da sessao nao identificado.", 401);
+    }
     await ensureMensagensPersonalizadasEstrutura();
     if (!basePromise) {
-        basePromise = (async () => {
-            const repository = new MensagensPersonalizadasRepository();
-            for (const taxonomia of taxonomiasBase) {
-                await repository.upsertTaxonomiaSeed(taxonomia);
-            }
-            const taxonomias = await repository.listarTaxonomias();
-            const resolverId = (tipo, nome) => {
-                const item = taxonomias.find((taxonomia) => taxonomia.tipo === tipo && taxonomia.nome === nome);
-                return item?.id.toString() ?? null;
-            };
-            for (const modelo of modelosBase(resolverId)) {
-                await repository.inserirModeloSeedSeAusente(modelo);
-            }
-        })();
+        basePromise = Promise.resolve();
     }
     await basePromise;
+    const repository = new MensagensPersonalizadasRepository();
+    for (const taxonomia of taxonomiasBase) {
+        await repository.upsertTaxonomiaSeed(taxonomia, tenantId);
+    }
+    const taxonomias = await repository.listarTaxonomias(tenantId);
+    const resolverId = (tipo, nome) => {
+        const item = taxonomias.find((taxonomia) => taxonomia.tipo === tipo && taxonomia.nome === nome);
+        return item?.id.toString() ?? null;
+    };
+    for (const modelo of modelosBase(resolverId)) {
+        await repository.inserirModeloSeedSeAusente(modelo, tenantId);
+    }
 }
 const modelosBaseParte1 = (taxonomiaId) => [
     {

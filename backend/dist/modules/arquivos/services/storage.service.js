@@ -3,40 +3,73 @@ import sharp from "sharp";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { toStringId } from "../../../utils/string-utils.js";
 import { ArquivosRepository } from "../repositories/arquivos.repository.js";
-import { getStoragePolicy } from "./storage-policy.js";
-import { LocalStorageProvider } from "./local-storage.provider.js";
+import { getStoragePolicy, storagePolicies } from "./storage-policy.js";
+import { getStorageProvider } from "./storage-factory.js";
 import { detectarMimeTypePorAssinatura, ehUrlExterna, ehValorInlineDeArquivo, extrairExtensao, extToMime, formatarTamanhoBytes, garantirExtensaoPermitida, garantirMimeTypePermitido, mimeToExt, normalizarCaminhoLogico, normalizarNomeArquivo, parseBase64Payload } from "./storage-utils.js";
+const STORAGE_TENANTS_ROOT = "tenants";
+const STORAGE_TENANT_FALLBACK = "sem-tenant";
+function escaparExpressaoRegular(texto) {
+    return texto.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 export class StorageService {
     repository = new ArquivosRepository();
-    provider = new LocalStorageProvider();
+    provider = getStorageProvider();
+    normalizarTenantRoot(tenantId) {
+        return normalizarCaminhoLogico(`${STORAGE_TENANTS_ROOT}/${tenantId?.trim() || STORAGE_TENANT_FALLBACK}`);
+    }
+    construirDiretorioBase(policy, input, data) {
+        const tenantRoot = this.normalizarTenantRoot(input.tenantId);
+        const year = data.getFullYear();
+        const month = String(data.getMonth() + 1).padStart(2, "0");
+        if (policy.imageOnly) {
+            const entitySegment = input.entidadeId ? toStringId(input.entidadeId) : "pendente";
+            return `${tenantRoot}/${policy.subdirectory}/${entitySegment}/${year}/${month}`;
+        }
+        return `${tenantRoot}/${policy.subdirectory}/${year}/${month}`;
+    }
     async listar(rawFilters) {
         const entidadeId = rawFilters.entidadeId ? BigInt(rawFilters.entidadeId) : undefined;
         const ativo = rawFilters.ativo === undefined ? undefined : ["true", "1", "yes"].includes(rawFilters.ativo);
         return this.repository.listar({
+            tenantId: rawFilters.tenantId,
             entidadeTipo: rawFilters.entidadeTipo?.trim() || undefined,
             entidadeId,
             categoria: rawFilters.categoria?.trim() || undefined,
             ativo
         });
     }
-    async obterPorId(rawId) {
-        return this.repository.buscarPorIdOuFalhar(this.parseId(rawId));
+    async obterPorId(rawId, tenantId) {
+        return this.repository.buscarPorIdOuFalhar(this.parseId(rawId), tenantId);
     }
-    async obterConteudoPorId(rawId, usuarioId) {
-        const arquivo = await this.repository.buscarPorIdOuFalhar(this.parseId(rawId));
-        return this.obterConteudoPorCaminhoInterno(arquivo.caminho_arquivo, arquivo, usuarioId, "VIEW");
+    async obterConteudoPorId(rawId, usuarioId, tenantId, auditar = true) {
+        const arquivo = await this.repository.buscarPorIdOuFalhar(this.parseId(rawId), tenantId);
+        return this.obterConteudoPorCaminhoInterno(arquivo.caminho_arquivo, arquivo, usuarioId, "VIEW", auditar);
     }
-    async obterConteudoPorCaminho(rawPath, usuarioId) {
+    async obterConteudoPorCaminho(rawPath, usuarioId, tenantId, auditar = true) {
         if (!rawPath?.trim()) {
             throw new AppError("Caminho do arquivo nao informado.", 400);
         }
         const caminhoArquivo = this.provider.normalizePath(rawPath);
-        const arquivo = await this.repository.buscarAtivoPorCaminho(caminhoArquivo);
-        return this.obterConteudoPorCaminhoInterno(caminhoArquivo, arquivo ?? undefined, usuarioId, "VIEW");
+        const tenantObrigatorio = this.requireTenantId(tenantId);
+        if (!this.caminhoPertenceAoTenant(caminhoArquivo, tenantObrigatorio)) {
+            throw new AppError("Arquivo nao encontrado ou sem permissao de acesso.", 404);
+        }
+        const arquivo = await this.repository.buscarAtivoPorCaminho(caminhoArquivo, tenantObrigatorio);
+        if (!arquivo) {
+            throw new AppError("Arquivo nao encontrado ou sem permissao de acesso.", 404);
+        }
+        return this.obterConteudoPorCaminhoInterno(caminhoArquivo, arquivo, usuarioId, "VIEW", auditar);
     }
-    async excluirLogico(rawId, usuarioId) {
+    async obterConteudoPorCaminhoBruto(rawPath) {
+        if (!rawPath?.trim()) {
+            throw new AppError("Caminho do arquivo nao informado.", 400);
+        }
+        const caminhoArquivo = this.provider.normalizePath(rawPath);
+        return this.obterConteudoPorCaminhoInterno(caminhoArquivo, undefined, undefined, "VIEW", false);
+    }
+    async excluirLogico(rawId, usuarioId, tenantId) {
         const id = this.parseId(rawId);
-        const arquivo = await this.repository.buscarPorIdOuFalhar(id);
+        const arquivo = await this.repository.buscarPorIdOuFalhar(id, tenantId);
         await this.repository.desativarPorId(id);
         await this.provider.remover(arquivo.caminho_arquivo);
         if (arquivo.thumbnail_caminho) {
@@ -52,15 +85,34 @@ export class StorageService {
             }
         });
     }
-    async vincularEntidade(caminhoArquivo, entidadeId) {
-        await this.repository.vincularEntidadePorCaminho(this.provider.normalizePath(caminhoArquivo), entidadeId);
+    async vincularEntidade(caminhoArquivo, entidadeId, tenantId) {
+        const caminhoNormalizado = this.provider.normalizePath(caminhoArquivo);
+        const arquivo = await this.repository.buscarAtivoPorCaminho(caminhoNormalizado, tenantId);
+        if (!arquivo) {
+            await this.repository.vincularEntidadePorCaminho(caminhoNormalizado, entidadeId, tenantId);
+            return;
+        }
+        const policy = this.obterPolicyDoArquivo(arquivo);
+        const novoCaminhoArquivo = this.reescreverCaminhoImagem(caminhoNormalizado, policy, entidadeId, false);
+        const novoThumbnailCaminho = arquivo.thumbnail_caminho
+            ? this.reescreverCaminhoImagem(arquivo.thumbnail_caminho, policy, entidadeId, true)
+            : undefined;
+        if (novoCaminhoArquivo !== caminhoNormalizado) {
+            await this.provider.mover(caminhoNormalizado, novoCaminhoArquivo);
+            if (arquivo.thumbnail_caminho && novoThumbnailCaminho && novoThumbnailCaminho !== arquivo.thumbnail_caminho) {
+                await this.provider.mover(arquivo.thumbnail_caminho, novoThumbnailCaminho);
+            }
+        }
+        await this.repository.vincularEntidadePorCaminho(caminhoNormalizado, entidadeId, tenantId, novoCaminhoArquivo !== caminhoNormalizado ? novoCaminhoArquivo : undefined, novoThumbnailCaminho && arquivo.thumbnail_caminho !== novoThumbnailCaminho
+            ? novoThumbnailCaminho
+            : undefined);
     }
-    async desativarPorCaminho(caminhoArquivo, usuarioId) {
+    async desativarPorCaminho(caminhoArquivo, usuarioId, tenantId) {
         if (!caminhoArquivo?.trim()) {
             return;
         }
         const caminhoLogico = this.provider.normalizePath(caminhoArquivo);
-        const arquivo = await this.repository.buscarAtivoPorCaminho(caminhoLogico);
+        const arquivo = await this.repository.buscarAtivoPorCaminho(caminhoLogico, tenantId);
         await this.repository.desativarPorCaminho(caminhoLogico);
         await this.provider.remover(caminhoLogico);
         if (arquivo?.thumbnail_caminho) {
@@ -75,11 +127,11 @@ export class StorageService {
             }
         });
     }
-    async rollbackArquivos(caminhosArquivos) {
+    async rollbackArquivos(caminhosArquivos, tenantId) {
         for (const caminhoArquivo of caminhosArquivos) {
             if (!caminhoArquivo)
                 continue;
-            await this.desativarPorCaminho(caminhoArquivo);
+            await this.desativarPorCaminho(caminhoArquivo, undefined, tenantId);
         }
     }
     async persistirCampo(input) {
@@ -172,18 +224,21 @@ export class StorageService {
         const baseName = nomeOriginal.replace(/\.[^.]+$/, "") || "arquivo";
         const uniqueName = `${data.getFullYear()}${String(data.getMonth() + 1).padStart(2, "0")}${String(data.getDate()).padStart(2, "0")}-${randomUUID()}-${baseName}`.slice(0, 120);
         const fileName = `${uniqueName}.${extensaoInferida}`;
-        const relativeDir = `${policy.subdirectory}/${data.getFullYear()}/${String(data.getMonth() + 1).padStart(2, "0")}`;
+        const relativeDir = this.construirDiretorioBase(policy, input, data);
         const caminhoArquivo = normalizarCaminhoLogico(`${relativeDir}/${fileName}`);
         const thumbnailCaminho = thumbnailBuffer
-            ? normalizarCaminhoLogico(`${policy.subdirectory}/thumbs/${data.getFullYear()}/${String(data.getMonth() + 1).padStart(2, "0")}/${fileName}`)
+            ? normalizarCaminhoLogico(policy.imageOnly
+                ? `${this.normalizarTenantRoot(input.tenantId)}/${policy.subdirectory}/thumbs/${input.entidadeId ? toStringId(input.entidadeId) : "pendente"}/${data.getFullYear()}/${String(data.getMonth() + 1).padStart(2, "0")}/${fileName}`
+                : `${this.normalizarTenantRoot(input.tenantId)}/${policy.subdirectory}/thumbs/${data.getFullYear()}/${String(data.getMonth() + 1).padStart(2, "0")}/${fileName}`)
             : undefined;
-        await this.provider.salvar(caminhoArquivo, principalBuffer);
+        await this.provider.salvar(caminhoArquivo, principalBuffer, mimeType);
         if (thumbnailBuffer && thumbnailCaminho) {
-            await this.provider.salvar(thumbnailCaminho, thumbnailBuffer);
+            await this.provider.salvar(thumbnailCaminho, thumbnailBuffer, mimeType);
         }
         try {
             const registro = await this.repository.criar({
                 entidadeTipo: input.entidadeTipo ?? policy.entidadeTipo,
+                tenantId: input.tenantId ?? null,
                 entidadeId: input.entidadeId ?? null,
                 categoria: policy.categoria,
                 nomeOriginal: input.nomeOriginal?.trim() || fileName,
@@ -222,13 +277,13 @@ export class StorageService {
             throw error;
         }
     }
-    async obterConteudoPorCaminhoInterno(caminhoArquivo, arquivo, usuarioId, acao = "VIEW") {
+    async obterConteudoPorCaminhoInterno(caminhoArquivo, arquivo, usuarioId, acao = "VIEW", auditar = true) {
         const normalizedPath = this.provider.normalizePath(caminhoArquivo);
         const exists = await this.provider.existe(normalizedPath);
         if (!exists) {
             throw new AppError("Arquivo fisico nao encontrado.", 404);
         }
-        if (arquivo) {
+        if (arquivo && auditar) {
             await this.repository.registrarAuditoria({
                 atorId: usuarioId,
                 acao,
@@ -252,5 +307,41 @@ export class StorageService {
             throw new AppError("Identificador de arquivo invalido.", 400);
         }
         return BigInt(parsed);
+    }
+    requireTenantId(rawTenantId) {
+        const tenantId = rawTenantId?.trim();
+        if (!tenantId)
+            throw new AppError("Tenant da sessao nao identificado.", 401);
+        return tenantId;
+    }
+    caminhoPertenceAoTenant(caminho, tenantId) {
+        const prefixo = `${STORAGE_TENANTS_ROOT}/${normalizarCaminhoLogico(tenantId)}/`;
+        return caminho.startsWith(prefixo);
+    }
+    obterPolicyDoArquivo(arquivo) {
+        const policy = Object.values(storagePolicies).find((item) => item.entidadeTipo === arquivo.entidade_tipo && item.categoria === arquivo.categoria);
+        if (!policy) {
+            throw new AppError("Politica de storage do arquivo nao encontrada.", 400);
+        }
+        return policy;
+    }
+    reescreverCaminhoImagem(caminhoArquivo, policy, entidadeId, thumb = false) {
+        if (!policy.imageOnly)
+            return caminhoArquivo;
+        const entitySegment = toStringId(entidadeId);
+        const subdirectoryRegex = escaparExpressaoRegular(policy.subdirectory);
+        const tenantPattern = new RegExp(`^${STORAGE_TENANTS_ROOT}/([^/]+)/${subdirectoryRegex}/${thumb ? "thumbs/" : ""}pendente/`);
+        const tenantMatch = caminhoArquivo.match(tenantPattern);
+        if (tenantMatch?.[1]) {
+            const tenantSegment = tenantMatch[1];
+            return caminhoArquivo.replace(tenantPattern, `${STORAGE_TENANTS_ROOT}/${tenantSegment}/${policy.subdirectory}/${thumb ? "thumbs/" : ""}${entitySegment}/`);
+        }
+        const legacyPrefix = thumb
+            ? `${policy.subdirectory}/thumbs/pendente/`
+            : `${policy.subdirectory}/pendente/`;
+        if (caminhoArquivo.startsWith(legacyPrefix)) {
+            return caminhoArquivo.replace(legacyPrefix, `${STORAGE_TENANTS_ROOT}/${STORAGE_TENANT_FALLBACK}/${policy.subdirectory}/${thumb ? "thumbs/" : ""}${entitySegment}/`);
+        }
+        return caminhoArquivo;
     }
 }

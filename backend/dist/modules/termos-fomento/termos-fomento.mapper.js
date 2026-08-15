@@ -14,6 +14,8 @@ export function mapTermoFomentoToResponse(termo, aditivos, documentos) {
         id: toStringId(termo.id),
         numeroTermo: termo.numero_termo,
         tipoTermo: termo.tipo_termo,
+        referenciaTermo: termo.referencia_termo ?? undefined,
+        responsavelIndicacao: termo.responsavel_indicacao ?? undefined,
         orgaoConcedente: termo.orgao_concedente ?? undefined,
         dataAssinatura: toIsoDate(termo.data_assinatura),
         dataInicioVigencia: toIsoDate(termo.data_inicio_vigencia),

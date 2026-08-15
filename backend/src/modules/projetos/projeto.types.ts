@@ -60,6 +60,7 @@ export type ProjetoTarefaInput = {
 };
 
 export type ProjetoFilters = {
+  projeto_id?: string;
   nome?: string;
   responsavel?: string;
   status?: ProjetoStatus;

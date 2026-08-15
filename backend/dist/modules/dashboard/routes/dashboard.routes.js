@@ -5,6 +5,7 @@ import { DashboardController } from "../controllers/dashboard.controller.js";
 const controller = new DashboardController();
 export const dashboardRoutes = Router();
 dashboardRoutes.get("/assistencia", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"]), asyncHandler(controller.obterAssistencia.bind(controller)));
+dashboardRoutes.get("/gerencial", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "PAINEL_INDICADORES_DASHBOARD_VISUALIZAR"]), asyncHandler(controller.obterGerencial.bind(controller)));
 dashboardRoutes.get("/power-bi", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"]), asyncHandler(controller.obterPowerBi.bind(controller)));
 dashboardRoutes.get("/power-bi/detalhamentos/:id", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"]), asyncHandler(controller.obterDetalhamentoPowerBi.bind(controller)));
 dashboardRoutes.get("/vulnerabilidade", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"]), asyncHandler(controller.obterVulnerabilidade.bind(controller)));

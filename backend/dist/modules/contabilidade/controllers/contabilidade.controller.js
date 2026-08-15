@@ -28,12 +28,13 @@ function obterAtor(request) {
         nomeUsuario: request.authUser?.nomeUsuario,
         permissoes: request.authUser?.permissoes ?? [],
         ip: obterIp(request),
-        maquina: obterOrigem(request)
+        maquina: obterOrigem(request),
+        tenantId: request.authUser?.tenant_id
     };
 }
 export class ContabilidadeController {
-    async listarContasBancarias(_request, response) {
-        const lista = await service.listarContasBancarias();
+    async listarContasBancarias(request, response) {
+        const lista = await service.listarContasBancarias(obterAtor(request));
         return response.json(lista);
     }
     async criarContaBancaria(request, response) {
@@ -48,8 +49,8 @@ export class ContabilidadeController {
         await service.removerContaBancaria(request.params.id, obterAtor(request));
         return response.status(204).send();
     }
-    async listarCategorias(_request, response) {
-        const lista = await service.listarCategorias();
+    async listarCategorias(request, response) {
+        const lista = await service.listarCategorias(obterAtor(request));
         return response.json(lista);
     }
     async criarCategoria(request, response) {
@@ -64,8 +65,8 @@ export class ContabilidadeController {
         await service.removerCategoria(request.params.id, obterAtor(request));
         return response.status(204).send();
     }
-    async listarCentrosCusto(_request, response) {
-        const lista = await service.listarCentrosCusto();
+    async listarCentrosCusto(request, response) {
+        const lista = await service.listarCentrosCusto(obterAtor(request));
         return response.json(lista);
     }
     async criarCentroCusto(request, response) {
@@ -80,8 +81,8 @@ export class ContabilidadeController {
         await service.removerCentroCusto(request.params.id, obterAtor(request));
         return response.status(204).send();
     }
-    async listarLancamentos(_request, response) {
-        const lista = await service.listarLancamentos();
+    async listarLancamentos(request, response) {
+        const lista = await service.listarLancamentos(obterAtor(request));
         return response.json(lista);
     }
     async criarLancamento(request, response) {
@@ -105,11 +106,11 @@ export class ContabilidadeController {
         return response.json(registro);
     }
     async removerLancamento(request, response) {
-        await service.removerLancamento(request.params.id, obterAtor(request));
+        await service.removerLancamento(request.params.id, request.body, obterAtor(request));
         return response.status(204).send();
     }
-    async listarMovimentacoes(_request, response) {
-        const lista = await service.listarMovimentacoes();
+    async listarMovimentacoes(request, response) {
+        const lista = await service.listarMovimentacoes(obterAtor(request));
         return response.json(lista);
     }
     async criarMovimentacao(request, response) {
@@ -124,8 +125,8 @@ export class ContabilidadeController {
         await service.removerMovimentacao(request.params.id, obterAtor(request));
         return response.status(204).send();
     }
-    async listarTransferencias(_request, response) {
-        const lista = await service.listarTransferencias();
+    async listarTransferencias(request, response) {
+        const lista = await service.listarTransferencias(obterAtor(request));
         return response.json(lista);
     }
     async criarTransferencia(request, response) {
@@ -136,8 +137,8 @@ export class ContabilidadeController {
         const registro = await service.estornarTransferencia(request.params.id, obterAtor(request));
         return response.json(registro);
     }
-    async listarConciliacoes(_request, response) {
-        const lista = await service.listarConciliacoes();
+    async listarConciliacoes(request, response) {
+        const lista = await service.listarConciliacoes(obterAtor(request));
         return response.json(lista);
     }
     async criarConciliacao(request, response) {
@@ -148,28 +149,36 @@ export class ContabilidadeController {
         const registro = await service.atualizarSituacaoConciliacao(request.params.id, request.body, obterAtor(request));
         return response.json(registro);
     }
-    async listarHistorico(_request, response) {
-        const lista = await service.listarHistorico();
+    async listarHistorico(request, response) {
+        const lista = await service.listarHistorico(obterAtor(request));
         return response.json(lista);
     }
-    async listarComprasIntegradas(_request, response) {
-        const lista = await service.listarComprasIntegradas();
+    async listarFechamentosMensais(request, response) {
+        const lista = await service.listarFechamentosMensais(obterAtor(request));
+        return response.json(lista);
+    }
+    async fecharMes(request, response) {
+        const registro = await service.fecharMes(request.body, obterAtor(request));
+        return response.status(201).json(registro);
+    }
+    async listarComprasIntegradas(request, response) {
+        const lista = await service.listarComprasIntegradas(obterAtor(request));
         return response.json(lista);
     }
     async gerarObrigacaoFinanceiraPorCompra(request, response) {
         const registro = await service.gerarObrigacaoFinanceiraPorCompra(request.params.id, obterAtor(request));
         return response.status(201).json(registro);
     }
-    async listarEmendas(_request, response) {
-        const lista = await service.listarEmendas();
+    async listarEmendas(request, response) {
+        const lista = await service.listarEmendas(obterAtor(request));
         return response.json(lista);
     }
     async criarEmenda(request, response) {
-        const registro = await service.criarEmenda(request.body);
+        const registro = await service.criarEmenda(request.body, obterAtor(request));
         return response.status(201).json(registro);
     }
     async atualizarStatusEmenda(request, response) {
-        const registro = await service.atualizarStatusEmenda(request.params.id, request.body);
+        const registro = await service.atualizarStatusEmenda(request.params.id, request.body, obterAtor(request));
         return response.json(registro);
     }
 }

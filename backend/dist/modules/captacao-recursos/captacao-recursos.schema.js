@@ -98,6 +98,11 @@ export const captacaoDoadorInputSchema = z
     aceitaWhatsapp: optionalBoolean.default(true),
     aceitaReceberCampanhas: optionalBoolean.default(true),
     categoriaDoador: z.enum(captacaoCategoriaDoadorValues).optional(),
+    segmentoRelacionamento: optionalTrimmedString.optional(),
+    statusRetencao: optionalTrimmedString.optional(),
+    motivoRisco: optionalTrimmedString.optional(),
+    proximaAcaoSugerida: optionalTrimmedString.optional(),
+    scoreRelacionamento: optionalInteger.optional(),
     responsavelRelacionamento: optionalTrimmedString.optional(),
     observacoesInternas: optionalTrimmedString.optional(),
     portalAtivo: optionalBoolean.default(true),
@@ -163,6 +168,16 @@ export const captacaoDoadorInputSchema = z
             });
         }
     }
+});
+export const captacaoTarefaRelacionamentoInputSchema = z.object({
+    titulo: z.string().trim().min(3, "Informe o título da tarefa."),
+    descricao: optionalTrimmedString.optional(),
+    status: optionalTrimmedString.default("pendente"),
+    prioridade: optionalTrimmedString.default("media"),
+    tipo: optionalTrimmedString.default("follow_up"),
+    responsavel: optionalTrimmedString.optional(),
+    dataPrevista: optionalIsoDate.optional(),
+    origem: optionalTrimmedString.default("manual")
 });
 export const captacaoCampanhaInputSchema = z.object({
     nome: z.string().trim().min(3, "Informe o nome da campanha."),

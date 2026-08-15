@@ -167,7 +167,7 @@ const AI_SUGGESTION_CATEGORIES = [
     { id: "familias", label: "Famílias", descricao: "Consultas sobre núcleo familiar, responsável e atualização cadastral." },
     { id: "beneficiarios", label: "Beneficiários", descricao: "Histórico, situação cadastral, pendências e vínculos." },
     { id: "beneficios", label: "Benefícios", descricao: "Concessões, duplicidades, custos e cestas básicas." },
-    { id: "atendimentos", label: "Atendimentos", descricao: "Histórico, pendências, retornos e movimentações técnicas." },
+    { id: "atendimentos", label: "Atendimentos diários", descricao: "Histórico, pendências, retornos e movimentações técnicas." },
     { id: "cursos-oficinas", label: "Cursos e oficinas", descricao: "Inscrições, vagas, abandono e conclusão." },
     { id: "gestao-indicadores", label: "Gestão e indicadores", descricao: "Resumos executivos, custos e comparação de períodos." },
     { id: "doadores-doacoes", label: "Doadores e doações", descricao: "Arrecadação, inatividade, campanhas e inadimplência." },
@@ -274,6 +274,13 @@ export class AiService {
             userId,
             context
         };
+        if (context?.mode === "field_suggestion") {
+            if (!env.APP_GEMINI_API_KEY || env.IA_PROVIDER !== "gemini") {
+                return this.getIaUnavailable(query, context);
+            }
+            const assisted = await this.tryAssistedResponse(ctx);
+            return assisted ?? this.getFallbackNotUnderstood(query, context);
+        }
         if (isGreetingQuery(ctx.normalizedQuery) || isSmallTalkQuery(ctx.normalizedQuery)) {
             return this.getConversationalReply(ctx.query, ctx.normalizedQuery, userName);
         }
@@ -465,11 +472,16 @@ export class AiService {
         }
         try {
             const client = new GoogleGenerativeAI(env.APP_GEMINI_API_KEY);
-            const respostaEstruturada = prefersStructuredAnswer(context.normalizedQuery);
+            const respostaEstruturada = context.context?.mode === "field_suggestion"
+                ? false
+                : prefersStructuredAnswer(context.normalizedQuery);
             const model = client.getGenerativeModel({
                 model: env.IA_MODEL,
                 systemInstruction: "Você é o Assistente Inteligente do sistema G3N para assistência social e terceiro setor. " +
                     "Responda em português do Brasil, de forma clara, profissional e objetiva. " +
+                    (context.context?.mode === "field_suggestion"
+                        ? "Esta é uma solicitação de sugestão para preencher um campo. Gere somente o texto final sugerido, relacionado ao título do campo e às informações fornecidas, sem responder consultas internas, sem transformar o pedido em busca de beneficiários e sem inventar fatos. "
+                        : "") +
                     (respostaEstruturada
                         ? "Quando a pergunta pedir análise, resumo, lista, comparação, indicador ou dado operacional, use este formato: Resposta direta, Resumo, Detalhes, Alertas, Sugestões. "
                         : "Quando a pergunta for geral, conceitual ou orientativa, responda em texto natural, fluido e bem organizado, sem forçar blocos com títulos. ") +
@@ -479,6 +491,7 @@ export class AiService {
             const contextoTela = normalizeContextTokens(context.context);
             const prompt = `Pergunta do usuário: ${context.query}\n` +
                 `Contexto atual da tela: ${contextoTela || "não informado"}\n` +
+                `Modo da solicitação: ${context.context?.mode || "assistente"}\n` +
                 `Estilo esperado: ${respostaEstruturada ? "resposta estruturada em blocos curtos" : "resposta natural em prosa clara"}\n` +
                 "Se a pergunta for geral, responda normalmente com base em conhecimento útil e seguro. " +
                 "Se a pergunta depender de dados específicos da instituição que não foram consultados aqui, informe isso com clareza e sugira uma consulta adequada dentro do sistema.";

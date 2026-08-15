@@ -15,9 +15,10 @@ matriculaRoutes.get("/:id/presencas/datas", ensureAuthenticated, ensurePermissio
 matriculaRoutes.post("/:id/presencas/datas", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.criarPresencaData.bind(controller)));
 matriculaRoutes.put("/:id/presencas/datas/:presencaDataId", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.atualizarPresencaData.bind(controller)));
 matriculaRoutes.patch("/:id/presencas/datas/:presencaDataId/cancelar", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.cancelarPresencaData.bind(controller)));
-matriculaRoutes.delete("/:id/presencas/datas/:presencaDataId", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.removerPresencaData.bind(controller)));
+matriculaRoutes.delete("/:id/presencas/datas/:presencaDataId", ensureAuthenticated, ensurePermissions(permissaoExclusao), asyncHandler(controller.removerPresencaData.bind(controller)));
 matriculaRoutes.get("/:id/presencas/datas/:presencaDataId/itens", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listarPresencasPorData.bind(controller)));
 matriculaRoutes.post("/:id/presencas/datas/:presencaDataId/itens", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.salvarPresencasPorData.bind(controller)));
+matriculaRoutes.post("/:id/presencas/datas/:presencaDataId/validar-senha", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.validarSenhaPresenca.bind(controller)));
 matriculaRoutes.get("/", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listar.bind(controller)));
 matriculaRoutes.get("/:id", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.buscarPorId.bind(controller)));
 matriculaRoutes.post("/", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.criar.bind(controller)));
