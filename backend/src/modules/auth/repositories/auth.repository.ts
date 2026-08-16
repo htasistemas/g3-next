@@ -164,24 +164,29 @@ function ehEmailAdminPadrao(email?: string | null) {
 export class AuthRepository {
   async buscarCandidatosGlobaisPorEmail(email: string) {
     await this.ensureEstrutura();
-    return prisma.$queryRawUnsafe<Array<{
-      acesso_id: bigint; identidade_id: bigint; usuario_id: bigint; senha_hash: string;
-      instituicao_id: string; tenant_id: string; instituicao_nome: string; cnpj: string | null;
-      unidade_nome: string | null; perfil: string | null; escopo: string;
-    }>>(`
-      SELECT a.id AS acesso_id, a.identidade_id, a.usuario_id, u.senha_hash,
-             i.id::text AS instituicao_id, i.tenant_id::text AS tenant_id,
-             COALESCE(i.nome_fantasia, i.razao_social) AS instituicao_nome,
-             i.cnpj, uo.nome AS unidade_nome, u.perfil_acesso AS perfil, a.escopo
-      FROM usuario_acesso a
-      JOIN usuario_identidade ui ON ui.id = a.identidade_id AND lower(ui.email) = lower($1)
-      JOIN usuarios u ON u.id = a.usuario_id AND u.deletado_em IS NULL
-      JOIN instituicoes i ON i.id = a.instituicao_id
-      LEFT JOIN unidades_organizacionais uo ON uo.id = a.unidade_organizacional_id
-      WHERE a.ativo = TRUE AND upper(coalesce(ui.status, 'ATIVO')) = 'ATIVO'
-        AND upper(coalesce(i.status, 'ATIVO')) = 'ATIVO'
-      ORDER BY i.nome_fantasia NULLS LAST, i.razao_social, a.id
-    `, email.trim().toLowerCase());
+    try {
+      return await prisma.$queryRawUnsafe<Array<{
+        acesso_id: bigint; identidade_id: bigint; usuario_id: bigint; senha_hash: string;
+        instituicao_id: string; tenant_id: string; instituicao_nome: string; cnpj: string | null;
+        unidade_nome: string | null; perfil: string | null; escopo: string;
+      }>>(`
+        SELECT a.id AS acesso_id, a.identidade_id, a.usuario_id, u.senha_hash,
+               i.id::text AS instituicao_id, i.tenant_id::text AS tenant_id,
+               COALESCE(i.nome_fantasia, i.razao_social) AS instituicao_nome,
+               i.cnpj, uo.nome AS unidade_nome, u.perfil_acesso AS perfil, a.escopo
+        FROM usuario_acesso a
+        JOIN usuario_identidade ui ON ui.id = a.identidade_id AND lower(ui.email) = lower($1)
+        JOIN usuarios u ON u.id = a.usuario_id AND u.deletado_em IS NULL
+        JOIN instituicoes i ON i.id = a.instituicao_id
+        LEFT JOIN unidades_organizacionais uo ON uo.id = a.unidade_organizacional_id
+        WHERE a.ativo = TRUE AND upper(coalesce(ui.status, 'ATIVO')) = 'ATIVO'
+          AND upper(coalesce(i.status, 'ATIVO')) = 'ATIVO'
+        ORDER BY i.nome_fantasia NULLS LAST, i.razao_social, a.id
+      `, email.trim().toLowerCase());
+    } catch (error) {
+      console.warn("[auth] contexto global indisponível; seguindo pelo login institucional legado", error);
+      return [];
+    }
   }
 
   async buscarAcessoGlobal(acessoId: string, identidadeId: string) {

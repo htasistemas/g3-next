@@ -1391,6 +1391,7 @@ const secoesManual: ManualSecao[] = [
           "Na tela de login, quando o CNPJ e o e-mail informados não corresponderem ao administrador inicial cadastrado, o sistema avisa que o e-mail está vinculado a outra instituição e orienta a revisar a Administração inicial.",
           "Na tela de login, a mensagem de senha inválida passou a indicar de forma mais clara que a credencial informada não confere com o usuário autenticado, facilitando a conferência do cadastro.",
           "Na tela de login, quando o usuário informar apenas o e-mail e a senha, o sistema tenta identificar automaticamente a instituição do acesso se esse e-mail for exclusivo de um único tenant.",
+          "Se a estrutura opcional de seleção de ambientes ainda não estiver disponível em uma base legada, o sistema segue automaticamente pelo login institucional tradicional, sem interromper o acesso com erro técnico de banco.",
           "Se o mesmo e-mail existir em mais de um cliente, o sistema pede CNPJ, código ou slug para evitar autenticação no tenant errado.",
           "Quando o tenant já existir, use a aba Administração inicial para redefinir a senha provisória do administrador e forçar troca no próximo login.",
           "Ao redefinir a senha do administrador pela tela master, o sistema também reativa esse usuário e zera as tentativas inválidas de login.",
