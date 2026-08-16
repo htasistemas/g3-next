@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.850",
+  "latestVersion": "1.00.851",
   "releaseDate": "2026-08-14",
   "description": "Relatórios completos e vínculo entre termos de parceria, Termos de Fomento e planos de trabalho.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.850",
+  "minCompatibleVersion": "1.00.851",
   "releaseType": "stable",
   "downloadUrl": null
 }
