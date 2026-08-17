@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.851",
-  "releaseDate": "2026-08-14",
-  "description": "Relatórios completos e vínculo entre termos de parceria, Termos de Fomento e planos de trabalho.",
+  "latestVersion": "1.00.853",
+  "releaseDate": "2026-08-16",
+  "description": "Preenchimento inteligente de Termos de colaboração com vínculos reais de contas, profissionais, planos e termos de fomento.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.851",
+  "minCompatibleVersion": "1.00.853",
   "releaseType": "stable",
   "downloadUrl": null
 }

@@ -717,7 +717,11 @@ const secoesManual: ManualSecao[] = [
         objetivo: "Controlar o ciclo completo de parcerias e recursos públicos, do projeto à prestação de contas.",
         comoUsar: [
           "Use o submenu Jurídico e Compliance > Termos de parceria para consultar o dashboard e a listagem do ambiente ativo.",
-          "Ao criar uma parceria, selecione o tipo de instrumento, informe o objeto, o projeto existente e os valores aprovados. O projeto é validado no backend contra o tenant atual.",
+          "Ao criar um Termo de colaboração, informe número, CNPJ, tipificação, origem da verba, nomenclatura, órgão cedente, conta bancária completa, representante legal, datas de assinatura e vigência. IJ, responsável pela indicação e voto da Comissão Diretiva da União são complementares.",
+          "Na tela Dados gerais, selecione a conta bancária ativa cadastrada na Contabilidade e o profissional ativo que será o representante legal; banco, agência, conta, operação, nome, CPF e cargo são preenchidos automaticamente.",
+          "Os vínculos de Termo de fomento e Plano de trabalho usam os cadastros existentes do sistema, mantendo os registros relacionados no mesmo ambiente institucional.",
+          "Cadastre cada parcela com quantidade, valor previsto e data de desembolso. O sistema alerta quando o voto está há mais de três meses sem informação e quando a vigência termina em até 90 dias.",
+          "Selecione Ativo ou Inativo no status do cadastro. Os órgãos cedentes incluem Fundo Municipal da Infância e Adolescência (FIA) e Fundo Municipal do Idoso.",
           "Em Dados gerais, registre identificação jurídica, processo, edital, proposta, responsáveis, público-alvo, território, vigência, recursos, parcelas, prazos de prestação de contas, legislação e observações.",
           "Na seção Plano de trabalho e execução, registre metas e indicadores, rubricas e orçamento, recebimentos e despesas. Saldos, vínculos, vigência e limites financeiros são validados pelo backend.",
           "As abas Documentos e Aditivos mantêm os comprovantes no storage, o histórico das alterações e a rastreabilidade do instrumento.",

@@ -31,12 +31,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { formatarMoedaInput, normalizarMoeda } from '@/lib/br-utils';
+import { formatarCnpj, formatarCpf, formatarMoedaInput, normalizarCnpj, normalizarCpf, normalizarMoeda, validarCnpj, validarCpf } from '@/lib/br-utils';
 import { abrirArquivoAutenticado } from '@/lib/arquivos';
 import { arquivosService } from '@/services/arquivos.service';
 import { projetosService } from '@/services/projetos.service';
 import { planoTrabalhoService } from '@/services/plano-trabalho.service';
 import { termoFomentoService } from '@/services/termo-fomento.service';
+import { contabilidadeService } from '@/services/contabilidade.service';
+import { profissionaisService } from '@/services/profissionais.service';
+import { prestacaoContasService } from '@/services/prestacao-contas.service';
+import type { ContaBancaria } from '@/types/contabilidade';
+import type { Profissional } from '@/types/profissional';
 import { termosParceriaService, type TermoParceria } from '@/services/termos-parceria.service';
 import { reportsService } from '@/services/reports.service';
 import { abrirRelatorioPdf } from '@/lib/report-utils';
@@ -90,9 +95,29 @@ const situacaoLabel: Record<string, string> = {
   CANCELADO: 'Cancelado',
   RESCINDIDO: 'Rescindido',
 };
+const tipificacoes = ['CERTIFICAVEL', 'NAO_CERTIFICAVEL'];
+const orgaosCedentes = ['Fundo Municipal da Infância e Adolescência (FIA)', 'Fundo Municipal do Idoso', 'Outro'];
 const vazio: Record<string, any> = {
   tipoInstrumento: 'TERMO_FOMENTO',
   numeroInstrumento: '',
+  ij: '',
+  cnpj: '',
+  tipificacao: 'NAO_CERTIFICAVEL',
+  numeroVotoComissao: '',
+  origemTermo: '',
+  nomenclaturaTermo: '',
+  responsavelIndicacao: '',
+  orgaoCedente: '',
+  statusCadastro: 'ATIVO',
+  banco: '',
+  agencia: '',
+  conta: '',
+  operacao: '',
+  contaBancariaId: '',
+  representanteLegal: '',
+  representanteCpf: '',
+  representanteCargo: '',
+  representanteProfissionalId: '',
   ano: new Date().getFullYear(),
   titulo: '',
   objeto: '',
@@ -195,6 +220,9 @@ export function TermosParceriaPage() {
   const [projetos, setProjetos] = useState<Array<{ id: string | number; nome: string }>>([]);
   const [planos, setPlanos] = useState<any[]>([]);
   const [termosFomento, setTermosFomento] = useState<any[]>([]);
+  const [contasBancarias, setContasBancarias] = useState<ContaBancaria[]>([]);
+  const [profissionais, setProfissionais] = useState<Profissional[]>([]);
+  const [concedentes, setConcedentes] = useState<any[]>([]);
   const [filtro, setFiltro] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('');
   const [filtroProjeto, setFiltroProjeto] = useState('');
@@ -223,6 +251,8 @@ export function TermosParceriaPage() {
   const setCampo = (campo: string, valor: unknown) =>
     setForm((anterior) => ({ ...anterior, [campo]: valor }));
   const mensagemErro = (erro: any, padrao: string) => erro?.response?.data?.message ?? padrao;
+  const alertaVoto = !form.numeroVotoComissao && form.dataAssinatura && new Date(`${form.dataAssinatura}T00:00:00`).getTime() <= new Date(new Date().setMonth(new Date().getMonth() - 3)).getTime();
+  const alertaVigencia = form.terminoVigencia && new Date(`${form.terminoVigencia}T00:00:00`).getTime() - Date.now() <= 90 * 86400000 && new Date(`${form.terminoVigencia}T00:00:00`).getTime() >= Date.now();
 
   async function carregar() {
     setCarregando(true);
@@ -269,6 +299,18 @@ export function TermosParceriaPage() {
       .listar()
       .then(setTermosFomento)
       .catch(() => undefined);
+    void contabilidadeService
+      .listarContasBancarias()
+      .then((items) => setContasBancarias(items.filter((item) => item.status === 'ATIVA')))
+      .catch(() => undefined);
+    void profissionaisService
+      .listar({ status: 'ATIVO' })
+      .then((resultado) => setProfissionais(resultado.profissionais))
+      .catch(() => undefined);
+    void prestacaoContasService
+      .listarProfissional('concedentes')
+      .then(setConcedentes)
+      .catch(() => undefined);
   }, []);
   useEffect(() => {
     void carregar();
@@ -279,6 +321,18 @@ export function TermosParceriaPage() {
     setSnapshot({ ...vazio });
     setNovoItem({});
     setAba('dadosGerais');
+  }
+  function preencherContaBancaria(contaId: string) {
+    const conta = contasBancarias.find((item) => String(item.id) === contaId);
+    if (!conta) return;
+    const numeroConta = [conta.numero?.trim(), conta.digito?.trim()].filter(Boolean).join('-');
+    const operacao = conta.tipo === 'CONTA_CORRENTE' ? 'Conta corrente' : conta.tipo === 'POUPANCA' ? 'Poupança' : conta.tipo === 'APLICACAO' ? 'Aplicação' : 'Caixa interno';
+    setForm((atual) => ({ ...atual, contaBancariaId: contaId, banco: conta.banco ?? atual.banco, agencia: conta.agencia ?? atual.agencia, conta: numeroConta || atual.conta, operacao }));
+  }
+  function preencherRepresentante(profissionalId: string) {
+    const profissional = profissionais.find((item) => String(item.id_profissional) === profissionalId);
+    if (!profissional) return;
+    setForm((atual) => ({ ...atual, representanteProfissionalId: profissionalId, representanteLegal: profissional.nome_completo, representanteCpf: normalizarCpf(profissional.cpf), representanteCargo: profissional.categoria || atual.representanteCargo }));
   }
   async function selecionar(item: TermoParceria) {
     try {
@@ -301,11 +355,11 @@ export function TermosParceriaPage() {
     }
   }
   async function salvar() {
-    if (!form.tipoInstrumento || !form.projetoId || String(form.objeto).trim().length < 5) {
+    if (!form.tipoInstrumento || !form.projetoId || String(form.objeto).trim().length < 5 || !form.numeroInstrumento || !validarCnpj(form.cnpj) || !form.origemTermo || !form.nomenclaturaTermo || !form.banco || !form.agencia || !form.conta || !form.operacao || !form.dataAssinatura || !form.inicioVigencia || !form.terminoVigencia || !form.representanteLegal || !validarCpf(form.representanteCpf) || !form.representanteCargo || !form.orgaoCedente) {
       setPopup({
         tipo: 'aviso',
         titulo: 'Validação',
-        texto: 'Informe o tipo, o projeto e um objeto com pelo menos cinco caracteres.',
+        texto: 'Preencha os campos obrigatórios do termo, incluindo CNPJ, conta bancária, vigência e representante legal.',
       });
       return;
     }
@@ -731,6 +785,37 @@ export function TermosParceriaPage() {
               <CartaoResumo label="Saldo disponível" value={moeda(valorDisponivel)} />
             </div>
             <div className="rounded-lg border border-[var(--g3-border)] p-4">
+              <h3 className="font-semibold text-[var(--g3-active)]">Conta bancária do termo</h3>
+              <p className="mt-1 text-xs text-[var(--g3-muted)]">Selecione uma conta ativa cadastrada em Contabilidade para preencher os dados automaticamente.</p>
+              <div className="mt-3 grid gap-3 md:grid-cols-4">
+                <Campo label="Conta cadastrada *" className="md:col-span-4">
+                  <Select value={String(form.contaBancariaId ?? '')} onChange={(e) => preencherContaBancaria(e.target.value)}>
+                    <option value="">Selecione uma conta bancária ativa</option>
+                    {contasBancarias.map((item) => <option key={item.id} value={item.id}>{item.nomeConta} — {item.banco} / {item.numero}{item.digito ? `-${item.digito}` : ''}</option>)}
+                  </Select>
+                </Campo>
+                <Campo label="Banco *"><Input value={form.banco ?? ''} onChange={(e) => setCampo('banco', e.target.value)} /></Campo>
+                <Campo label="Agência *"><Input value={form.agencia ?? ''} onChange={(e) => setCampo('agencia', e.target.value)} /></Campo>
+                <Campo label="Conta *"><Input value={form.conta ?? ''} onChange={(e) => setCampo('conta', e.target.value)} /></Campo>
+                <Campo label="Operação *"><Input value={form.operacao ?? ''} onChange={(e) => setCampo('operacao', e.target.value)} /></Campo>
+              </div>
+            </div>
+            <div className="rounded-lg border border-[var(--g3-border)] p-4">
+              <h3 className="font-semibold text-[var(--g3-active)]">Representante legal</h3>
+              <p className="mt-1 text-xs text-[var(--g3-muted)]">Selecione um profissional ativo cadastrado. Nome, CPF e categoria serão preenchidos automaticamente.</p>
+              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                <Campo label="Profissional cadastrado *" className="md:col-span-3">
+                  <Select value={String(form.representanteProfissionalId ?? '')} onChange={(e) => preencherRepresentante(e.target.value)}>
+                    <option value="">Selecione o representante legal</option>
+                    {profissionais.map((item) => <option key={item.id_profissional} value={item.id_profissional}>{item.nome_completo}{item.categoria ? ` — ${item.categoria}` : ''}</option>)}
+                  </Select>
+                </Campo>
+                <Campo label="Representante legal *"><Input value={form.representanteLegal ?? ''} onChange={(e) => setCampo('representanteLegal', e.target.value)} /></Campo>
+                <Campo label="CPF do representante *"><Input value={formatarCpf(form.representanteCpf)} onChange={(e) => setCampo('representanteCpf', normalizarCpf(e.target.value))} maxLength={14} /></Campo>
+                <Campo label="Cargo/função *"><Input value={form.representanteCargo ?? ''} onChange={(e) => setCampo('representanteCargo', e.target.value)} /></Campo>
+              </div>
+            </div>
+            <div className="rounded-lg border border-[var(--g3-border)] p-4">
               <h3 className="font-semibold text-[var(--g3-active)]">Identificação e vínculos</h3>
               <div className="mt-3 grid gap-3 md:grid-cols-3">
                 <Campo label="Tipo de instrumento *">
@@ -745,11 +830,22 @@ export function TermosParceriaPage() {
                     ))}
                   </Select>
                 </Campo>
-                <Campo label="Número do instrumento">
+                <Campo label="Número do termo *">
                   <Input
                     value={form.numeroInstrumento ?? ''}
                     onChange={(e) => setCampo('numeroInstrumento', e.target.value)}
                   />
+                </Campo>
+                <Campo label="IJ">
+                  <Input value={form.ij ?? ''} onChange={(e) => setCampo('ij', e.target.value)} />
+                </Campo>
+                <Campo label="CNPJ *">
+                  <Input value={formatarCnpj(form.cnpj)} onChange={(e) => setCampo('cnpj', normalizarCnpj(e.target.value))} maxLength={18} />
+                </Campo>
+                <Campo label="Tipificação *">
+                  <Select value={form.tipificacao} onChange={(e) => setCampo('tipificacao', e.target.value)}>
+                    {tipificacoes.map((item) => <option key={item} value={item}>{item === 'CERTIFICAVEL' ? 'Certificável' : 'Não certificável'}</option>)}
+                  </Select>
                 </Campo>
                 <Campo label="Ano">
                   <Input
@@ -811,18 +907,37 @@ export function TermosParceriaPage() {
                     ))}
                   </Select>
                 </Campo>
-                <Campo label="Título" className="md:col-span-2">
+                <Campo label="Nomenclatura conforme o termo *" className="md:col-span-2">
                   <Input
-                    value={form.titulo ?? ''}
-                    onChange={(e) => setCampo('titulo', e.target.value)}
+                    value={form.nomenclaturaTermo ?? ''}
+                    onChange={(e) => { setCampo('nomenclaturaTermo', e.target.value); setCampo('titulo', e.target.value); }}
                   />
                 </Campo>
-                <Campo label="Órgão concedente">
-                  <Input
-                    value={form.concedenteId ?? ''}
-                    placeholder="ID do órgão concedente"
-                    onChange={(e) => setCampo('concedenteId', e.target.value)}
-                  />
+                <Campo label="Órgão cedente *">
+                  <Select value={form.orgaoCedente ?? ''} onChange={(e) => setCampo('orgaoCedente', e.target.value)}>
+                    <option value="">Selecione o órgão cedente</option>
+                    {orgaosCedentes.map((item) => <option key={item} value={item}>{item}</option>)}
+                  </Select>
+                </Campo>
+                <Campo label="Órgão concedente cadastrado">
+                  <Select value={String(form.concedenteId ?? '')} onChange={(e) => setCampo('concedenteId', e.target.value)}>
+                    <option value="">Selecione um concedente cadastrado</option>
+                    {concedentes.map((item) => <option key={item.id} value={item.id}>{item.razaoSocial || item.nome || `Concedente ${item.id}`}{item.cpfCnpj ? ` — ${item.cpfCnpj}` : ''}</option>)}
+                  </Select>
+                </Campo>
+                <Campo label="Nº do voto da Comissão Diretiva da União">
+                  <Input value={form.numeroVotoComissao ?? ''} onChange={(e) => setCampo('numeroVotoComissao', e.target.value)} />
+                </Campo>
+                <Campo label="Origem do termo (origem da verba) *">
+                  <Input value={form.origemTermo ?? ''} onChange={(e) => setCampo('origemTermo', e.target.value)} />
+                </Campo>
+                <Campo label="Responsável pela indicação">
+                  <Input value={form.responsavelIndicacao ?? ''} onChange={(e) => setCampo('responsavelIndicacao', e.target.value)} />
+                </Campo>
+                <Campo label="Status do cadastro *">
+                  <Select value={form.statusCadastro ?? 'ATIVO'} onChange={(e) => setCampo('statusCadastro', e.target.value)}>
+                    <option value="ATIVO">Ativo</option><option value="INATIVO">Inativo</option>
+                  </Select>
                 </Campo>
                 <Campo label="Número do processo">
                   <Input
@@ -954,6 +1069,8 @@ export function TermosParceriaPage() {
                     onChange={(e) => setCampo('terminoVigencia', e.target.value)}
                   />
                 </Campo>
+                {alertaVoto ? <div className="md:col-span-4 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Informe o nº do voto da Comissão Diretiva da União. Já se passaram três meses desde a assinatura.</div> : null}
+                {alertaVigencia ? <div className="md:col-span-4 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">A vigência do termo termina em até 90 dias.</div> : null}
                 <Campo label="Quantidade de parcelas">
                   <Input
                     type="number"
@@ -1149,6 +1266,12 @@ export function TermosParceriaPage() {
                       onChange={(e) => setNovoItem({ ...novoItem, parcela: e.target.value })}
                     />
                     <Input
+                      type="date"
+                      aria-label="Data de desembolso"
+                      value={novoItem.dataDesembolso ?? ''}
+                      onChange={(e) => setNovoItem({ ...novoItem, dataDesembolso: e.target.value })}
+                    />
+                    <Input
                       placeholder="Valor previsto"
                       inputMode="decimal"
                       value={formatarMoedaInput(novoItem.valorPrevisto ?? 0)}
@@ -1176,7 +1299,7 @@ export function TermosParceriaPage() {
                     {(form.receitas ?? []).map((item: any) => (
                       <div key={item.id} className="flex justify-between gap-2 border-t py-2">
                         <span>
-                          Parcela {item.parcela || '—'} — {moeda(item.valorRecebido)}
+                          Parcela {item.parcela || '—'} — {moeda(item.valorPrevisto)} — desembolso {data(item.dataDesembolso || item.dataPrevista)}
                         </span>
                         <Button
                           size="sm"

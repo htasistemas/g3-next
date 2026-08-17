@@ -1,6 +1,22 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.853",
+                        "releaseDate": "2026-08-16",
+                        "title": "Preenchimento inteligente dos Termos de colaboração",
+                        "description": "A tela de Dados gerais passou a usar diretamente os cadastros institucionais para completar vínculos e dados derivados.",
+                        "changes": ["Contas bancárias ativas da Contabilidade passaram a ser selecionáveis, com preenchimento automático dos dados bancários.", "Profissionais ativos passaram a ser selecionáveis como representantes legais, com preenchimento automático de nome, CPF e categoria.", "O backend valida que conta e profissional pertencem ao tenant e estão ativos.", "Vínculos de Plano de trabalho e Termo de fomento permanecem baseados nos cadastros existentes.", "Manual do sistema atualizado."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.852",
+                        "releaseDate": "2026-08-16",
+                        "title": "Cadastro completo de Termos de colaboração",
+                        "description": "Incluídos os dados jurídicos, bancários, parcelas, representante legal, órgãos cedentes e alertas de prazo solicitados para o termo.",
+                        "changes": ["Campos obrigatórios de número, CNPJ, tipificação, origem, nomenclatura, conta bancária, vigência e representante legal.", "Parcelas com valor previsto e data de desembolso.", "Alertas após três meses sem voto e com 90 dias para o fim da vigência.", "FIA e Fundo Municipal do Idoso adicionados aos órgãos cedentes.", "Migration incremental e validações backend com normalização de CNPJ/CPF."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.834",
                         "releaseDate": "2026-08-15",
                         "title": "Relatórios completos de termos de parceria",

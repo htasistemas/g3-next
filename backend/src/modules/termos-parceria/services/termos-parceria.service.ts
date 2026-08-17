@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { PrestacaoContasProfissionalService } from "../../transparencias/services/prestacao-contas-profissional.service.js";
+import { normalizarCnpj, normalizarCpf, validarCnpj, validarCpf } from "../../../utils/br-utils.js";
 
 type Actor = {
   id?: string;
@@ -26,6 +27,9 @@ const textoOpcional = z.preprocess((value) => {
 }, z.string().optional().nullable());
 
 const dataOpcional = z.preprocess((value) => value === "" ? undefined : value, z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable());
+const dataObrigatoria = z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Informe uma data válida.");
+const cnpjObrigatorio = z.string().trim().transform(normalizarCnpj).refine((value) => validarCnpj(value), "Informe um CNPJ válido.");
+const cpfObrigatorio = z.string().trim().transform(normalizarCpf).refine((value) => validarCpf(value), "Informe um CPF válido.");
 
 export function numeroBrasileiro(valor: unknown) {
   if (typeof valor === "number") return Number.isFinite(valor) ? valor : Number.NaN;
@@ -52,7 +56,25 @@ export function validarIntervalo(inicio?: string | null, fim?: string | null, no
 
 const instrumentoSchema = z.object({
   tipoInstrumento: z.enum(tipos),
-  numeroInstrumento: textoOpcional,
+  numeroInstrumento: z.string().trim().min(1, "Informe o número do termo."),
+  ij: textoOpcional,
+  cnpj: cnpjObrigatorio,
+  tipificacao: z.enum(["CERTIFICAVEL", "NAO_CERTIFICAVEL"]),
+  numeroVotoComissao: textoOpcional,
+  origemTermo: z.string().trim().min(1, "Informe a origem do termo."),
+  nomenclaturaTermo: z.string().trim().min(1, "Informe a nomenclatura conforme o termo."),
+  responsavelIndicacao: textoOpcional,
+  orgaoCedente: z.string().trim().min(1, "Informe o órgão cedente."),
+  statusCadastro: z.enum(["ATIVO", "INATIVO"]).default("ATIVO"),
+  banco: z.string().trim().min(1, "Informe o banco."),
+  agencia: z.string().trim().min(1, "Informe a agência."),
+  conta: z.string().trim().min(1, "Informe a conta."),
+  operacao: z.string().trim().min(1, "Informe a operação."),
+  contaBancariaId: z.string().trim().min(1, "Selecione a conta bancária."),
+  representanteLegal: z.string().trim().min(2, "Informe o representante legal."),
+  representanteCpf: cpfObrigatorio,
+  representanteCargo: z.string().trim().min(2, "Informe o cargo do representante legal."),
+  representanteProfissionalId: z.string().trim().min(1, "Selecione o representante legal."),
   ano: z.coerce.number().int().min(1900).max(2200).optional().nullable(),
   numeroProcesso: textoOpcional,
   numeroProposta: textoOpcional,
@@ -76,9 +98,9 @@ const instrumentoSchema = z.object({
   planoTrabalhoId: z.string().trim().optional().nullable(),
   termoFomentoId: textoOpcional,
   concedenteId: z.string().trim().optional().nullable(),
-  dataAssinatura: dataOpcional,
-  inicioVigencia: dataOpcional,
-  terminoVigencia: dataOpcional,
+  dataAssinatura: dataObrigatoria,
+  inicioVigencia: dataObrigatoria,
+  terminoVigencia: dataObrigatoria,
   prazoPrestacaoParcial: z.coerce.number().int().min(0).optional().nullable(),
   prazoPrestacaoFinal: z.coerce.number().int().min(0).optional().nullable(),
   permiteProrrogacao: z.boolean().default(false),
@@ -242,9 +264,12 @@ export class TermosParceriaService {
     if (input.planoTrabalhoId) await this.validarPlanoTrabalho(input.planoTrabalhoId, tenantId);
     if (input.termoFomentoId) await this.validarTermoFomento(input.termoFomentoId, tenantId);
     if (input.concedenteId) await this.validarConcedente(input.concedenteId, tenantId);
+    await this.validarContaBancaria(input.contaBancariaId, tenantId);
+    await this.validarProfissional(input.representanteProfissionalId, tenantId);
     const registro = await profissional.criar("instrumentos", input, actor, ip);
     await prisma.$executeRaw(Prisma.sql`
       UPDATE prestacao_contas_instrumento SET ano = ${input.ano ?? null}, numero_processo_administrativo = ${input.numeroProcessoAdministrativo ?? null},
+        ij = ${input.ij ?? null}, cnpj = ${input.cnpj ?? null}, tipificacao = ${input.tipificacao ?? null}, numero_voto_comissao = ${input.numeroVotoComissao ?? null}, origem_termo = ${input.origemTermo ?? null}, nomenclatura_termo = ${input.nomenclaturaTermo ?? null}, responsavel_indicacao = ${input.responsavelIndicacao ?? null}, orgao_cedente = ${input.orgaoCedente ?? null}, status_cadastro = ${input.statusCadastro ?? "ATIVO"}, banco = ${input.banco ?? null}, agencia = ${input.agencia ?? null}, conta = ${input.conta ?? null}, operacao = ${input.operacao ?? null}, conta_bancaria_id = ${BigInt(input.contaBancariaId)}, representante_legal = ${input.representanteLegal ?? null}, representante_cpf = ${input.representanteCpf ?? null}, representante_cargo = ${input.representanteCargo ?? null}, representante_profissional_id = ${BigInt(input.representanteProfissionalId)},
         numero_sei = ${input.numeroSei ?? null}, titulo = ${input.titulo ?? null}, descricao = ${input.descricao ?? null}, permite_prorrogacao = ${input.permiteProrrogacao},
         numero_proposta = ${input.numeroProposta ?? null}, numero_programa = ${input.numeroPrograma ?? null}, numero_edital = ${input.numeroEdital ?? null},
         unidade_gestora = ${input.unidadeGestora ?? null}, orgao_responsavel = ${input.orgaoResponsavel ?? null}, gestor_parceria = ${input.gestorParceria ?? null}, fiscal_parceria = ${input.fiscalParceria ?? null}, responsavel_organizacao = ${input.responsavelOrganizacao ?? null},
@@ -271,10 +296,13 @@ export class TermosParceriaService {
     if (input.planoTrabalhoId) await this.validarPlanoTrabalho(input.planoTrabalhoId, tenantId);
     if (input.termoFomentoId) await this.validarTermoFomento(input.termoFomentoId, tenantId);
     if (input.concedenteId) await this.validarConcedente(input.concedenteId, tenantId);
+    if (input.contaBancariaId) await this.validarContaBancaria(input.contaBancariaId, tenantId);
+    if (input.representanteProfissionalId) await this.validarProfissional(input.representanteProfissionalId, tenantId);
     const rows = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
       UPDATE prestacao_contas_instrumento SET
         tipo_instrumento = COALESCE(${input.tipoInstrumento ?? null}, tipo_instrumento),
         numero_instrumento = COALESCE(${input.numeroInstrumento ?? null}, numero_instrumento),
+        ij = COALESCE(${input.ij ?? null}, ij), cnpj = COALESCE(${input.cnpj ?? null}, cnpj), tipificacao = COALESCE(${input.tipificacao ?? null}, tipificacao), numero_voto_comissao = COALESCE(${input.numeroVotoComissao ?? null}, numero_voto_comissao), origem_termo = COALESCE(${input.origemTermo ?? null}, origem_termo), nomenclatura_termo = COALESCE(${input.nomenclaturaTermo ?? null}, nomenclatura_termo), responsavel_indicacao = COALESCE(${input.responsavelIndicacao ?? null}, responsavel_indicacao), orgao_cedente = COALESCE(${input.orgaoCedente ?? null}, orgao_cedente), status_cadastro = COALESCE(${input.statusCadastro ?? null}, status_cadastro), banco = COALESCE(${input.banco ?? null}, banco), agencia = COALESCE(${input.agencia ?? null}, agencia), conta = COALESCE(${input.conta ?? null}, conta), operacao = COALESCE(${input.operacao ?? null}, operacao), conta_bancaria_id = COALESCE(${input.contaBancariaId ? BigInt(input.contaBancariaId) : null}, conta_bancaria_id), representante_legal = COALESCE(${input.representanteLegal ?? null}, representante_legal), representante_cpf = COALESCE(${input.representanteCpf ?? null}, representante_cpf), representante_cargo = COALESCE(${input.representanteCargo ?? null}, representante_cargo), representante_profissional_id = COALESCE(${input.representanteProfissionalId ? BigInt(input.representanteProfissionalId) : null}, representante_profissional_id),
         numero_processo = COALESCE(${input.numeroProcesso ?? null}, numero_processo),
         numero_processo_administrativo = COALESCE(${input.numeroProcessoAdministrativo ?? null}, numero_processo_administrativo),
         numero_proposta = COALESCE(${input.numeroProposta ?? null}, numero_proposta), numero_programa = COALESCE(${input.numeroPrograma ?? null}, numero_programa), numero_edital = COALESCE(${input.numeroEdital ?? null}, numero_edital),
@@ -367,7 +395,7 @@ export class TermosParceriaService {
     const tabelas: Record<EntidadeFilha, { tabela: string; campos: Record<string, string> }> = {
       metas: { tabela: "prestacao_contas_meta", campos: { descricao: "descricao", quantidadePrevista: "quantidade_prevista", situacao: "situacao" } },
       rubricas: { tabela: "prestacao_contas_rubrica", campos: { categoria: "categoria", descricao: "descricao", valorTotal: "valor_total" } },
-      receitas: { tabela: "prestacao_contas_receita", campos: { parcela: "parcela", valorPrevisto: "valor_previsto", valorRecebido: "valor_recebido", situacao: "situacao", observacao: "observacao" } },
+      receitas: { tabela: "prestacao_contas_receita", campos: { parcela: "parcela", dataDesembolso: "data_desembolso", valorPrevisto: "valor_previsto", valorRecebido: "valor_recebido", situacao: "situacao", observacao: "observacao" } },
       despesas: { tabela: "prestacao_contas_despesa", campos: { descricao: "descricao", valorBruto: "valor_bruto", valorLiquido: "valor_liquido", observacao: "observacao" } },
       documentos: { tabela: "prestacao_contas_documento", campos: { categoria: "categoria", tipo: "tipo", descricao: "descricao" } }
     };
@@ -399,6 +427,8 @@ export class TermosParceriaService {
   private async validarProjeto(id: string, tenantId: string) { const rows = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`SELECT id FROM projetos WHERE id = ${idBigInt(id, "Projeto")} AND tenant_id::text = ${tenantId} AND ativo = TRUE LIMIT 1`); if (!rows[0]) throw new AppError("O projeto nao pertence ao ambiente atual.", 403); }
   private async validarPlanoTrabalho(id: string, tenantId: string) { const rows = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`SELECT id FROM plano_trabalho WHERE id = ${idBigInt(id, "Plano de trabalho")} AND tenant_id::text = ${tenantId} AND COALESCE(ativo, TRUE) = TRUE LIMIT 1`); if (!rows[0]) throw new AppError("O plano de trabalho nao pertence ao ambiente atual.", 403); }
   private async validarConcedente(id: string, tenantId: string) { const rows = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`SELECT id FROM prestacao_contas_concedente WHERE id = ${idBigInt(id, "Concedente")} AND tenant_id::text = ${tenantId} AND excluido_em IS NULL LIMIT 1`); if (!rows[0]) throw new AppError("O concedente nao pertence ao ambiente atual.", 403); }
+  private async validarContaBancaria(id: string, tenantId: string) { const rows = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`SELECT id FROM conta_bancaria WHERE id = ${idBigInt(id, "Conta bancaria")} AND tenant_id::text = ${tenantId} AND ativo = TRUE LIMIT 1`); if (!rows[0]) throw new AppError("A conta bancaria selecionada nao pertence ao ambiente atual ou esta inativa.", 403); }
+  private async validarProfissional(id: string, tenantId: string) { const rows = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`SELECT id FROM cadastro_profissionais WHERE id = ${idBigInt(id, "Profissional")} AND tenant_id::text = ${tenantId} AND status = 'ATIVO' LIMIT 1`); if (!rows[0]) throw new AppError("O representante selecionado nao pertence ao ambiente atual ou nao esta ativo.", 403); }
   private async validarTermoFomento(id: string, tenantId: string) { const rows = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`SELECT id FROM termo_fomento WHERE id = ${idBigInt(id, "Termo de fomento")} AND tenant_id::text = ${tenantId} LIMIT 1`); if (!rows[0]) throw new AppError("O termo de fomento nao pertence ao ambiente atual.", 403); }
   private async validarNumeroUnico(numero: string | null | undefined, tenantId: string, ignorarId?: bigint) {
     const valor = numero?.trim();
