@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.853",
-  "releaseDate": "2026-08-16",
-  "description": "Preenchimento inteligente de Termos de colaboração com vínculos reais de contas, profissionais, planos e termos de fomento.",
+  "latestVersion": "1.00.854",
+  "releaseDate": "2026-08-17",
+  "description": "Aditivos de Termos de parceria com vigência, cronograma e acréscimo de valor.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.853",
+  "minCompatibleVersion": "1.00.854",
   "releaseType": "stable",
   "downloadUrl": null
 }

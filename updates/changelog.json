@@ -1,6 +1,14 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.854",
+                        "releaseDate": "2026-08-17",
+                        "title": "Aditivos completos nos Termos de parceria",
+                        "description": "A aba Aditivos passou a registrar vigência, prorrogação, cronograma de novas parcelas e acréscimos de valor.",
+                        "changes": ["Termo principal preenchido automaticamente a partir do instrumento aberto.", "Incluídos início e término da nova vigência, prorrogação, valor total do plano, parcela e valor da nova parcela.", "Acréscimos exigem a indicação da parcela a partir da qual a correção será aplicada.", "Manual do sistema atualizado."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.853",
                         "releaseDate": "2026-08-16",
                         "title": "Preenchimento inteligente dos Termos de colaboração",

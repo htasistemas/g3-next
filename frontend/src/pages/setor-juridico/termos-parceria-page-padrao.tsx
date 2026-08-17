@@ -238,6 +238,14 @@ export function TermosParceriaPage() {
   const [novoItem, setNovoItem] = useState<Record<string, any>>({});
   const [tipoAditivo, setTipoAditivo] = useState('');
   const [justificativaAditivo, setJustificativaAditivo] = useState('');
+  const [inicioAditivo, setInicioAditivo] = useState('');
+  const [fimAditivo, setFimAditivo] = useState('');
+  const [prorrogacaoVigencia, setProrrogacaoVigencia] = useState(false);
+  const [valorTotalPlanoAditivo, setValorTotalPlanoAditivo] = useState(0);
+  const [parcelaAditivo, setParcelaAditivo] = useState('');
+  const [valorNovaParcelaAditivo, setValorNovaParcelaAditivo] = useState(0);
+  const [acrescimoAditivo, setAcrescimoAditivo] = useState(0);
+  const [corrigirAPartirParcela, setCorrigirAPartirParcela] = useState('');
   const termoAtual = useMemo(
     () => lista.find((item) => String(item.id) === termoId),
     [lista, termoId],
@@ -526,6 +534,14 @@ export function TermosParceriaPage() {
       });
       return;
     }
+    if (prorrogacaoVigencia && (!inicioAditivo || !fimAditivo || !parcelaAditivo.trim() || valorNovaParcelaAditivo <= 0)) {
+      setPopup({ tipo: 'aviso', titulo: 'Validação', texto: 'Na prorrogação, informe o início, o término, a parcela e o valor da nova parcela.' });
+      return;
+    }
+    if (acrescimoAditivo > 0 && !corrigirAPartirParcela.trim()) {
+      setPopup({ tipo: 'aviso', titulo: 'Validação', texto: 'Informe a parcela a partir da qual o acréscimo será corrigido.' });
+      return;
+    }
     setSalvando(true);
     try {
       await termosParceriaService.criarAditivo(termoId, {
@@ -533,13 +549,29 @@ export function TermosParceriaPage() {
         tipo: tipoAditivo,
         justificativa: justificativaAditivo,
         dataAditivo: new Date().toISOString().slice(0, 10),
+        novaVigenciaInicio: inicioAditivo || null,
+        novaVigenciaFim: fimAditivo || null,
+        prorrogacaoVigencia,
+        valorTotalPlano: numero(valorTotalPlanoAditivo || form.valorGlobal),
+        parcela: parcelaAditivo || null,
+        valorNovaParcela: numero(valorNovaParcelaAditivo),
         valorAnterior: numero(form.valorGlobal),
-        novoValor: numero(form.valorGlobal),
+        acrescimo: numero(acrescimoAditivo),
+        corrigirAPartirParcela: corrigirAPartirParcela || null,
+        novoValor: numero(form.valorGlobal) + numero(acrescimoAditivo),
       });
       const atualizado = await termosParceriaService.obter(termoId);
       setForm((anterior) => ({ ...anterior, ...atualizado }));
       setTipoAditivo('');
       setJustificativaAditivo('');
+      setInicioAditivo('');
+      setFimAditivo('');
+      setProrrogacaoVigencia(false);
+      setValorTotalPlanoAditivo(0);
+      setParcelaAditivo('');
+      setValorNovaParcelaAditivo(0);
+      setAcrescimoAditivo(0);
+      setCorrigirAPartirParcela('');
       setPopup({
         tipo: 'sucesso',
         titulo: 'Aditivo adicionado',
@@ -1482,23 +1514,67 @@ export function TermosParceriaPage() {
             <div className="rounded-lg border border-[var(--g3-border)] p-4">
               <h3 className="font-semibold text-[var(--g3-active)]">Histórico e novos aditivos</h3>
               <p className="mt-1 text-xs text-[var(--g3-muted)]">
-                Cada aditivo preserva o histórico do instrumento original e registra justificativa,
-                data e novo valor.
+                O termo principal é preenchido automaticamente. Informe as alterações de vigência,
+                cronograma e valor que serão preservadas no histórico.
               </p>
-              <div className="mt-3 grid gap-3 md:grid-cols-[1fr_2fr_auto]">
+              <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <div>
+                  <Label>Termo principal</Label>
+                  <Input value={form.nomenclaturaTermo || form.titulo || form.numeroInstrumento || 'Termo atual'} readOnly />
+                </div>
+                <div>
+                  <Label>Tipo de aditivo *</Label>
                 <Input
                   placeholder="Tipo do aditivo"
                   value={tipoAditivo}
                   onChange={(e) => setTipoAditivo(e.target.value)}
                 />
+                </div>
+                <div>
+                  <Label>Novo início da vigência</Label>
+                  <Input type="date" value={inicioAditivo} onChange={(e) => setInicioAditivo(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Novo término da vigência</Label>
+                  <Input type="date" value={fimAditivo} onChange={(e) => setFimAditivo(e.target.value)} />
+                </div>
+                <label className="flex items-center gap-2 rounded-md border border-[var(--g3-border)] px-3 py-2 text-sm">
+                  <input type="checkbox" checked={prorrogacaoVigencia} onChange={(e) => setProrrogacaoVigencia(e.target.checked)} />
+                  Prorrogação de vigência
+                </label>
+                <div>
+                  <Label>Valor total do plano</Label>
+                  <Input type="text" inputMode="decimal" value={formatarMoedaInput(valorTotalPlanoAditivo || form.valorGlobal || 0)} onChange={(e) => setValorTotalPlanoAditivo(normalizarMoeda(e.target.value))} />
+                </div>
+                <div>
+                  <Label>Parcela do novo cronograma</Label>
+                  <Input placeholder="Ex.: 1, 2 ou 1ª parcela" value={parcelaAditivo} onChange={(e) => setParcelaAditivo(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Valor da nova parcela</Label>
+                  <Input type="text" inputMode="decimal" value={formatarMoedaInput(valorNovaParcelaAditivo)} onChange={(e) => setValorNovaParcelaAditivo(normalizarMoeda(e.target.value))} />
+                </div>
+                <div>
+                  <Label>Acréscimo de valor</Label>
+                  <Input type="text" inputMode="decimal" value={formatarMoedaInput(acrescimoAditivo)} onChange={(e) => setAcrescimoAditivo(normalizarMoeda(e.target.value))} />
+                </div>
+                <div>
+                  <Label>Corrigir a partir da parcela</Label>
+                  <Input placeholder="Ex.: 3ª parcela" value={corrigirAPartirParcela} onChange={(e) => setCorrigirAPartirParcela(e.target.value)} />
+                </div>
+                <div className="md:col-span-2 xl:col-span-3">
+                  <Label>Justificativa detalhada *</Label>
                 <Input
                   placeholder="Justificativa detalhada"
                   value={justificativaAditivo}
                   onChange={(e) => setJustificativaAditivo(e.target.value)}
                 />
+                </div>
+                <div className="flex items-end">
                 <Button onClick={() => void adicionarAditivo()} disabled={salvando || !termoId}>
                   <Plus className="mr-1 h-4 w-4" /> Adicionar
                 </Button>
+                </div>
               </div>
             </div>
             <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
@@ -1510,6 +1586,8 @@ export function TermosParceriaPage() {
                     <th className="px-3 py-2 text-left">Data</th>
                     <th className="px-3 py-2 text-right">Valor anterior</th>
                     <th className="px-3 py-2 text-right">Novo valor</th>
+                    <th className="px-3 py-2 text-right">Acréscimo</th>
+                    <th className="px-3 py-2 text-left">Cronograma</th>
                     <th className="px-3 py-2 text-left">Justificativa</th>
                   </tr>
                 </thead>
@@ -1521,12 +1599,14 @@ export function TermosParceriaPage() {
                       <td className="px-3 py-2">{data(item.dataAditivo)}</td>
                       <td className="px-3 py-2 text-right">{moeda(item.valorAnterior)}</td>
                       <td className="px-3 py-2 text-right">{moeda(item.novoValor)}</td>
+                      <td className="px-3 py-2 text-right">{moeda(item.acrescimo)}</td>
+                      <td className="px-3 py-2">{item.prorrogacaoVigencia ? `${item.parcela || '—'} · ${moeda(item.valorNovaParcela)}` : '—'}</td>
                       <td className="px-3 py-2">{item.justificativa || '—'}</td>
                     </tr>
                   ))}
                   {!(form.aditivos ?? []).length ? (
                     <tr>
-                      <td colSpan={6} className="px-3 py-8 text-center">
+                      <td colSpan={8} className="px-3 py-8 text-center">
                         Nenhum aditivo cadastrado.
                       </td>
                     </tr>

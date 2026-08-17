@@ -140,6 +140,11 @@ const aditivoSchema = z.object({
   dataAditivo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
   novaVigenciaInicio: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
   novaVigenciaFim: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  prorrogacaoVigencia: z.boolean().default(false),
+  valorTotalPlano: numeroNaoNegativo("O valor total do plano deve ser um numero valido.").default(0),
+  parcela: textoOpcional,
+  valorNovaParcela: numeroNaoNegativo("O valor da nova parcela deve ser um numero valido.").default(0),
+  corrigirAPartirParcela: textoOpcional,
   valorAnterior: numeroNaoNegativo("O valor anterior deve ser um numero valido.").default(0),
   acrescimo: numeroNaoNegativo("O acrescimo deve ser um numero valido.").default(0),
   reducao: numeroNaoNegativo("A reducao deve ser um numero valido.").default(0),
@@ -354,7 +359,8 @@ export class TermosParceriaService {
     const tenantId = tenant(actor); const input = aditivoSchema.parse(raw); const instrumentoId = idBigInt(id, "Termo");
     await this.instrumento(instrumentoId, tenantId);
     validarIntervalo(input.novaVigenciaInicio, input.novaVigenciaFim, "A vigencia do aditivo");
-    const rows = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`INSERT INTO prestacao_contas_aditivo (tenant_id, instrumento_id, numero, ano, tipo, data_aditivo, nova_vigencia_inicio, nova_vigencia_fim, valor_anterior, acrescimo, reducao, novo_valor, justificativa, processo, documento_id, criado_por, atualizado_por) VALUES (${tenantId}::uuid, ${instrumentoId}, ${input.numero}, ${input.ano ?? null}, ${input.tipo}, ${input.dataAditivo ?? null}::date, ${input.novaVigenciaInicio ?? null}::date, ${input.novaVigenciaFim ?? null}::date, ${input.valorAnterior}, ${input.acrescimo}, ${input.reducao}, ${input.novoValor}, ${input.justificativa}, ${input.processo ?? null}, ${input.documentoId ? BigInt(input.documentoId) : null}, ${actor?.id ?? null}, ${actor?.id ?? null}) RETURNING *`);
+    if (input.acrescimo > 0 && !input.corrigirAPartirParcela) throw new AppError("Informe a parcela a partir da qual o acrescimo sera corrigido.", 422);
+    const rows = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`INSERT INTO prestacao_contas_aditivo (tenant_id, instrumento_id, numero, ano, tipo, data_aditivo, nova_vigencia_inicio, nova_vigencia_fim, prorrogacao_vigencia, valor_total_plano, parcela, valor_nova_parcela, corrigir_a_partir_parcela, valor_anterior, acrescimo, reducao, novo_valor, justificativa, processo, documento_id, criado_por, atualizado_por) VALUES (${tenantId}::uuid, ${instrumentoId}, ${input.numero}, ${input.ano ?? null}, ${input.tipo}, ${input.dataAditivo ?? null}::date, ${input.novaVigenciaInicio ?? null}::date, ${input.novaVigenciaFim ?? null}::date, ${input.prorrogacaoVigencia}, ${input.valorTotalPlano}, ${input.parcela ?? null}, ${input.valorNovaParcela}, ${input.corrigirAPartirParcela ?? null}, ${input.valorAnterior}, ${input.acrescimo}, ${input.reducao}, ${input.novoValor}, ${input.justificativa}, ${input.processo ?? null}, ${input.documentoId ? BigInt(input.documentoId) : null}, ${actor?.id ?? null}, ${actor?.id ?? null}) RETURNING *`);
     return mapRow(rows[0] ?? {});
   }
 

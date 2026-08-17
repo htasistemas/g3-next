@@ -722,6 +722,8 @@ const secoesManual: ManualSecao[] = [
           "Os vínculos de Termo de fomento e Plano de trabalho usam os cadastros existentes do sistema, mantendo os registros relacionados no mesmo ambiente institucional.",
           "Cadastre cada parcela com quantidade, valor previsto e data de desembolso. O sistema alerta quando o voto está há mais de três meses sem informação e quando a vigência termina em até 90 dias.",
           "Selecione Ativo ou Inativo no status do cadastro. Os órgãos cedentes incluem Fundo Municipal da Infância e Adolescência (FIA) e Fundo Municipal do Idoso.",
+          "Na aba Aditivos, o termo principal é vinculado automaticamente ao cadastro aberto. Informe tipo, novo início e término da vigência, marque Prorrogação de vigência quando aplicável e registre o valor total do plano, a parcela e o valor da nova parcela.",
+          "Quando houver acréscimo de valor, informe também a parcela a partir da qual a correção será aplicada; o novo valor do termo é calculado a partir do valor anterior e do acréscimo.",
           "Em Dados gerais, registre identificação jurídica, processo, edital, proposta, responsáveis, público-alvo, território, vigência, recursos, parcelas, prazos de prestação de contas, legislação e observações.",
           "Na seção Plano de trabalho e execução, registre metas e indicadores, rubricas e orçamento, recebimentos e despesas. Saldos, vínculos, vigência e limites financeiros são validados pelo backend.",
           "As abas Documentos e Aditivos mantêm os comprovantes no storage, o histórico das alterações e a rastreabilidade do instrumento.",
