@@ -34,6 +34,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { useAuth } from "@/hooks/use-auth";
+import { httpClient } from "@/services/http-client";
 import {
   usuarioDefaultValues,
   usuarioFormSchema,
@@ -186,6 +187,7 @@ function mapFormularioParaPayload(values: UsuarioFormValues): UsuarioPayload {
     unidade: values.unidade?.trim() || undefined,
     cargo: values.cargo?.trim() || undefined,
     perfil_acesso: values.perfil_acesso?.trim().toUpperCase() || undefined,
+    perfil_id: values.perfil_id?.trim() || undefined,
     permissoes,
     status: values.status,
     exigir_troca_senha: !!values.exigir_troca_senha,
@@ -383,6 +385,7 @@ export function UsuariosPage() {
   const { data: usuarioData, isLoading: carregandoUsuario } = useUsuario(idSelecionado);
   const { data: faceData, isLoading: carregandoFace } = useUsuarioFace(idSelecionado);
   const { data: permissoesData, isLoading: carregandoPermissoes } = usePermissoesUsuarios();
+  const { data: perfisAcessoData } = useQuery({ queryKey: ["perfis-acesso", tenantKey], queryFn: async () => (await httpClient.get<{ perfis: Array<{ id: string; nome: string; ativo: boolean }> }>("/api/perfis-acesso")).data, enabled: !!usuario });
   const { data: acessosData, isLoading: carregandoAcessos } = useUsuarioAcessos(idSelecionado);
   const { data: catalogoAcessos } = useCatalogoAcessos();
 
@@ -429,6 +432,7 @@ export function UsuariosPage() {
 
   const permissoesSelecionadasValue = watch("permissoes");
   const perfilSelecionado = watch("perfil_acesso") ?? "OPERADOR";
+  const perfilIdSelecionado = watch("perfil_id") ?? "";
   const origemTipoSelecionada = watch("origem_tipo");
   const origemNomeSelecionada = watch("origem_nome");
   const emailUsuarioAtual = watch("email");
@@ -1459,23 +1463,21 @@ export function UsuariosPage() {
               <div className="space-y-1 xl:col-span-2">
                 <Label>Perfil principal</Label>
                 <Select
-                  value={perfilSelecionado}
+                  value={perfilIdSelecionado}
                   onChange={(event) => {
                     const value = event.target.value;
-                    setValue("perfil_acesso", value, { shouldDirty: true, shouldValidate: true });
-                    if (value && !permissoesSelecionadas.includes(value)) {
-                      setValue("permissoes", [...permissoesSelecionadas, value], {
-                        shouldDirty: true,
-                        shouldValidate: true
-                      });
-                    }
+                    const profile = perfisAcessoData?.perfis.find((item) => item.id === value);
+                    setValue("perfil_id", value, { shouldDirty: true, shouldValidate: true });
+                    setValue("perfil_acesso", profile?.nome ?? perfilSelecionado, { shouldDirty: true, shouldValidate: true });
                   }}
                 >
-                  {perfisDisponiveis.map((permissao) => (
-                    <option key={permissao} value={permissao}>
-                      {formatarPerfil(permissao)}
+                  <option value="">Selecione um perfil de acesso</option>
+                  {(perfisAcessoData?.perfis ?? []).filter((item) => item.ativo).map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.nome}
                     </option>
                   ))}
+                  {!perfisAcessoData?.perfis?.length ? perfisDisponiveis.map((permissao) => <option key={permissao} value="">{formatarPerfil(permissao)}</option>) : null}
                 </Select>
               </div>
 

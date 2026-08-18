@@ -16,6 +16,7 @@ export type UsuarioInputBase = {
   unidade?: string;
   cargo?: string;
   perfil_acesso?: string;
+  perfil_id?: string;
   permissoes?: string[];
   status?: UsuarioStatus;
   exigir_troca_senha?: boolean;

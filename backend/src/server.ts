@@ -27,6 +27,7 @@ import { ensureUsuariosGestaoEstrutura } from "./modules/usuarios/repositories/u
 import { ensureVisitasDomiciliaresEstrutura } from "./modules/visitas-domiciliares/repositories/visitas-domiciliares.repository.js";
 import { ensureAgendamentosEstrutura } from "./modules/agendamentos/repositories/agendamentos.repository.js";
 import { ensureMultiTenantStructure } from "./modules/multi-tenant/tenant-estrutura.service.js";
+import { ensurePerfisAcessoEstrutura } from "./modules/perfis-acesso/repositories/perfis-acesso-estrutura.repository.js";
 
 async function aquecerEstruturasDeTela() {
   const commemorativeImportService = new CommemorativeImportService();
@@ -78,7 +79,8 @@ async function bootstrap() {
 
   await Promise.all([
     ensureUsuariosGestaoEstrutura(prisma),
-    ensureRegistroPontoEstrutura(prisma)
+    ensureRegistroPontoEstrutura(prisma),
+    ensurePerfisAcessoEstrutura(prisma)
   ]);
 
   app.listen(env.API_PORT, env.API_HOST, () => {

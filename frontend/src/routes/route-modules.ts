@@ -244,6 +244,7 @@ const routeModules: RouteModuleDefinition[] = [
     loader: () => import("@/pages/portais/portal-externo-page")
   },
   { path: "/configuracoes/usuarios", loader: () => import("@/pages/configuracoes/usuarios-page") },
+  { path: "/configuracoes/perfis-acesso", loader: () => import("@/pages/configuracoes/perfis-acesso-page") },
   {
     path: "/configuracoes/master-instituicoes",
     loader: () => import("@/pages/configuracoes/master-instituicoes-page")

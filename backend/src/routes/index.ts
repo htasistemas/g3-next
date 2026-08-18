@@ -63,6 +63,7 @@ import { agendamentosRoutes } from "../modules/agendamentos/routes/agendamentos.
 import { instituicoesRoutes } from "../modules/instituicoes/routes/instituicoes.routes.js";
 import { projetoRoutes } from "../modules/projetos/routes/projeto.routes.js";
 import { portaisExternosRoutes } from "../modules/portais-externos/routes/portais-externos.routes.js";
+import { perfisAcessoRoutes } from "../modules/perfis-acesso/routes/perfis-acesso.routes.js";
 import { educacionalRoutes } from "../modules/educacional/routes/educacional.routes.js";
 import { parceriasPublicasRoutes } from "../modules/educacional/parcerias-publicas.routes.js";
 import { importacaoDadosRoutes } from "../modules/importacao-dados/importacao-dados.routes.js";
@@ -149,6 +150,7 @@ appRoutes.use("/api/vendas", vendaRoutes);
 appRoutes.use("/api/carteira-evento", carteiraEventoRoutes);
 appRoutes.use("/api/configuracoes/atualizar-sistema", atualizacaoSistemaRoutes);
 appRoutes.use("/api/usuarios", usuarioRoutes);
+appRoutes.use("/api/perfis-acesso", perfisAcessoRoutes);
 appRoutes.use("/api/mensagens-personalizadas", mensagensPersonalizadasRoutes);
 appRoutes.use(
   "/api/email",

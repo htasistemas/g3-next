@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.854",
-  "releaseDate": "2026-08-17",
-  "description": "Aditivos de Termos de parceria com vigência, cronograma e acréscimo de valor.",
+  "latestVersion": "1.00.855",
+  "releaseDate": "2026-08-18",
+  "description": "Gestão de perfis de acesso com matriz de permissões tenant-scoped e autorização backend.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.854",
+  "minCompatibleVersion": "1.00.855",
   "releaseType": "stable",
   "downloadUrl": null
 }

@@ -14,6 +14,7 @@ export type Usuario = {
   unidade?: string;
   cargo?: string;
   perfil_acesso?: string;
+  perfil_id?: string;
   permissoes: string[];
   status: UsuarioStatus;
   exigir_troca_senha: boolean;
@@ -106,6 +107,7 @@ export type UsuarioPayload = {
   unidade?: string;
   cargo?: string;
   perfil_acesso?: string;
+  perfil_id?: string;
   permissoes?: string[];
   status?: UsuarioStatus;
   exigir_troca_senha?: boolean;

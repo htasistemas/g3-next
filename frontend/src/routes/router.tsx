@@ -234,6 +234,7 @@ const AtualizarSistemaPage = carregarPagina(
   "AtualizarSistemaPage"
 );
 const UsuariosPage = carregarPagina("/configuracoes/usuarios", "UsuariosPage");
+const PerfisAcessoPage = carregarPagina("/configuracoes/perfis-acesso", "PerfisAcessoPage");
 const MasterInstituicoesPage = carregarPagina(
   "/configuracoes/master-instituicoes",
   "MasterInstituicoesPage"
@@ -608,6 +609,10 @@ export const router = createBrowserRouter([
             {UsuariosPage}
           </RequirePermission>
         )
+      },
+      {
+        path: "/configuracoes/perfis-acesso",
+        element: <RequirePermission permissions={["ADMINISTRADOR", "CONFIGURACOES_PERFIS_ACESSO_ADMINISTRAR"]}>{PerfisAcessoPage}</RequirePermission>
       },
       {
         path: "/configuracoes/master-instituicoes",

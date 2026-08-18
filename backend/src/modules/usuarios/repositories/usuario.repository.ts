@@ -20,6 +20,7 @@ import type {
   UsuarioUpdateInput
 } from "../usuario.types.js";
 import { ensureUsuariosGestaoEstrutura } from "./usuario-estrutura.repository.js";
+import { ensurePerfisAcessoEstrutura } from "../../perfis-acesso/repositories/perfis-acesso-estrutura.repository.js";
 
 type UsuarioAtor = {
   id?: bigint;
@@ -273,6 +274,7 @@ export class UsuarioRepository {
     ator: UsuarioAtor
   ): Promise<UsuarioDetalheResponse> {
     await ensureUsuariosGestaoEstrutura(prisma);
+    await ensurePerfisAcessoEstrutura(prisma);
 
     const nomeUsuario = input.nome_usuario.trim();
     const email = input.email.trim().toLowerCase();
@@ -315,6 +317,7 @@ export class UsuarioRepository {
         ator
       );
       await this.sincronizarPermissoesTx(tx, usuario.id, permissoesNormalizadas);
+      await this.sincronizarPerfilAcessoTx(tx, usuario.id, input.perfil_id, ator);
       await this.registrarAuditoriaTx(
         tx,
         {
@@ -348,6 +351,7 @@ export class UsuarioRepository {
     ator: UsuarioAtor
   ): Promise<UsuarioDetalheResponse> {
     await ensureUsuariosGestaoEstrutura(prisma);
+    await ensurePerfisAcessoEstrutura(prisma);
 
     const existente = await this.buscarUsuarioRowPorId(id, ator.tenant_id);
     if (!existente) {
@@ -404,6 +408,7 @@ export class UsuarioRepository {
         ator
       );
       await this.sincronizarPermissoesTx(tx, id, permissoesNormalizadas);
+      await this.sincronizarPerfilAcessoTx(tx, id, input.perfil_id, ator);
       await this.registrarAuditoriaTx(
         tx,
         {
@@ -826,6 +831,23 @@ export class UsuarioRepository {
       ator.nome_usuario,
       ator.tenant_id
     );
+  }
+
+  private async sincronizarPerfilAcessoTx(
+    tx: Prisma.TransactionClient,
+    usuarioId: bigint,
+    perfilId: string | undefined,
+    ator: UsuarioAtor
+  ) {
+    if (!perfilId) return;
+    const perfil = await tx.$queryRawUnsafe<Array<{ id: bigint }>>(
+      `SELECT id FROM perfil_acesso WHERE id=$1::bigint AND tenant_id=$2::uuid AND instituicao_id=$3::uuid AND ativo=TRUE`,
+      perfilId, ator.tenant_id, ator.instituicao_id
+    );
+    if (!perfil[0]) throw new AppError("Perfil de acesso invalido para a instituicao atual.", 403);
+    await tx.$executeRawUnsafe(`DELETE FROM usuario_perfil_acesso WHERE usuario_id=$1 AND tenant_id=$2::uuid`, usuarioId, ator.tenant_id);
+    await tx.$executeRawUnsafe(`INSERT INTO usuario_perfil_acesso (usuario_id, perfil_id, tenant_id, principal) VALUES ($1,$2,$3::uuid,TRUE)`, usuarioId, perfil[0].id, ator.tenant_id);
+    await tx.$executeRawUnsafe(`UPDATE usuarios SET perfil_acesso_id=$1 WHERE id=$2 AND tenant_id=$3::uuid`, perfil[0].id, usuarioId, ator.tenant_id);
   }
 
   private async sincronizarPermissoesTx(

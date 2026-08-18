@@ -1,6 +1,14 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.855",
+                        "releaseDate": "2026-08-18",
+                        "title": "Gestão de perfis de acesso",
+                        "description": "Perfis tenant-scoped, matriz dinâmica de permissões e validação centralizada no backend.",
+                        "changes": ["Criada a tela Configurações gerais > Perfis de acesso com pesquisa, árvore, seleção em massa, duplicação e ativação/inativação.", "Perfis, vínculos de usuários e auditoria básica protegidos por tenant e instituição.", "A autorização de backend recalcula permissões de perfil por requisição e mantém compatibilidade com permissões legadas.", "Manual do sistema atualizado."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.854",
                         "releaseDate": "2026-08-17",
                         "title": "Aditivos completos nos Termos de parceria",

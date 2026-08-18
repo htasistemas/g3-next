@@ -656,6 +656,13 @@ const menuSectionsBase: MenuSection[] = [
         label: "Usuários",
         icon: UsersRound,
         requiredPermissions: ["ADMINISTRADOR"]
+      },
+      {
+        id: "configuracoes-perfis-acesso",
+        to: "/configuracoes/perfis-acesso",
+        label: "Perfis de acesso",
+        icon: ShieldCheck,
+        requiredPermissions: ["ADMINISTRADOR", "CONFIGURACOES_PERFIS_ACESSO_ADMINISTRAR"]
       }
     ]
   },

@@ -75,6 +75,7 @@ const baseUsuarioSchemaShape = {
   unidade: optionalTrimmedString,
   cargo: optionalTrimmedString,
   perfil_acesso: optionalTrimmedString,
+  perfil_id: optionalInteger.transform((value) => value?.toString()),
   permissoes: optionalPermissoesArray,
   status: z.enum(usuarioStatusValues).default("ATIVO"),
   exigir_troca_senha: optionalBoolean.default(false),

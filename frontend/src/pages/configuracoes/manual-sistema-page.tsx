@@ -80,6 +80,29 @@ const secoesManual: ManualSecao[] = [
     ]
   },
   {
+    id: "perfis-de-acesso",
+    titulo: "Perfis de acesso",
+    descricao: "Configure autorizações por instituição sem depender de regras fixas no frontend.",
+    icon: UserRound,
+    telas: [
+      {
+        nome: "Perfis de acesso",
+        objetivo: "Criar perfis tenant-scoped, duplicar configurações e controlar permissões de cada módulo e ação.",
+        comoUsar: [
+          "Acesse Configurações gerais > Perfis de acesso e selecione Novo perfil.",
+          "Use a pesquisa da matriz, os estados parcial/marcado dos módulos e as ações em massa para montar o acesso.",
+          "Incluir, alterar e excluir exigem Visualizar; o backend rejeita combinações inconsistentes.",
+          "Atribua o perfil principal no cadastro de usuários. Alterações passam a valer na próxima requisição autorizada.",
+          "Perfis e permissões são isolados por instituição/tenant e novas permissões permanecem negadas até concessão explícita."
+        ],
+        atencoes: [
+          "Não remova o último perfil administrativo ativo da instituição.",
+          "Ocultar o menu não substitui a autorização do backend; chamadas sem permissão retornam 403."
+        ]
+      }
+    ]
+  },
+  {
     id: "base-g3n-apresentacao",
     titulo: "Base G3N de apresentação",
     descricao: "Clone a base atual no mesmo banco, em um schema isolado, para demonstrações, treinamentos e testes sem expor a identidade da ADRA.",
