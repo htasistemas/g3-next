@@ -49,6 +49,24 @@ const concedenteSchema = z.object({
     situacao: optionalText.default("ATIVO")
 });
 const instrumentoSchema = z.object({
+    ij: optionalText.nullable().optional(),
+    cnpj: optionalText.nullable().optional(),
+    tipificacao: optionalText.nullable().optional(),
+    numeroVotoComissao: optionalText.nullable().optional(),
+    origemTermo: optionalText.nullable().optional(),
+    nomenclaturaTermo: optionalText.nullable().optional(),
+    responsavelIndicacao: optionalText.nullable().optional(),
+    orgaoCedente: optionalText.nullable().optional(),
+    statusCadastro: optionalText.default("ATIVO"),
+    banco: optionalText.nullable().optional(),
+    agencia: optionalText.nullable().optional(),
+    conta: optionalText.nullable().optional(),
+    operacao: optionalText.nullable().optional(),
+    contaBancariaId: optionalText.nullable().optional(),
+    representanteLegal: optionalText.nullable().optional(),
+    representanteCpf: optionalText.nullable().optional(),
+    representanteCargo: optionalText.nullable().optional(),
+    representanteProfissionalId: optionalText.nullable().optional(),
     concedenteId: optionalText.nullable().optional(),
     transparenciaId: optionalText.nullable().optional(),
     planoTrabalhoId: optionalText.nullable().optional(),
@@ -136,6 +154,7 @@ const receitaSchema = z.object({
     parcela: optionalText.nullable().optional(),
     competencia: optionalText.nullable().optional(),
     dataPrevista: optionalDate,
+    dataDesembolso: optionalDate,
     dataRecebida: optionalDate,
     valorPrevisto: optionalNumber.default(0),
     valorRecebido: optionalNumber.default(0),
@@ -591,7 +610,9 @@ export class PrestacaoContasProfissionalService {
         const rows = await prisma.$queryRaw(Prisma.sql `
       INSERT INTO prestacao_contas_instrumento (
         tenant_id, concedente_id, transparencia_id, plano_trabalho_id, projeto_id, unidade_id, tipo_instrumento,
-        numero_instrumento, numero_processo, numero_proposta, numero_programa, numero_edital,
+        numero_instrumento, ij, cnpj, tipificacao, numero_voto_comissao, origem_termo, nomenclatura_termo, responsavel_indicacao, orgao_cedente, status_cadastro,
+        banco, agencia, conta, operacao, conta_bancaria_id, representante_legal, representante_cpf, representante_cargo, representante_profissional_id,
+        numero_processo, numero_proposta, numero_programa, numero_edital,
         unidade_gestora, orgao_responsavel, gestor_parceria, fiscal_parceria, responsavel_organizacao,
         objeto, justificativa, publico_alvo, territorio, data_assinatura, inicio_vigencia, termino_vigencia,
         prazo_prestacao_parcial, prazo_prestacao_final, valor_global, valor_repasse,
@@ -601,8 +622,9 @@ export class PrestacaoContasProfissionalService {
       ) VALUES (
         ${tenantId}::uuid, ${idToBigInt(input.concedenteId)}, ${idToBigInt(input.transparenciaId)},
         ${idToBigInt(input.planoTrabalhoId)}, ${idToBigInt(input.projetoId)}, ${idToBigInt(input.unidadeId)},
-        ${input.tipoInstrumento}, ${input.numeroInstrumento ?? null}, ${input.numeroProcesso ?? null},
-        ${input.numeroProposta ?? null}, ${input.numeroPrograma ?? null}, ${input.numeroEdital ?? null},
+        ${input.tipoInstrumento}, ${input.numeroInstrumento ?? null}, ${input.ij ?? null}, ${input.cnpj ?? null}, ${input.tipificacao ?? null}, ${input.numeroVotoComissao ?? null}, ${input.origemTermo ?? null}, ${input.nomenclaturaTermo ?? null}, ${input.responsavelIndicacao ?? null}, ${input.orgaoCedente ?? null}, ${input.statusCadastro ?? "ATIVO"},
+        ${input.banco ?? null}, ${input.agencia ?? null}, ${input.conta ?? null}, ${input.operacao ?? null}, ${idToBigInt(input.contaBancariaId)}, ${input.representanteLegal ?? null}, ${input.representanteCpf ?? null}, ${input.representanteCargo ?? null}, ${idToBigInt(input.representanteProfissionalId)},
+        ${input.numeroProcesso ?? null}, ${input.numeroProposta ?? null}, ${input.numeroPrograma ?? null}, ${input.numeroEdital ?? null},
         ${input.unidadeGestora ?? null}, ${input.orgaoResponsavel ?? null}, ${input.gestorParceria ?? null},
         ${input.fiscalParceria ?? null}, ${input.responsavelOrganizacao ?? null}, ${input.objeto},
         ${input.justificativa ?? null}, ${input.publicoAlvo ?? null}, ${input.territorio ?? null},
@@ -673,12 +695,12 @@ export class PrestacaoContasProfissionalService {
         const instrumentoId = idToBigInt(input.instrumentoId);
         const rows = await prisma.$queryRaw(Prisma.sql `
       INSERT INTO prestacao_contas_receita (
-        tenant_id, instrumento_id, parcela, competencia, data_prevista, data_recebida, valor_previsto,
+        tenant_id, instrumento_id, parcela, competencia, data_prevista, data_desembolso, data_recebida, valor_previsto,
         valor_recebido, conta_bancaria, documento, origem, tipo_receita, comprovante_arquivo_id,
         observacoes, situacao, criado_por, atualizado_por
       ) VALUES (
         ${tenantId}::uuid, ${instrumentoId}, ${input.parcela ?? null}, ${input.competencia ?? null},
-        ${input.dataPrevista ?? null}::date, ${input.dataRecebida ?? null}::date, ${input.valorPrevisto ?? 0},
+        ${input.dataPrevista ?? null}::date, ${input.dataDesembolso ?? input.dataPrevista ?? null}::date, ${input.dataRecebida ?? null}::date, ${input.valorPrevisto ?? 0},
         ${input.valorRecebido ?? 0}, ${input.contaBancaria ?? null}, ${input.documento ?? null},
         ${input.origem ?? null}, ${input.tipoReceita ?? "REPASSE"}, ${idToBigInt(input.comprovanteArquivoId)},
         ${input.observacoes ?? null}, ${input.situacao ?? "PREVISTA"}, ${actor?.id ?? null}, ${actor?.id ?? null}

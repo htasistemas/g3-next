@@ -9,6 +9,7 @@ export class EducacionalService {
     async listar(recurso, tenantId) { return this.repository.listar(recurso, this.tenant(tenantId)); }
     async proximoNumeroMatricula(tenantId) { return this.repository.proximoNumeroMatricula(this.tenant(tenantId)); }
     async buscarBeneficiarios(raw, tenantId) { const input = buscaBeneficiarioSchema.parse(raw); return this.repository.buscarBeneficiarios(input.busca, this.tenant(tenantId)); }
+    async buscarAlunos(raw, tenantId) { const input = buscaBeneficiarioSchema.parse(raw); return this.repository.buscarAlunos(input.busca, this.tenant(tenantId)); }
     async listarUnidadesEnsino(tenantId) { return this.repository.listarUnidadesEnsino(this.tenant(tenantId)); }
     async listarAlunosAgrupados(rawFiltros, tenantId) { return this.repository.listarAlunosAgrupados(alunosAgrupadosFiltrosSchema.parse(rawFiltros ?? {}), this.tenant(tenantId)); }
     async vidaAcademicaAluno(rawId, tenantId) { return this.repository.vidaAcademicaAluno(rawId, this.tenant(tenantId)); }

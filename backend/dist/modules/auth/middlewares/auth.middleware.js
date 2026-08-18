@@ -3,6 +3,8 @@ import { AppError } from "../../../shared/errors/app-error.js";
 import { AuthService } from "../services/auth.service.js";
 import { ensureMultiTenantStructure } from "../../multi-tenant/tenant-estrutura.service.js";
 import { prisma } from "../../../database/prisma.js";
+import { ensurePerfisAcessoEstrutura } from "../../perfis-acesso/repositories/perfis-acesso-estrutura.repository.js";
+import { obterPermissoesEfetivas } from "../../perfis-acesso/services/perfis-acesso.service.js";
 const authService = new AuthService();
 const AUTH_COOKIE_NAME = env.APP_AUTH_COOKIE_NAME;
 function obterTokenDaRequisicao(request) {
@@ -14,7 +16,7 @@ function obterTokenDaRequisicao(request) {
     return cookieToken ?? null;
 }
 export function ensureAuthenticated(request, _response, next) {
-    void ensureMultiTenantStructure(prisma).then(() => {
+    void ensureMultiTenantStructure(prisma).then(async () => {
         const token = obterTokenDaRequisicao(request);
         if (!token) {
             throw new AppError("Nao autenticado.", 401);
@@ -33,7 +35,7 @@ export function ensureAuthenticated(request, _response, next) {
                 plano: payload.plano,
                 perfil: payload.perfil,
                 is_superadmin: payload.is_superadmin,
-                permissoes: payload.permissoes ?? [],
+                permissoes: [...new Set([...(payload.permissoes ?? []), ...(payload.tenant_id ? await obterPermissoesEfetivas(payload.sub, payload.tenant_id) : [])])],
                 contexto: payload.contexto
             };
             return next();
@@ -44,7 +46,7 @@ export function ensureAuthenticated(request, _response, next) {
     }).catch(next);
 }
 export function hydrateAuthenticatedUser(request, _response, next) {
-    void ensureMultiTenantStructure(prisma).then(() => {
+    void ensureMultiTenantStructure(prisma).then(async () => {
         const token = obterTokenDaRequisicao(request);
         if (!token) {
             return next();
@@ -63,7 +65,7 @@ export function hydrateAuthenticatedUser(request, _response, next) {
                 plano: payload.plano,
                 perfil: payload.perfil,
                 is_superadmin: payload.is_superadmin,
-                permissoes: payload.permissoes ?? [],
+                permissoes: [...new Set([...(payload.permissoes ?? []), ...(payload.tenant_id ? await obterPermissoesEfetivas(payload.sub, payload.tenant_id) : [])])],
                 contexto: payload.contexto
             };
         }
@@ -74,16 +76,28 @@ export function hydrateAuthenticatedUser(request, _response, next) {
     }).catch(next);
 }
 export function ensurePermissions(permissoesPermitidas) {
-    return (request, _response, next) => {
-        const usuario = request.authUser;
-        if (!usuario) {
-            throw new AppError("Nao autenticado.", 401);
+    return async (request, _response, next) => {
+        try {
+            const usuario = request.authUser;
+            if (!usuario) {
+                throw new AppError("Nao autenticado.", 401);
+            }
+            await ensurePerfisAcessoEstrutura(prisma);
+            const permissoesPerfil = usuario.tenant_id ? await obterPermissoesEfetivas(usuario.id, usuario.tenant_id) : [];
+            const administrativoPerfil = usuario.tenant_id
+                ? await prisma.$queryRawUnsafe(`SELECT TRUE AS administrativo FROM usuario_perfil_acesso up JOIN perfil_acesso p ON p.id=up.perfil_id WHERE up.usuario_id=$1::bigint AND up.tenant_id=$2::uuid AND up.principal=TRUE AND p.ativo=TRUE AND p.administrativo=TRUE LIMIT 1`, usuario.id, usuario.tenant_id)
+                : [];
+            const permissoesEfetivas = [...new Set([...usuario.permissoes, ...permissoesPerfil, ...(administrativoPerfil[0]?.administrativo ? ["ADMINISTRADOR"] : [])])];
+            usuario.permissoes = permissoesEfetivas;
+            const temPermissao = permissoesEfetivas.some((permissao) => permissoesPermitidas.includes(permissao));
+            if (!temPermissao) {
+                throw new AppError("Usuario autenticado nao possui permissao para executar esta acao.", 403);
+            }
+            return next();
         }
-        const temPermissao = usuario.permissoes.some((permissao) => permissoesPermitidas.includes(permissao));
-        if (!temPermissao) {
-            throw new AppError("Usuario autenticado nao possui permissao para executar esta acao.", 403);
+        catch (error) {
+            return next(error);
         }
-        return next();
     };
 }
 export function ensureSuperadmin(request, _response, next) {

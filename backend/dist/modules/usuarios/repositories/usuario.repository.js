@@ -4,6 +4,7 @@ import { AppError } from "../../../shared/errors/app-error.js";
 import { normalizeDigits, trimOrUndefined } from "../../../utils/string-utils.js";
 import { mapAuditoriaRowParaResponse, mapUsuarioRowParaResponse } from "../usuario.mapper.js";
 import { ensureUsuariosGestaoEstrutura } from "./usuario-estrutura.repository.js";
+import { ensurePerfisAcessoEstrutura } from "../../perfis-acesso/repositories/perfis-acesso-estrutura.repository.js";
 export class UsuarioRepository {
     async listar(filters, tenantId) {
         await ensureUsuariosGestaoEstrutura(prisma);
@@ -186,6 +187,7 @@ export class UsuarioRepository {
     }
     async criar(input, senhaHash, ator) {
         await ensureUsuariosGestaoEstrutura(prisma);
+        await ensurePerfisAcessoEstrutura(prisma);
         const nomeUsuario = input.nome_usuario.trim();
         const email = input.email.trim().toLowerCase();
         const cpf = normalizeDigits(input.cpf);
@@ -215,6 +217,7 @@ export class UsuarioRepository {
                 email
             }, ator);
             await this.sincronizarPermissoesTx(tx, usuario.id, permissoesNormalizadas);
+            await this.sincronizarPerfilAcessoTx(tx, usuario.id, input.perfil_id, ator);
             await this.registrarAuditoriaTx(tx, {
                 ator_id: ator.id,
                 acao: "CREATE",
@@ -237,6 +240,7 @@ export class UsuarioRepository {
     }
     async atualizar(id, input, ator) {
         await ensureUsuariosGestaoEstrutura(prisma);
+        await ensurePerfisAcessoEstrutura(prisma);
         const existente = await this.buscarUsuarioRowPorId(id, ator.tenant_id);
         if (!existente) {
             throw new AppError("Usuario nao encontrado.", 404);
@@ -271,6 +275,7 @@ export class UsuarioRepository {
                 status: input.status ?? this.mapStatusPersistido(existente.status)
             }, ator);
             await this.sincronizarPermissoesTx(tx, id, permissoesNormalizadas);
+            await this.sincronizarPerfilAcessoTx(tx, id, input.perfil_id, ator);
             await this.registrarAuditoriaTx(tx, {
                 ator_id: ator.id,
                 acao: "UPDATE",
@@ -576,6 +581,16 @@ export class UsuarioRepository {
         WHERE id = $1
           AND (tenant_id::text = $20 OR tenant_id IS NULL)
       `, usuarioId, trimOrUndefined(input.nome_exibicao) ?? null, normalizeDigits(input.telefone) ?? null, normalizeDigits(input.cpf) ?? null, trimOrUndefined(input.matricula) ?? null, trimOrUndefined(input.setor) ?? null, trimOrUndefined(input.unidade) ?? null, trimOrUndefined(input.cargo) ?? null, input.status ?? "ATIVO", !!input.exigir_troca_senha, !!input.exigir_autenticacao_segura, !!input.permitir_biometria_facial_login, !!input.permitir_biometria_facial_login && !!input.exigir_biometria_facial_login, trimOrUndefined(input.origem_tipo) ?? null, trimOrUndefined(input.origem_id) ?? null, trimOrUndefined(input.origem_nome) ?? null, ator.tenant_id, ator.instituicao_id, ator.nome_usuario, ator.tenant_id);
+    }
+    async sincronizarPerfilAcessoTx(tx, usuarioId, perfilId, ator) {
+        if (!perfilId)
+            return;
+        const perfil = await tx.$queryRawUnsafe(`SELECT id FROM perfil_acesso WHERE id=$1::bigint AND tenant_id=$2::uuid AND instituicao_id=$3::uuid AND ativo=TRUE`, perfilId, ator.tenant_id, ator.instituicao_id);
+        if (!perfil[0])
+            throw new AppError("Perfil de acesso invalido para a instituicao atual.", 403);
+        await tx.$executeRawUnsafe(`DELETE FROM usuario_perfil_acesso WHERE usuario_id=$1 AND tenant_id=$2::uuid`, usuarioId, ator.tenant_id);
+        await tx.$executeRawUnsafe(`INSERT INTO usuario_perfil_acesso (usuario_id, perfil_id, tenant_id, principal) VALUES ($1,$2,$3::uuid,TRUE)`, usuarioId, perfil[0].id, ator.tenant_id);
+        await tx.$executeRawUnsafe(`UPDATE usuarios SET perfil_acesso_id=$1 WHERE id=$2 AND tenant_id=$3::uuid`, perfil[0].id, usuarioId, ator.tenant_id);
     }
     async sincronizarPermissoesTx(tx, usuarioId, permissoes) {
         const nomes = [...new Set(permissoes.map((item) => item.trim().toUpperCase()).filter(Boolean))];
