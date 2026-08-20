@@ -25,6 +25,8 @@
 - MUST NOT fazer `commit` ou `push` automaticamente.
 - MUST only executar `commit` ou `push` mediante ordem explícita do usuário.
 - MUST manter alterações locais preparadas e aguardando confirmação quando houver necessidade de versionamento remoto.
+- Quando o usuário solicitar explicitamente `commit` e `push` para produção, MUST promover o commit para a branch `main`, pois o workflow oficial de deploy automático é acionado por push na `main`.
+- Nessa situação, MUST confirmar o hash publicado em `origin/main` e informar que o workflow de deploy foi acionado.
 
 ### UX e Interação
 
