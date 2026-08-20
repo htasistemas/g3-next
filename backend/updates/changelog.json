@@ -1,6 +1,14 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.860",
+                        "releaseDate": "2026-08-20",
+                        "title": "Correção do deploy e Cloudflare Tunnel",
+                        "description": "O deploy passou a detectar o token configurado no .env e religar o túnel automaticamente após a publicação.",
+                        "changes": ["Detecção segura de TUNNEL_TOKEN no ambiente e no arquivo .env.", "Religamento automático do serviço g3n-tunnel após rebuild.", "Prevenção de publicação sem a camada pública configurada."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.859",
                         "releaseDate": "2026-08-20",
                         "title": "Indicadores ampliados do Portal de inscrições",

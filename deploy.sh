@@ -10,6 +10,18 @@ MAINTENANCE_DIR="${MAINTENANCE_DIR:-$APP_DIR/docker/runtime}"
 MAINTENANCE_FLAG="${APP_MAINTENANCE_FLAG_PATH:-$MAINTENANCE_DIR/maintenance.enable}"
 DEPLOY_OK=0
 
+has_tunnel_token() {
+  if [[ -n "${TUNNEL_TOKEN:-}" ]]; then
+    return 0
+  fi
+
+  if [[ -f "$APP_DIR/.env" ]] && grep -Eq '^TUNNEL_TOKEN=[^[:space:]]+' "$APP_DIR/.env"; then
+    return 0
+  fi
+
+  return 1
+}
+
 log() { printf "[%s] %s\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
 
 enable_maintenance() {
@@ -200,11 +212,11 @@ if ! wait_healthy nginx-g3n 120; then
   exit 1
 fi
 
-if [[ -n "${TUNNEL_TOKEN:-}" ]]; then
+if has_tunnel_token; then
   log "Ensure g3n tunnel is up"
   docker compose -f "$APP_COMPOSE" up -d --remove-orphans --force-recreate g3n-tunnel
 else
-  log "Skipping g3n tunnel (TUNNEL_TOKEN not set)"
+  log "Skipping g3n tunnel (TUNNEL_TOKEN not found in environment or .env)"
 fi
 
 if [ -x "$APP_DIR/scripts/deploy-check.sh" ]; then

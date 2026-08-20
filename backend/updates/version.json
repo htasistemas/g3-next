@@ -1,9 +1,9 @@
 {
-  "latestVersion": "1.00.859",
+  "latestVersion": "1.00.860",
   "releaseDate": "2026-08-20",
-  "description": "Portal público de inscrições com indicadores destacados e navegação ampliada por situação.",
+  "description": "Deploy com religamento automático do Cloudflare Tunnel a partir do token do servidor.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.859",
+  "minCompatibleVersion": "1.00.860",
   "releaseType": "stable"
 }
