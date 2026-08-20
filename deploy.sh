@@ -179,7 +179,8 @@ if ! docker compose -f "$APP_COMPOSE" run --rm --no-deps g3n-backend npx prisma 
     20260813_login_contexto_organizacional \
     20260813_gestao_parcerias_instrumentos \
     20260814_harden_gestao_parcerias \
-    20260815_vinculo_termo_fomento_parceria; do
+    20260815_vinculo_termo_fomento_parceria \
+    20260820_create_portal_inscricoes; do
     docker compose -f "$APP_COMPOSE" run --rm --no-deps g3n-backend npx prisma db execute --schema prisma/schema.prisma --file "prisma/migrations/$migration/migration.sql"
   done
 fi

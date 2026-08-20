@@ -1,6 +1,14 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.861",
+                        "releaseDate": "2026-08-20",
+                        "title": "Migration do Portal de inscrições no deploy legado",
+                        "description": "Incluída a migration do Portal de inscrições no caminho de compatibilidade usado por bancos legados.",
+                        "changes": ["Tabelas do portal aplicadas quando o histórico Prisma exige fallback.", "Correção da falha genérica de operação no banco na tela pública."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.860",
                         "releaseDate": "2026-08-20",
                         "title": "Correção do deploy e Cloudflare Tunnel",

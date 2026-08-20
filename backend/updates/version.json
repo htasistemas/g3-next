@@ -1,9 +1,9 @@
 {
-  "latestVersion": "1.00.860",
+  "latestVersion": "1.00.861",
   "releaseDate": "2026-08-20",
-  "description": "Deploy com religamento automático do Cloudflare Tunnel a partir do token do servidor.",
+  "description": "Deploy com fallback completo da migration do Portal de inscrições em bancos legados.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.860",
+  "minCompatibleVersion": "1.00.861",
   "releaseType": "stable"
 }
