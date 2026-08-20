@@ -276,6 +276,13 @@ const menuSectionsBase: MenuSection[] = [
         icon: GraduationCap
       },
       {
+        id: "atendimentos-pre-inscricoes",
+        to: "/atendimentos/pre-inscricoes",
+        label: "Pré-inscrições",
+        icon: ClipboardPenLine,
+        requiredPermissions: ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"]
+      },
+      {
         id: "atendimentos-banco-empregos",
         to: "/atendimentos/banco-empregos",
         label: "Banco de empregos",
@@ -737,6 +744,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/cadastros/voluntariado")) return "Cadastro de voluntariado";
   if (pathname.startsWith("/atendimentos/central-atendimentos")) return "Central de atendimentos";
   if (pathname.startsWith("/atendimentos/matriculas")) return "Inscrições em cursos e atendimentos";
+  if (pathname.startsWith("/atendimentos/pre-inscricoes")) return "Pré-inscrições";
   if (pathname.startsWith("/atendimentos/banco-empregos")) return "Banco de empregos";
   if (pathname.startsWith("/educacional")) return "Gestão educacional";
   if (pathname.startsWith("/atendimentos/biblioteca")) return "Biblioteca";
@@ -802,6 +810,7 @@ function ocultarTituloTopo(pathname: string) {
     pathname.startsWith("/configuracoes/mensagens-personalizadas") ||
     pathname.startsWith("/atendimentos/central-atendimentos") ||
     pathname.startsWith("/atendimentos/matriculas") ||
+    pathname.startsWith("/atendimentos/pre-inscricoes") ||
     pathname.startsWith("/atendimentos/banco-empregos") ||
     pathname.startsWith("/atendimentos/biblioteca") ||
     pathname.startsWith("/atendimentos/registro-visitas") ||

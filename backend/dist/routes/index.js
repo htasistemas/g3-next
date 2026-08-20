@@ -60,6 +60,7 @@ import { instituicoesRoutes } from "../modules/instituicoes/routes/instituicoes.
 import { projetoRoutes } from "../modules/projetos/routes/projeto.routes.js";
 import { portaisExternosRoutes } from "../modules/portais-externos/routes/portais-externos.routes.js";
 import { perfisAcessoRoutes } from "../modules/perfis-acesso/routes/perfis-acesso.routes.js";
+import { portalInscricoesRoutes } from "../modules/portal-inscricoes/portal-inscricoes.routes.js";
 import { educacionalRoutes } from "../modules/educacional/routes/educacional.routes.js";
 import { parceriasPublicasRoutes } from "../modules/educacional/parcerias-publicas.routes.js";
 import { importacaoDadosRoutes } from "../modules/importacao-dados/importacao-dados.routes.js";
@@ -136,6 +137,7 @@ appRoutes.use("/api/chamados-tecnicos", chamadoTecnicoRoutes);
 appRoutes.use("/api/datas-comemorativas", datasComemorativasRoutes);
 appRoutes.use("/api/captacao-recursos", captacaoRecursosRoutes);
 appRoutes.use("/api/portais-externos", portaisExternosRoutes);
+appRoutes.use("/api/portal-inscricoes", portalInscricoesRoutes);
 appRoutes.use("/api/configuracoes/parametros", parametrosSistemaRoutes);
 appRoutes.use("/api/configuracoes/backup", backupSistemaRoutes);
 appRoutes.use("/api/configuracoes/licenca-uso", licencaUsoRoutes);

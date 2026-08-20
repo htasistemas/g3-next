@@ -43,8 +43,8 @@ if (migration.status !== 0) {
   const migrationOutput = `${migration.stdout?.toString() ?? ""}\n${migration.stderr?.toString() ?? ""}`;
   const bancoLegado = migrationOutput.includes("P3005") || migrationOutput.includes("schema is not empty");
   const migrationsDir = resolve(process.cwd(), "prisma", "migrations");
-  const migrations = existsSync(migrationsDir)
-    ? readdirSync(migrationsDir).filter((name) => name.includes("educacional") || name.includes("tipo_unidade") || name.includes("login_contexto_organizacional") || name.includes("prestacao_contas_profissional") || name.includes("gestao_parcerias_instrumentos") || name.includes("harden_gestao_parcerias") || name.includes("vinculo_termo_fomento_parceria")).sort()
+    const migrations = existsSync(migrationsDir)
+    ? readdirSync(migrationsDir).filter((name) => name.includes("educacional") || name.includes("tipo_unidade") || name.includes("login_contexto_organizacional") || name.includes("prestacao_contas_profissional") || name.includes("gestao_parcerias_instrumentos") || name.includes("harden_gestao_parcerias") || name.includes("vinculo_termo_fomento_parceria") || name.includes("portal_inscricoes")).sort()
     : [];
 
   if (migrations.length === 0) {

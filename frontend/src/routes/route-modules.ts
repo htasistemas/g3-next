@@ -228,6 +228,18 @@ const routeModules: RouteModuleDefinition[] = [
     loader: () => import("@/pages/portais/portal-externo-page")
   },
   {
+    path: "/inscricoes/:slug",
+    loader: () => import("@/pages/portal-inscricoes/portal-inscricoes-page")
+  },
+  {
+    path: "/inscricoes",
+    loader: () => import("@/pages/portal-inscricoes/portal-inscricoes-page")
+  },
+  {
+    path: "/atendimentos/pre-inscricoes",
+    loader: () => import("@/pages/portal-inscricoes/pre-inscricoes-page")
+  },
+  {
     path: "/portal-beneficiario-familia",
     loader: () => import("@/pages/portais/portal-externo-page")
   },

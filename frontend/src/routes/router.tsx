@@ -254,6 +254,9 @@ const CaptacaoRecursosPage = carregarPagina(
 );
 const PortalDoadorPage = carregarPagina("/portal-doador", "PortalDoadorPage");
 const PortalVoluntarioPage = carregarPagina("/portal-voluntario", "PortalVoluntarioPage");
+const PortalInscricoesPage = carregarPagina("/inscricoes/:slug", "PortalInscricoesPage");
+const PortalInscricoesIndexPage = carregarPagina("/inscricoes", "PortalInscricoesPage");
+const PreInscricoesPage = carregarPagina("/atendimentos/pre-inscricoes", "PreInscricoesPage");
 const PortalBeneficiarioFamiliaPage = carregarPagina(
   "/portal-beneficiario-familia",
   "PortalBeneficiarioFamiliaPage"
@@ -303,6 +306,16 @@ export const router = createBrowserRouter([
   {
     path: "/portal-voluntario",
     element: PortalVoluntarioPage,
+    errorElement: <RouteErrorBoundary />
+  },
+  {
+    path: "/inscricoes/:slug",
+    element: PortalInscricoesPage,
+    errorElement: <RouteErrorBoundary />
+  },
+  {
+    path: "/inscricoes",
+    element: PortalInscricoesIndexPage,
     errorElement: <RouteErrorBoundary />
   },
   {
@@ -383,6 +396,7 @@ export const router = createBrowserRouter([
         )
       },
       { path: "/atendimentos/matriculas", element: CadastroMatriculasPage },
+      { path: "/atendimentos/pre-inscricoes", element: <RequirePermission permissions={["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"]}>{PreInscricoesPage}</RequirePermission> },
       { path: "/atendimentos/banco-empregos", element: BancoEmpregosPage },
       { path: "/atendimentos/biblioteca", element: BibliotecaPage },
       { path: "/atendimentos/registro-visitas", element: RegistroVisitasPage },

@@ -1,6 +1,46 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.859",
+                        "releaseDate": "2026-08-20",
+                        "title": "Indicadores ampliados do Portal de inscrições",
+                        "description": "Os indicadores do catálogo foram destacados visualmente e ampliados para facilitar a descoberta das oportunidades.",
+                        "changes": ["Cards com fundo verde claro, bordas e sombreamento.", "Novos indicadores de inscrições abertas e encerradas.", "Grade responsiva com cinco opções de resumo do catálogo."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.858",
+                        "releaseDate": "2026-08-20",
+                        "title": "Experiência moderna no Portal de inscrições",
+                        "description": "Redesenho visual do portal público com navegação mais clara, filtros e indicadores institucionais.",
+                        "changes": ["Hero institucional com identidade visual do tenant.", "Filtros por categoria e disponibilidade de vagas.", "Indicadores de oportunidades, vagas e modalidades.", "Fluxo de pré-inscrição com visual guiado e responsivo."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.857",
+                        "releaseDate": "2026-08-20",
+                        "title": "Sincronização do catálogo público",
+                        "description": "O Portal de inscrições passou a exibir todos os cards ativos publicados no Catálogo e vagas, inclusive oportunidades esgotadas.",
+                        "changes": ["Publicação externa sincronizada para os seis cards ativos da ADRA Uberlândia.", "Oportunidades encerradas permanecem visíveis com seu status real.", "API pública validada com seis oportunidades."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.856",
+                        "releaseDate": "2026-08-20",
+                        "title": "Identidade visual do portal de inscrições",
+                        "description": "O portal público passou a respeitar a cor configurada por instituição e a reutilizar o card do catálogo de cursos e vagas.",
+                        "changes": ["Cor institucional aplicada ao cabeçalho, destaques, botões e indicadores.", "Card público alinhado ao card da aba Catálogo e vagas.", "Contadores públicos de vagas, inscritos e fila carregados do backend."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.855",
+                        "releaseDate": "2026-08-20",
+                        "title": "Portal público de inscrições",
+                        "description": "Fluxo multi-tenant de publicação, pré-inscrição, análise e conversão para matrícula.",
+                        "changes": ["Portal público por slug da instituição.", "Pré-inscrição com protocolo, aceite LGPD e consulta segura.", "Área interna para análise, lista de espera e aprovação transacional.", "Migration incremental sem apagar dados existentes."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.834",
                         "releaseDate": "2026-08-15",
                         "title": "APIs de relatórios de parcerias",

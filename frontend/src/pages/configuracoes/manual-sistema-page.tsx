@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   BookOpenText,
+  ClipboardCheck,
   Brain,
   CheckCircle2,
   GraduationCap,
@@ -1618,6 +1619,29 @@ const secoesManual: ManualSecao[] = [
           "Não use exclusão para corrigir vida acadêmica histórica. Prefira transferência, cancelamento, inativação, resultado final ou novo lançamento com rastreabilidade.",
           "Boletim e histórico dependem da qualidade dos lançamentos anteriores. Se faltam chamada, nota ou resultado, corrija a origem antes de emitir documento oficial.",
           "Dados de outra instituição não devem aparecer no fluxo. Se aparecerem, interrompa o uso e acione o suporte técnico para verificação de tenant."
+        ]
+      }
+    ]
+  },
+  {
+    id: "portal-inscricoes",
+    titulo: "Portal público de inscrições",
+    descricao: "Publicação de oportunidades e análise segura de pré-inscrições externas.",
+    icon: ClipboardCheck,
+    telas: [
+      {
+        nome: "Pré-inscrições",
+        objetivo: "Receber solicitações externas sem gerar matrícula definitiva automaticamente.",
+        comoUsar: [
+          "Publique a oportunidade em cursos e atendimentos, habilitando inscrição pública, período e vagas.",
+          "Divulgue o link /inscricoes/{slug} ou o QR Code da instituição.",
+          "Analise a solicitação em Pré-inscrições e aprove, solicite complementação, coloque em lista de espera ou não aprove.",
+          "A aprovação cria a matrícula definitiva dentro do módulo existente e reduz a vaga em transação."
+        ],
+        atencoes: [
+          "A pré-inscrição não confirma vaga até a aprovação da equipe.",
+          "O CPF é normalizado e a pessoa não deve ser cadastrada novamente.",
+          "Toda decisão fica registrada no histórico e é isolada por instituição."
         ]
       }
     ]

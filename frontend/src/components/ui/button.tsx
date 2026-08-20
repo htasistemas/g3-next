@@ -14,6 +14,8 @@ const buttonVariants = cva(
           "border-[var(--g3-border)] bg-[var(--g3-card)] text-[var(--g3-foreground)] hover:bg-[var(--g3-primary-soft)]",
         danger:
           "border-transparent bg-[var(--g3-danger)] text-white hover:bg-red-700",
+        destructive:
+          "border-transparent bg-[var(--g3-danger)] text-white hover:bg-red-700",
         secondary:
           "border-[var(--g3-border)] bg-[var(--g3-card-soft)] text-[var(--g3-foreground)] hover:bg-[var(--g3-primary-soft)]",
         ghost:
