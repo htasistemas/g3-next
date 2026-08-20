@@ -149,7 +149,7 @@ export function PortalInscricoesPage() {
 
   return (
     <div className="min-h-screen bg-[#f5f7fa] text-slate-900">
-      <header className="relative overflow-hidden px-5 pb-40 pt-7 text-white" style={{ background: `linear-gradient(135deg, ${corPrincipal}, color-mix(in srgb, ${corPrincipal} 62%, #111827))` }}>
+      <header className="relative overflow-hidden px-5 pb-24 pt-7 text-white" style={{ background: `linear-gradient(135deg, ${corPrincipal}, color-mix(in srgb, ${corPrincipal} 62%, #111827))` }}>
         <div className="pointer-events-none absolute -right-24 -top-32 h-96 w-96 rounded-full border-[32px] border-white/10" />
         <div className="pointer-events-none absolute bottom-[-170px] left-[42%] h-80 w-80 rounded-full bg-white/10 blur-3xl" />
         <div className="relative mx-auto max-w-6xl">

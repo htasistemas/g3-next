@@ -1,6 +1,14 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.862",
+                        "releaseDate": "2026-08-20",
+                        "title": "Sincronização do catálogo em produção",
+                        "description": "Cursos ativos da ADRA foram sincronizados com o Portal Público e a identidade visual institucional foi aplicada.",
+                        "changes": ["Publicação dos registros ativos do catálogo da ADRA.", "Cor verde institucional aplicada quando ausente.", "Altura da tarja principal reduzida para melhorar o fluxo visual."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.861",
                         "releaseDate": "2026-08-20",
                         "title": "Migration do Portal de inscrições no deploy legado",
