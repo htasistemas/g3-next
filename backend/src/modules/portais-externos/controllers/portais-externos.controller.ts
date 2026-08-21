@@ -20,7 +20,9 @@ export class PortaisExternosController {
     const logo = await service.obterLogoInstituicao(request.params.slug);
     if ("url" in logo) return response.redirect(logo.url);
     response.setHeader("Content-Type", logo.mimeType);
-    response.setHeader("Cache-Control", "public, max-age=3600");
+    response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    response.setHeader("Pragma", "no-cache");
+    response.setHeader("Expires", "0");
     return logo.stream.pipe(response);
   }
 }

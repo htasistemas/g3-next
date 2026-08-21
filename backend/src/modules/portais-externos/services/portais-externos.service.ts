@@ -291,15 +291,18 @@ export class PortaisExternosService {
     const slug = normalizarTexto(rawSlug).toLowerCase();
     const rows = await prisma.$queryRaw<Array<{ logo_url: string | null; tenant_id: string }>>`
       SELECT i.tenant_id::text, COALESCE(
-        i.logo_url,
         (
-          SELECT COALESCE(im.logomarca_relatorio, im.logomarca)
+          SELECT COALESCE(
+            NULLIF(TRIM(im.logomarca), ''),
+            NULLIF(TRIM(im.logomarca_relatorio), '')
+          )
           FROM unidade_assistencial ua
           LEFT JOIN imagens_unidade im ON im.unidade_id = ua.id
           WHERE ua.tenant_id = i.tenant_id
           ORDER BY ua.unidade_principal DESC NULLS LAST, ua.id
           LIMIT 1
-        )
+        ),
+        NULLIF(TRIM(i.logo_url), '')
       ) AS logo_url
       FROM instituicoes i
       WHERE LOWER(i.slug) = ${slug}

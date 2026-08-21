@@ -10,6 +10,7 @@ import {
   CalendarClock,
   Check,
   ClipboardList,
+  ClipboardPenLine,
   Copy,
   Mail,
   MessageCircle,
@@ -77,16 +78,18 @@ import type {
   MatriculaProfissionalCatalogo,
   MatriculaSalaCatalogo
 } from "@/types/matricula";
+import { PreInscricoesPage } from "@/pages/portal-inscricoes/pre-inscricoes-page";
 
 const abas = [
   { id: "listagem", label: "Listagem de inscrições", icon: Search },
   { id: "dados", label: "Dados da inscrição", icon: BookOpenCheck },
   { id: "catalogo", label: "Catálogo e vagas", icon: CalendarClock },
   { id: "inscricoes", label: "Inscrições e lista de espera", icon: UserPlus },
+  { id: "pre-inscricoes", label: "Pré-inscrições", icon: ClipboardPenLine },
   { id: "presenca", label: "Confirmar presença", icon: Users }
 ] as const;
 
-type AbaId = "listagem" | "dados" | "catalogo" | "inscricoes" | "presenca";
+type AbaId = "listagem" | "dados" | "catalogo" | "inscricoes" | "pre-inscricoes" | "presenca";
 
 type AcaoCrud = {
   label: string;
@@ -513,7 +516,7 @@ export function CadastroMatriculasPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { usuario } = useAuth();
-  const abaInicial = searchParams.get("aba") === "dados" ? "dados" : "listagem";
+  const abaInicial = searchParams.get("aba") === "dados" ? "dados" : searchParams.get("aba") === "pre-inscricoes" ? "pre-inscricoes" : "listagem";
   const [abaAtiva, setAbaAtiva] = useState<AbaId>(abaInicial);
   const [idSelecionado, setIdSelecionado] = useState<string>();
   const [snapshot, setSnapshot] = useState<MatriculaFormValues | null>(null);
@@ -2668,6 +2671,7 @@ export function CadastroMatriculasPage() {
       { label: "Excluir inscrição", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento || !possuiMatriculaSelecionada },
       { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
     ],
+    "pre-inscricoes": [],
     presenca: [
       { label: "Nova inscrição", icon: Plus, onClick: novo, variant: "default", disabled: acaoEmAndamento },
       {
@@ -2762,6 +2766,8 @@ export function CadastroMatriculasPage() {
             </CardHeader>
 
             <CardContent className="space-y-4 p-3">
+              {abaAtiva === "pre-inscricoes" && <PreInscricoesPage embutida />}
+
               {abaAtiva === "listagem" && (
                 <div className="space-y-3">
                   <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">

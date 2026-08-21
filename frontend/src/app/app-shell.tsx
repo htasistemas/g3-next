@@ -276,13 +276,6 @@ const menuSectionsBase: MenuSection[] = [
         icon: GraduationCap
       },
       {
-        id: "atendimentos-pre-inscricoes",
-        to: "/atendimentos/pre-inscricoes",
-        label: "Pré-inscrições",
-        icon: ClipboardPenLine,
-        requiredPermissions: ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"]
-      },
-      {
         id: "atendimentos-banco-empregos",
         to: "/atendimentos/banco-empregos",
         label: "Banco de empregos",
