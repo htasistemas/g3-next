@@ -1635,6 +1635,7 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "Publique a oportunidade em cursos e atendimentos, habilitando inscrição pública, período e vagas.",
           "Divulgue o link /inscricoes/{slug} ou o QR Code da instituição.",
+          "O cabeçalho público mostra o primeiro nome institucional válido entre razão social, nome fantasia e unidade assistencial vinculada; mantenha ao menos um desses campos preenchido para a identificação aparecer.",
           "Analise a solicitação em Pré-inscrições e aprove, solicite complementação, coloque em lista de espera ou não aprove.",
           "A aprovação cria a matrícula definitiva dentro do módulo existente e reduz a vaga em transação."
         ],

@@ -1,9 +1,9 @@
 {
-  "latestVersion": "1.00.862",
-  "releaseDate": "2026-08-20",
-  "description": "Portal de inscrições sincronizado com catálogo, cursos publicados e identidade visual da instituição.",
+  "latestVersion": "1.00.863",
+  "releaseDate": "2026-08-21",
+  "description": "Correção da identificação institucional no cabeçalho do Portal público de inscrições.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.862",
+  "minCompatibleVersion": "1.00.863",
   "releaseType": "stable"
 }

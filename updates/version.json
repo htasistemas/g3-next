@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.855",
-  "releaseDate": "2026-08-18",
-  "description": "Gestão de perfis de acesso com matriz de permissões tenant-scoped e autorização backend.",
+  "latestVersion": "1.00.863",
+  "releaseDate": "2026-08-21",
+  "description": "Correção da identificação institucional no cabeçalho do Portal público de inscrições.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.855",
+  "minCompatibleVersion": "1.00.863",
   "releaseType": "stable",
   "downloadUrl": null
 }

@@ -26,10 +26,10 @@ const mapOpportunity = (r: any) => ({
 
 export class PortalInscricoesService {
   async listarInstituicoes() {
-    return prisma.$queryRaw<Array<{ slug: string; nome: string }>>(Prisma.sql`SELECT slug, COALESCE(nome_fantasia, razao_social) AS nome FROM instituicoes WHERE status = 'ativo' ORDER BY COALESCE(nome_fantasia, razao_social)`);
+    return prisma.$queryRaw<Array<{ slug: string; nome: string }>>(Prisma.sql`SELECT slug, COALESCE(NULLIF(BTRIM(razao_social), ''), NULLIF(BTRIM(nome_fantasia), ''), 'Instituição') AS nome FROM instituicoes WHERE status = 'ativo' ORDER BY COALESCE(NULLIF(BTRIM(razao_social), ''), NULLIF(BTRIM(nome_fantasia), ''), 'Instituição')`);
   }
   private async tenant(slug?: string, tenantId?: string) {
-    const rows = await prisma.$queryRaw<any[]>(Prisma.sql`SELECT id::text, tenant_id::text, COALESCE(nome_fantasia, razao_social) nome, razao_social, slug, email, telefone, endereco, logo_url, cor_tema FROM instituicoes WHERE status = 'ativo' AND (${slug ? Prisma.sql`LOWER(slug) = ${slug.toLowerCase()}` : Prisma.sql`tenant_id::text = ${tenantId ?? ""}`}) LIMIT 1`);
+    const rows = await prisma.$queryRaw<any[]>(Prisma.sql`SELECT i.id::text, i.tenant_id::text, COALESCE(NULLIF(BTRIM(i.razao_social), ''), NULLIF(BTRIM(i.nome_fantasia), ''), NULLIF(BTRIM(u.nome_fantasia), ''), 'Instituição') AS titulo_publico, NULLIF(BTRIM(i.razao_social), '') AS razao_social, i.slug, i.email, i.telefone, i.endereco, i.logo_url, i.cor_tema FROM instituicoes i LEFT JOIN LATERAL (SELECT nome_fantasia FROM unidade_assistencial WHERE tenant_id = i.tenant_id AND NULLIF(BTRIM(nome_fantasia), '') IS NOT NULL ORDER BY id LIMIT 1) u ON TRUE WHERE i.status = 'ativo' AND (${slug ? Prisma.sql`LOWER(i.slug) = ${slug.toLowerCase()}` : Prisma.sql`i.tenant_id::text = ${tenantId ?? ""}`}) LIMIT 1`);
     if (!rows[0]) throw new AppError("Instituição não encontrada ou indisponível.", 404); return rows[0];
   }
   private async opportunity(id: string, tenantId: string) {
@@ -39,7 +39,7 @@ export class PortalInscricoesService {
   async listar(slug?: string, tenantId?: string, busca?: string) {
     const t = await this.tenant(slug, tenantId);
     const q = text(busca); const rows = await prisma.$queryRaw<any[]>(Prisma.sql`SELECT c.*, u.nome_fantasia unidade_nome, COALESCE((SELECT COUNT(*) FROM cursos_atendimentos_matriculas m WHERE m.curso_id = c.id AND m.tenant_id = c.tenant_id AND UPPER(COALESCE(m.status,'')) = 'ATIVA'), 0)::int total_inscritos, COALESCE((SELECT COUNT(*) FROM cursos_atendimentos_fila_espera f WHERE f.curso_id = c.id AND f.tenant_id = c.tenant_id), 0)::int total_fila FROM cursos_atendimentos c LEFT JOIN unidade_assistencial u ON u.id = c.unidade_id AND u.tenant_id = c.tenant_id WHERE c.tenant_id::text = ${t.tenant_id} AND c.inscricao_publica = TRUE AND (${q} = '' OR c.nome ILIKE ${`%${q}%`} OR COALESCE(c.descricao_publica,c.descricao,'') ILIKE ${`%${q}%`}) ORDER BY c.inscricao_encerramento NULLS LAST, c.nome LIMIT 100`);
-    return { instituicao: { nome: t.nome, razaoSocial: t.razao_social, slug: t.slug, email: t.email, telefone: t.telefone, endereco: t.endereco, logoUrl: t.logo_url, corPrincipal: t.cor_tema }, oportunidades: rows.map(mapOpportunity) };
+    return { instituicao: { nome: t.titulo_publico, razaoSocial: t.razao_social || t.titulo_publico, slug: t.slug, email: t.email, telefone: t.telefone, endereco: t.endereco, logoUrl: t.logo_url, corPrincipal: t.cor_tema }, oportunidades: rows.map(mapOpportunity) };
   }
   async detalhes(id: string, slug?: string, tenantId?: string) { const t = await this.tenant(slug, tenantId); return mapOpportunity(await this.opportunity(id, t.tenant_id)); }
   async obterImagemOportunidade(id: string, slug: string) { const t = await this.tenant(slug); const rows = await prisma.$queryRaw<Array<{ imagem: string | null }>>(Prisma.sql`SELECT imagem FROM cursos_atendimentos WHERE id=${id}::bigint AND tenant_id::text=${t.tenant_id} AND inscricao_publica=TRUE LIMIT 1`); const caminho = rows[0]?.imagem?.trim(); if (!caminho || /(^|[-_/])logo([_.-]|$)/i.test(caminho)) throw new AppError("Imagem do curso não cadastrada.", 404); try { return await storageService.obterConteudoPorCaminhoBruto(caminho); } catch { return storageService.obterConteudoPorCaminhoBruto(`tenants/${t.tenant_id}/${caminho}`); } }

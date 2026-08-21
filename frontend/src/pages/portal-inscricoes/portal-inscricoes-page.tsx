@@ -152,7 +152,7 @@ export function PortalInscricoesPage() {
         <div className="pointer-events-none absolute -right-24 -top-32 h-96 w-96 rounded-full border-[32px] border-white/10" />
         <div className="pointer-events-none absolute bottom-[-170px] left-[42%] h-80 w-80 rounded-full bg-white/10 blur-3xl" />
         <div className="relative mx-auto max-w-6xl">
-          <div className="flex flex-row items-center justify-center gap-4 text-left"><PortalLogo slug={slug} /><div><h1 className="max-w-xl text-xl font-black leading-tight tracking-tight">{data?.instituicao?.razaoSocial || data?.instituicao?.nome || "Instituição"}</h1></div></div>
+          <div className="flex flex-row items-center justify-center gap-4 text-left"><PortalLogo slug={slug} /><div><h1 className="max-w-xl text-xl font-black leading-tight tracking-tight">{data?.instituicao?.nome || data?.instituicao?.razaoSocial || "Instituição"}</h1></div></div>
           <div className="mx-auto mt-4 max-w-4xl text-center"><h2 className="text-4xl font-black leading-[1.05] tracking-tight md:text-6xl">Encontre uma oportunidade para você.</h2><p className="mx-auto mt-2 max-w-xl text-base text-white/80 md:text-lg">Faça sua pré-inscrição de forma rápida, segura e sem complicação.</p></div>
         </div>
       </header>

@@ -1,6 +1,14 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.863",
+                        "releaseDate": "2026-08-21",
+                        "title": "Identificação institucional no Portal de inscrições",
+                        "description": "O cabeçalho público passou a usar um fallback consistente para exibir o nome institucional também quando a base de produção possui campos vazios ou diferentes da base de teste.",
+                        "changes": ["Razão social, nome fantasia e unidade assistencial passaram a ter fallback ordenado.", "Manual do sistema atualizado."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.855",
                         "releaseDate": "2026-08-18",
                         "title": "Gestão de perfis de acesso",
