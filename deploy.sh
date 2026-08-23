@@ -185,6 +185,11 @@ if ! docker compose -f "$APP_COMPOSE" run --rm --no-deps g3n-backend npx prisma 
     docker compose -f "$APP_COMPOSE" run --rm --no-deps g3n-backend npx prisma db execute --schema prisma/schema.prisma --file "prisma/migrations/$migration/migration.sql"
   done
 fi
+
+# `docker compose run` pode deixar um container temporário com o mesmo nome
+# definido por `container_name` no compose. Remova somente esse container
+# descartável antes de recriar o serviço definitivo; os volumes permanecem.
+remove_runtime_container g3n-backend
 docker compose -f "$APP_COMPOSE" build --no-cache g3n-frontend
 docker compose -f "$APP_COMPOSE" up -d --remove-orphans --force-recreate g3n-backend
 

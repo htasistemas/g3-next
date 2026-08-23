@@ -1,6 +1,14 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.868",
+                        "releaseDate": "2026-08-23",
+                        "title": "Correção do deploy do backend",
+                        "description": "O deploy passou a reconciliar o container temporário criado durante as migrações antes de recriar o serviço definitivo do backend.",
+                        "changes": ["Corrigida a colisão de nome do container g3n-backend durante a atualização da aplicação.", "Volumes e dados persistentes continuam preservados."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.867",
                         "releaseDate": "2026-08-23",
                         "title": "Alertas e prioridade na lista de documentos",

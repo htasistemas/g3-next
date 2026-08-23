@@ -1,9 +1,9 @@
 {
-  "latestVersion": "1.00.867",
+  "latestVersion": "1.00.868",
   "releaseDate": "2026-08-23",
-  "description": "Alerta de documentos vencidos no topo e ordenação prioritária da listagem.",
+  "description": "Correção da recriação do container do backend no deploy.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.867",
+  "minCompatibleVersion": "1.00.868",
   "releaseType": "stable"
 }
