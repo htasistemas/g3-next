@@ -16,11 +16,13 @@ import { useResumoLembretesDiarios } from "@/features/lembretes-diarios/use-lemb
 import { registroPontoService } from "@/services/registro-ponto.service";
 import { datasComemorativasService } from "@/services/datas-comemorativas.service";
 import { useResumoTarefasAdministrativas } from "@/features/tarefas-administrativas/use-tarefas-administrativas";
+import { useDocumentosInstituicao } from "@/features/documentos-instituicao/use-documentos-instituicao";
 import { useUnidadeAssistencialAtual } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
 import type { DataComemorativaPopupPayload } from "@/types/datas-comemorativas";
 import type { RegistroPontoAlertaPendente } from "@/types/registro-ponto";
 import {
   AlarmClockCheck,
+  AlertTriangle,
   BadgeDollarSign,
   BookOpenText,
   BriefcaseBusiness,
@@ -854,6 +856,7 @@ export function AppShell() {
     enabled: carregarResumoInicial && typeof usuarioId === "number"
   });
   const { data: tarefasResumoData } = useResumoTarefasAdministrativas({ enabled: carregarResumoInicial });
+  const { data: documentosInstituicaoData } = useDocumentosInstituicao();
   const location = useLocation();
   const navigate = useNavigate();
   const titulo = obterTitulo(location.pathname);
@@ -900,6 +903,7 @@ export function AppShell() {
   const totalTarefasEmAtraso = tarefasResumoData?.totalEmAtraso ?? 0;
   const tarefaAlertaVisivel = totalTarefasPendentes > 0;
   const tarefaPisca = totalTarefasEmAtraso > 0;
+  const totalDocumentosVencidos = documentosInstituicaoData?.filter((item) => item.situacao === "vencido").length ?? 0;
   const possuiPermissao = useMemo(
     () =>
       (permissoesNecessarias?: string[]) => {
@@ -1160,6 +1164,10 @@ export function AppShell() {
 
   function abrirTarefas() {
     navigate("/setor-administrativo/tarefas-pendencias?tab=listagem");
+  }
+
+  function abrirDocumentosVencidos() {
+    navigate("/setor-administrativo/gestao-documentos?aba=lista");
   }
 
   function confirmarPopupPontoPendente() {
@@ -1447,6 +1455,21 @@ export function AppShell() {
                         {totalTarefasPendentes}
                       </span>
                     )}
+                  </button>
+                )}
+                {totalDocumentosVencidos > 0 && (
+                  <button
+                    type="button"
+                    className="inline-flex animate-pulse items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-semibold uppercase text-red-700"
+                    onClick={abrirDocumentosVencidos}
+                    aria-label="Abrir documentos vencidos"
+                    title="Há documentos da instituição vencidos"
+                  >
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Documentos vencidos
+                    <span className="ml-1 rounded-full bg-red-600 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                      {totalDocumentosVencidos}
+                    </span>
                   </button>
                 )}
                 <span className="rounded-full bg-[var(--g3-primary-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--g3-active)]">

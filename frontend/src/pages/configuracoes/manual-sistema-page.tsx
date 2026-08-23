@@ -547,13 +547,15 @@ const secoesManual: ManualSecao[] = [
           "Quando um documento vencido for renovado, atualize a validade e salve o cadastro. A nova data passa a ser considerada exatamente pelo dia informado.",
           "Use o botão Visualizar documento no topo da aba Cadastro e edição para abrir o arquivo principal do cadastro ativo em um clique.",
           "Use a seção Arquivos do documento para anexar um ou mais arquivos, substituir, visualizar, imprimir ou excluir cada arquivo em um clique.",
+          "Na lista de documentos, os registros são apresentados por prioridade: vencidos, vencendo em breve, em renovação, válidos e sem vencimento.",
           "Após cada alteração relevante, consulte o histórico do documento para acompanhar registros de cadastro, envio, troca e remoção de anexo."
         ],
         atencoes: [
           "O sistema aceita anexos PDF, JPG e PNG e grava apenas o caminho do arquivo no cadastro do documento, dentro da pasta do tenant autenticado.",
           "A renovação de documento vencido agora respeita corretamente a data de validade informada, inclusive quando a nova validade for o dia atual.",
-          "Os arquivos podem ser selecionados antes do primeiro salvamento e são enviados automaticamente quando você clicar em Salvar, sem exigir um segundo ciclo de gravação.",
-          "A tela mantém a fila de arquivos pendentes visível até a conclusão do envio e exibe a barra de progresso enquanto o documento e os anexos estão sendo enviados.",
+          "Em um documento já salvo, os arquivos selecionados começam a ser enviados imediatamente e exibem uma barra de progresso; depois da conclusão, clique em Salvar para concluir as demais alterações do documento.",
+          "Em um cadastro novo, os arquivos ficam na fila até que o documento seja salvo pela primeira vez; a tela mantém a fila visível e informa quando ainda há anexos aguardando envio.",
+          "Quando houver documentos vencidos, o topo do sistema exibe o botão Documentos vencidos com a quantidade encontrada; clique nele para abrir diretamente a lista de documentos.",
           "Se o documento já estiver salvo, o anexo permanece disponível para substituição e exclusão sem duplicar arquivo no banco.",
           "A listagem de documentos mostra um clip quando há anexo cadastrado e orienta o usuário quando ainda não existe arquivo vinculado.",
           "A tela Documentos da instituição agora lista, cadastra, atualiza e exclui documentos, anexos, arquivos e histórico sempre dentro do tenant autenticado, impedindo mistura de documentos entre instituições.",

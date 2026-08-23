@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.864",
+  "latestVersion": "1.00.867",
   "releaseDate": "2026-08-23",
-  "description": "Aprimoramentos no Portal público de inscrições e na inicialização do backend.",
+  "description": "Alerta de documentos vencidos no topo e ordenação prioritária da listagem.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.864",
+  "minCompatibleVersion": "1.00.867",
   "releaseType": "stable",
   "downloadUrl": null
 }

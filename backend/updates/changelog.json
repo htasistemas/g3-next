@@ -1,6 +1,30 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.867",
+                        "releaseDate": "2026-08-23",
+                        "title": "Alertas e prioridade na lista de documentos",
+                        "description": "O topo do sistema passa a indicar documentos institucionais vencidos e a listagem organiza os registros por prioridade de situação.",
+                        "changes": ["Incluído botão de alerta com a quantidade de documentos vencidos e atalho para a lista de documentos.", "A listagem passou a ordenar vencidos, vencendo em breve, em renovação, válidos e sem vencimento.", "Manual do sistema atualizado."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.866",
+                        "releaseDate": "2026-08-23",
+                        "title": "Preenchimento do tipo de documento na edição",
+                        "description": "Ao selecionar um documento na lista, o cadastro de edição passa a carregar corretamente o tipo de documento já salvo.",
+                        "changes": ["Normalizada a correspondência entre o valor salvo e as opções do campo Tipo de documento.", "Mantida a compatibilidade com tipos personalizados e registros antigos."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.865",
+                        "releaseDate": "2026-08-23",
+                        "title": "Upload imediato de anexos institucionais",
+                        "description": "A tela de Documentos da instituição passou a iniciar o envio de anexos assim que o arquivo é selecionado, com acompanhamento visual do progresso.",
+                        "changes": ["Anexos de documentos já salvos são enviados antes da gravação das demais alterações.", "A barra de progresso identifica o arquivo e bloqueia o botão Salvar durante o envio.", "Falhas de upload agora exibem a mensagem retornada pelo backend.", "Manual do sistema atualizado."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.864",
                         "releaseDate": "2026-08-23",
                         "title": "Aprimoramentos no Portal de inscrições",

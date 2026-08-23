@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
   Bell,
@@ -167,6 +167,12 @@ function mesclarOpcaoAtual(opcoes: readonly string[], valorAtual?: string | null
   return [valor, ...opcoes];
 }
 
+function normalizarOpcaoSelecionada(opcoes: readonly string[], valorAtual?: string | null) {
+  const valor = String(valorAtual ?? "").trim();
+  if (!valor) return "";
+  return opcoes.find((opcao) => opcao.toLowerCase() === valor.toLowerCase()) ?? valor;
+}
+
 function ehArquivoPermitido(file: File) {
   return file.size > 0;
 }
@@ -214,6 +220,23 @@ function obterClasseSeloSituacao(situacao?: string | null) {
   return "bg-slate-100 text-slate-700";
 }
 
+function obterPrioridadeListagemDocumento(situacao?: string | null) {
+  switch (situacao) {
+    case "vencido":
+      return 0;
+    case "vence_em_breve":
+      return 1;
+    case "em_renovacao":
+      return 2;
+    case "valido":
+      return 3;
+    case "sem_vencimento":
+      return 4;
+    default:
+      return 5;
+  }
+}
+
 function IconeSituacaoDocumento({ situacao }: { situacao?: string | null }) {
   if (situacao === "vencido") {
     return <AlertTriangle className="h-4 w-4" />;
@@ -229,9 +252,13 @@ function IconeSituacaoDocumento({ situacao }: { situacao?: string | null }) {
 
 export function GestaoDocumentosPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { usuario } = useAuth();
   const responsavelLogado = useMemo(() => obterNomeUsuarioLogado(usuario), [usuario]);
-  const [abaAtiva, setAbaAtiva] = useState<AbaId>("lista");
+  const [abaAtiva, setAbaAtiva] = useState<AbaId>(() => {
+    const aba = searchParams.get("aba");
+    return abas.some((item) => item.id === aba) ? (aba as AbaId) : "lista";
+  });
   const [busca, setBusca] = useState("");
   const [form, setForm] = useState<FormState>(() => criarFormularioPadrao(responsavelLogado));
   const [snapshot, setSnapshot] = useState<FormState>(() => criarFormularioPadrao(responsavelLogado));
@@ -270,14 +297,27 @@ export function GestaoDocumentosPage() {
 
   const documentosFiltrados = useMemo(() => {
     const termo = busca.trim().toLowerCase();
-    if (!termo) return documentos;
     return [...documentos]
       .filter((item) => {
+        if (!termo) return true;
         const alvo = `${item.tipoDocumento} ${item.orgaoEmissor} ${item.categoria ?? ""} ${item.situacao ?? ""}`;
         return alvo.toLowerCase().includes(termo);
       })
-      .sort((a, b) => a.tipoDocumento.localeCompare(b.tipoDocumento, "pt-BR"));
+      .sort((a, b) => {
+        const prioridade = obterPrioridadeListagemDocumento(a.situacao) - obterPrioridadeListagemDocumento(b.situacao);
+        if (prioridade !== 0) return prioridade;
+        const validade = String(a.validade ?? "").localeCompare(String(b.validade ?? ""));
+        if (validade !== 0) return validade;
+        return a.tipoDocumento.localeCompare(b.tipoDocumento, "pt-BR");
+      });
   }, [busca, documentos]);
+
+  useEffect(() => {
+    const aba = searchParams.get("aba");
+    if (abas.some((item) => item.id === aba)) {
+      setAbaAtiva(aba as AbaId);
+    }
+  }, [searchParams]);
 
   const alertas = useMemo(() => {
     const hoje = new Date();
@@ -356,7 +396,8 @@ export function GestaoDocumentosPage() {
     anexoMutation.isPending ||
     substituirAnexoMutation.isPending ||
     excluirAnexoMutation.isPending ||
-    historicoMutation.isPending;
+    historicoMutation.isPending ||
+    uploadFileProgress !== null;
 
   const linksSugeridosParaTipo = useMemo(() => {
     const tipo = form.tipoDocumento.trim().toLowerCase();
@@ -382,10 +423,10 @@ export function GestaoDocumentosPage() {
   function selecionar(item: DocumentoInstituicao) {
     const proximo: FormState = {
       id: item.id,
-      tipoDocumento: item.tipoDocumento,
+      tipoDocumento: normalizarOpcaoSelecionada(tiposDocumentoTerceiroSetor, item.tipoDocumento),
       orgaoEmissor: item.orgaoEmissor,
       descricao: item.descricao ?? "",
-      categoria: item.categoria ?? "",
+      categoria: normalizarOpcaoSelecionada(categoriasDocumentoInstitucional, item.categoria),
       emissao: item.emissao ?? "",
       validade: item.validade ?? "",
       responsavelInterno: responsavelLogado || item.responsavelInterno || "",
@@ -545,7 +586,69 @@ export function GestaoDocumentosPage() {
       return;
     }
 
+    if (form.id) {
+      void enviarArquivosImediatamente(files, form.id);
+      return;
+    }
+
     setAnexosPendentes((atuais) => [...atuais, ...files]);
+    setPopupMensagem({
+      tipo: "aviso",
+      titulo: "Atenção",
+      texto: "O cadastro ainda não foi salvo. O arquivo ficará aguardando até o documento ser salvo."
+    });
+  }
+
+  async function enviarArquivosImediatamente(files: File[], documentoId: string) {
+    const anexosEnviados: DocumentoInstituicaoAnexo[] = [];
+
+    try {
+      for (const [indice, file] of files.entries()) {
+        setUploadFileProgressNome(files.length > 1 ? `${file.name} (${indice + 1}/${files.length})` : file.name);
+        setUploadFileProgress(0);
+
+        const payload = await montarPayloadAnexoDocumentoInstituicao({
+          arquivo: file,
+          usuario: responsavelLogado || "Usuário"
+        });
+
+        const anexo = await anexoMutation.mutateAsync({
+          id: documentoId,
+          payload,
+          onUploadProgress: (event) => {
+            const total = event.total ?? 0;
+            const progressoArquivo = total > 0 ? Math.round((event.loaded * 100) / total) : 95;
+            const progressoTotal = Math.round(((indice + progressoArquivo / 100) / files.length) * 100);
+            setUploadFileProgress(Math.max(1, Math.min(99, progressoTotal)));
+          }
+        });
+
+        anexosEnviados.push(anexo);
+      }
+
+      setUploadFileProgress(100);
+      setAnexosLocais((atuais) => [...anexosEnviados, ...atuais]);
+      setPopupMensagem({
+        tipo: "sucesso",
+        titulo: "Confirmação",
+        texto:
+          anexosEnviados.length === 1
+            ? "Anexo enviado com sucesso. Agora clique em Salvar para concluir as alterações do documento."
+            : `${anexosEnviados.length} anexos enviados com sucesso. Agora clique em Salvar para concluir as alterações do documento.`
+      });
+    } catch (error: any) {
+      const arquivosNaoEnviados = files.slice(anexosEnviados.length);
+      if (arquivosNaoEnviados.length > 0) {
+        setAnexosPendentes((atuais) => [...arquivosNaoEnviados, ...atuais]);
+      }
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Erro no envio",
+        texto: error?.response?.data?.message ?? "Não foi possível enviar o anexo. Tente novamente."
+      });
+    } finally {
+      limparUploadFileProgress();
+    }
   }
 
   async function enviarAnexosPendentes(documentoId: string) {
@@ -1033,7 +1136,7 @@ export function GestaoDocumentosPage() {
             <div className="space-y-1">
               <Label>Tipo de documento *</Label>
               <Select
-                value={form.tipoDocumento}
+                value={form.tipoDocumento ?? ""}
                 onChange={(event) => {
                   const novoTipo = event.target.value;
                   setForm((atual) => ({ ...atual, tipoDocumento: novoTipo }));
