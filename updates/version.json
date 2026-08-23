@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.868",
+  "latestVersion": "1.00.869",
   "releaseDate": "2026-08-23",
-  "description": "Correção da recriação do container do backend no deploy.",
+  "description": "Correção da conclusão do upload de anexos institucionais.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.868",
+  "minCompatibleVersion": "1.00.869",
   "releaseType": "stable",
   "downloadUrl": null
 }

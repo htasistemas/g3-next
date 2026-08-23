@@ -86,14 +86,16 @@ export function useAdicionarAnexoDocumentoInstituicao() {
       payload: DocumentoInstituicaoAnexoPayload;
       onUploadProgress?: (progressEvent: AxiosProgressEvent) => void;
     }) => documentosInstituicaoService.adicionarAnexo(id, payload, { onUploadProgress }),
-    onSuccess: async (_response, vars) => {
-      await queryClient.invalidateQueries({ queryKey: ["documentos-instituicao"] });
-      await queryClient.invalidateQueries({
-        queryKey: ["documentos-instituicao", vars.id, "anexos"]
-      });
-      await queryClient.invalidateQueries({
-        queryKey: ["documentos-instituicao", vars.id, "historico"]
-      });
+    onSuccess: (_response, vars) => {
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["documentos-instituicao"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["documentos-instituicao", vars.id, "anexos"]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["documentos-instituicao", vars.id, "historico"]
+        })
+      ]).catch(() => undefined);
     }
   });
 }
@@ -112,14 +114,16 @@ export function useSubstituirAnexoDocumentoInstituicao() {
       payload: DocumentoInstituicaoAnexoPayload;
       onUploadProgress?: (progressEvent: AxiosProgressEvent) => void;
     }) => documentosInstituicaoService.substituirAnexo(id, anexoId, payload, { onUploadProgress }),
-    onSuccess: async (_response, vars) => {
-      await queryClient.invalidateQueries({ queryKey: ["documentos-instituicao"] });
-      await queryClient.invalidateQueries({
-        queryKey: ["documentos-instituicao", vars.id, "anexos"]
-      });
-      await queryClient.invalidateQueries({
-        queryKey: ["documentos-instituicao", vars.id, "historico"]
-      });
+    onSuccess: (_response, vars) => {
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["documentos-instituicao"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["documentos-instituicao", vars.id, "anexos"]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["documentos-instituicao", vars.id, "historico"]
+        })
+      ]).catch(() => undefined);
     }
   });
 }

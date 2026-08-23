@@ -1,6 +1,14 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.869",
+                        "releaseDate": "2026-08-23",
+                        "title": "Conclusão do upload de anexos",
+                        "description": "O envio de anexos institucionais passa a concluir sem aguardar as consultas de atualização da tela.",
+                        "changes": ["As atualizações da lista, anexos e histórico agora ocorrem em segundo plano após a resposta do upload.", "A barra de progresso é liberada assim que o endpoint confirma o arquivo."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.868",
                         "releaseDate": "2026-08-23",
                         "title": "Correção do deploy do backend",
