@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.869",
+  "latestVersion": "1.00.870",
   "releaseDate": "2026-08-23",
-  "description": "Correção da conclusão do upload de anexos institucionais.",
+  "description": "Correção definitiva do conflito do container durante as migrações do deploy.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.869",
+  "minCompatibleVersion": "1.00.870",
   "releaseType": "stable",
   "downloadUrl": null
 }

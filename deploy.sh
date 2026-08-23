@@ -159,7 +159,12 @@ docker compose -f "$APP_COMPOSE" up -d --remove-orphans g3n-minio
 
 docker compose -f "$APP_COMPOSE" build g3n-backend
 log "Aplicando migrations do PostgreSQL"
-if ! docker compose -f "$APP_COMPOSE" run --rm --no-deps g3n-backend npx prisma migrate deploy; then
+run_backend_task() {
+  local migration_container="g3n-backend-migration-$$_$RANDOM"
+  docker compose -f "$APP_COMPOSE" run --rm --no-deps --name "$migration_container" g3n-backend "$@"
+}
+
+if ! run_backend_task npx prisma migrate deploy; then
   log "Historico Prisma ausente em banco legado; aplicando migrations educacionais idempotentes"
   for migration in \
     20260718_create_educacional_fase1 \
@@ -182,7 +187,7 @@ if ! docker compose -f "$APP_COMPOSE" run --rm --no-deps g3n-backend npx prisma 
     20260815_vinculo_termo_fomento_parceria \
     20260820_create_portal_inscricoes \
     20260820_portal_publicacao_catalogo; do
-    docker compose -f "$APP_COMPOSE" run --rm --no-deps g3n-backend npx prisma db execute --schema prisma/schema.prisma --file "prisma/migrations/$migration/migration.sql"
+    run_backend_task npx prisma db execute --schema prisma/schema.prisma --file "prisma/migrations/$migration/migration.sql"
   done
 fi
 
@@ -190,6 +195,9 @@ fi
 # definido por `container_name` no compose. Remova somente esse container
 # descartável antes de recriar o serviço definitivo; os volumes permanecem.
 remove_runtime_container g3n-backend
+# O container pode ter sido criado fora do projeto Compose atual. A remoção
+# direta evita conflito de nome sem tocar em volumes persistentes.
+docker rm -f g3n-backend >/dev/null 2>&1 || true
 docker compose -f "$APP_COMPOSE" build --no-cache g3n-frontend
 docker compose -f "$APP_COMPOSE" up -d --remove-orphans --force-recreate g3n-backend
 

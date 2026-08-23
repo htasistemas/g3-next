@@ -1,6 +1,14 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.870",
+                        "releaseDate": "2026-08-23",
+                        "title": "Correção do container nas migrações do deploy",
+                        "description": "As migrações do deploy passam a usar containers temporários exclusivos e o serviço do backend é recriado sem conflito de nome.",
+                        "changes": ["Evitada a reserva do nome fixo g3n-backend pelos comandos temporários de migração.", "Adicionada remoção controlada do container antigo antes da recriação do backend, preservando volumes e dados."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.869",
                         "releaseDate": "2026-08-23",
                         "title": "Conclusão do upload de anexos",
