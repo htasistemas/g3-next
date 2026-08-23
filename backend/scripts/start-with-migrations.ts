@@ -2,9 +2,14 @@ import { existsSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { spawnSync, spawn } from "node:child_process";
 import { createConnection } from "node:net";
-import { loadBackendEnvFiles } from "../src/config/env-runtime.js";
+import { loadBackendEnvFiles, normalizeRuntimeEnv } from "../src/config/env-runtime.js";
 
 loadBackendEnvFiles();
+// O Prisma CLI e os processos filhos leem diretamente de process.env. Aplicar
+// aqui a mesma normalização usada pela configuração da API garante que o
+// ambiente de desenvolvimento tenha DATABASE_URL e o segredo padrão antes de
+// executar as migrations.
+Object.assign(process.env, normalizeRuntimeEnv(process.env));
 
 const apiHost = process.env.API_HOST || "0.0.0.0";
 const apiPort = Number(process.env.API_PORT || 3333);

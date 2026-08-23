@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   ArrowRight,
   BadgeCheck,
   CheckCircle2,
   ClipboardCheck,
+  ClipboardList,
+  Loader2,
   MapPin,
   Search,
   ShieldCheck,
@@ -46,6 +48,21 @@ const statusLabel: Record<string, string> = {
 
 const baseApi = String(httpClient.defaults.baseURL ?? "").replace(/\/$/, "");
 
+const acompanhamentoStatus: Record<string, string> = {
+  AGUARDANDO_ANALISE: "Aguardando análise",
+  DOCUMENTACAO_PENDENTE: "Documentação pendente",
+  LISTA_ESPERA: "Lista de espera",
+  APROVADA: "Aprovada",
+  NAO_APROVADA: "Não aprovada",
+  CANCELADA: "Cancelada"
+};
+
+function formatarData(data?: string) {
+  if (!data) return "—";
+  const valor = new Date(data);
+  return Number.isNaN(valor.getTime()) ? "—" : valor.toLocaleDateString("pt-BR");
+}
+
 function imagemOportunidade(slug: string, oportunidade: Opportunity) {
   if (!oportunidade.imagem) return "";
   if (/^(data:|blob:|https?:\/\/)/i.test(oportunidade.imagem)) return oportunidade.imagem;
@@ -76,6 +93,10 @@ export function PortalInscricoesPage() {
   const [etapa, setEtapa] = useState(0);
   const [erro, setErro] = useState("");
   const [protocolo, setProtocolo] = useState("");
+  const [consulta, setConsulta] = useState({ protocolo: "", cpf: "" });
+  const [resultadoConsulta, setResultadoConsulta] = useState<any>();
+  const [consultaErro, setConsultaErro] = useState("");
+  const [consultando, setConsultando] = useState(false);
   const [form, setForm] = useState<any>({ cpf: "", nomeCompleto: "", dataNascimento: "", telefone: "", email: "", termosVersao: "1.0", termosAceitos: false });
 
   useEffect(() => {
@@ -110,6 +131,26 @@ export function PortalInscricoesPage() {
       setEtapa(4);
     } catch (e: any) {
       setErro(e.response?.data?.message || "Não foi possível concluir sua inscrição. Confira os campos destacados e tente novamente.");
+    }
+  };
+
+  const acompanhar = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setConsultaErro("");
+    setResultadoConsulta(undefined);
+    if (!consulta.protocolo.trim() || !consulta.cpf.trim()) {
+      setConsultaErro("Informe o protocolo e o CPF usados na pré-inscrição.");
+      return;
+    }
+
+    setConsultando(true);
+    try {
+      const resultado = await portalInscricoesService.acompanhar(slug, consulta.protocolo, consulta.cpf);
+      setResultadoConsulta(resultado);
+    } catch (e: any) {
+      setConsultaErro(e.response?.data?.message || "Não foi possível consultar a pré-inscrição.");
+    } finally {
+      setConsultando(false);
     }
   };
 
@@ -159,6 +200,22 @@ export function PortalInscricoesPage() {
 
       <div className="relative z-10 mx-auto -mt-1 w-full max-w-6xl px-4">
         <div className="flex w-full flex-col gap-3 md:flex-row md:items-stretch"><div className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl bg-white p-2 text-slate-700 shadow-xl ring-1 ring-slate-200 sm:gap-3"><Search className="ml-2 h-5 w-5 shrink-0 sm:ml-3" style={{ color: corPrincipal }} /><input aria-label="O que você está procurando?" value={busca} onChange={(event) => setBusca(event.target.value)} placeholder="Pesquise por curso, oficina, atendimento ou atividade..." className="min-w-0 flex-1 bg-transparent px-1 py-3 outline-none sm:px-2" /><span className="rounded-xl px-3 py-2 text-xs font-bold text-white sm:px-4" style={{ backgroundColor: corPrincipal }}>Buscar</span></div><div className="flex max-w-full items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm font-medium leading-relaxed text-amber-950 shadow-sm md:max-w-sm">A pré-inscrição não garante a vaga. A efetivação depende da análise e da confirmação da instituição.</div></div>
+        <section className="mt-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5" aria-labelledby="consulta-pre-inscricao">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="flex items-center gap-2 text-sm font-bold" style={{ color: corPrincipal }}><ClipboardList className="h-4 w-4" /> Consulta de pré-inscrição</p>
+              <h2 id="consulta-pre-inscricao" className="mt-1 text-lg font-black">Acompanhe sua solicitação</h2>
+              <p className="mt-1 text-sm text-slate-500">Use o protocolo recebido e o CPF informado no cadastro.</p>
+            </div>
+            <form onSubmit={acompanhar} className="grid w-full gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:max-w-3xl">
+              <input aria-label="Protocolo da pré-inscrição" value={consulta.protocolo} onChange={(event) => setConsulta((atual) => ({ ...atual, protocolo: event.target.value.toUpperCase() }))} placeholder="PRE-2026-000001" className="min-w-0 rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400" />
+              <input aria-label="CPF da pré-inscrição" value={consulta.cpf} onChange={(event) => setConsulta((atual) => ({ ...atual, cpf: event.target.value }))} placeholder="CPF" inputMode="numeric" className="min-w-0 rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400" />
+              <Button type="submit" disabled={consultando} style={{ backgroundColor: corPrincipal }}>{consultando ? <Loader2 className="h-4 w-4 animate-spin" /> : "Consultar"}</Button>
+            </form>
+          </div>
+          {consultaErro && <p role="alert" className="mt-3 text-sm font-medium text-red-600">{consultaErro}</p>}
+          {resultadoConsulta && <div className="mt-4 grid gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm sm:grid-cols-2"><p><b>Protocolo:</b> {resultadoConsulta.protocolo}</p><p><b>Situação:</b> {acompanhamentoStatus[resultadoConsulta.status] || resultadoConsulta.status}</p><p><b>Atividade:</b> {resultadoConsulta.atividade || "—"}</p><p><b>Solicitação:</b> {formatarData(resultadoConsulta.criadoEm)}</p>{resultadoConsulta.atualizadoEm && <p><b>Atualizada em:</b> {formatarData(resultadoConsulta.atualizadoEm)}</p>}</div>}
+        </section>
       </div>
 
       <main className="relative mx-auto mt-6 max-w-6xl px-4 pb-16">

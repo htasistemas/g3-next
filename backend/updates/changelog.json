@@ -1,6 +1,14 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.864",
+                        "releaseDate": "2026-08-23",
+                        "title": "Aprimoramentos no Portal de inscrições",
+                        "description": "Aprimoramentos no fluxo público de inscrições, na identificação institucional e na inicialização do backend.",
+                        "changes": ["Aprimorado o fluxo de pré-inscrições e a experiência do Portal público de inscrições.", "Atualizado o Manual do sistema e a inicialização com migrações.", "A versão oficial do sistema foi atualizada para 1.00.864."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.863",
                         "releaseDate": "2026-08-21",
                         "title": "Identificação institucional no Portal de inscrições",

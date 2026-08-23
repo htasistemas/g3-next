@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarDays, Check, ClipboardList, Clock3, Eye, FileWarning, ListChecks, Loader2, RefreshCw, Search, UserRound, X } from "lucide-react";
+import { CalendarDays, Check, ClipboardList, Clock3, Copy, Eye, ExternalLink, FileWarning, ListChecks, Loader2, RefreshCw, Search, UserRound, X } from "lucide-react";
+import QRCode from "qrcode";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/hooks/use-auth";
 import { portalInscricoesService } from "@/services/portal-inscricoes.service";
 
 const statusLabels: Record<string, string> = {
@@ -26,7 +28,15 @@ function formatarData(valor?: string) {
   return Number.isNaN(data.getTime()) ? "—" : data.toLocaleDateString("pt-BR");
 }
 
+function formatarTelefone(valor?: string) {
+  const digitos = String(valor ?? "").replace(/\D/g, "");
+  if (digitos.length === 11) return `(${digitos.slice(0, 2)}) ${digitos.slice(2, 7)}-${digitos.slice(7)}`;
+  if (digitos.length === 10) return `(${digitos.slice(0, 2)}) ${digitos.slice(2, 6)}-${digitos.slice(6)}`;
+  return valor || "Não informado";
+}
+
 export function PreInscricoesPage({ embutida = false }: { embutida?: boolean }) {
+  const { usuario } = useAuth();
   const [status, setStatus] = useState("");
   const [busca, setBusca] = useState("");
   const [items, setItems] = useState<any[]>([]);
@@ -34,6 +44,38 @@ export function PreInscricoesPage({ embutida = false }: { embutida?: boolean }) 
   const [mensagem, setMensagem] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [processando, setProcessando] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState("");
+  const [linkCopiado, setLinkCopiado] = useState(false);
+  const linkInscricoesExternas = usuario?.instituicao_slug?.trim()
+    ? `/inscricoes/${encodeURIComponent(usuario.instituicao_slug.trim())}`
+    : "/inscricoes";
+  const urlPublicaInscricoes = typeof window === "undefined"
+    ? linkInscricoesExternas
+    : `${window.location.origin}${linkInscricoesExternas}`;
+
+  useEffect(() => {
+    let ativo = true;
+    void QRCode.toDataURL(urlPublicaInscricoes, { margin: 1, width: 180 })
+      .then((url) => {
+        if (ativo) setQrCodeUrl(url);
+      })
+      .catch(() => {
+        if (ativo) setQrCodeUrl("");
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [urlPublicaInscricoes]);
+
+  async function copiarLinkPublico() {
+    try {
+      await navigator.clipboard.writeText(urlPublicaInscricoes);
+      setLinkCopiado(true);
+      window.setTimeout(() => setLinkCopiado(false), 2500);
+    } catch {
+      setMensagem("Não foi possível copiar o link. Copie o endereço exibido manualmente.");
+    }
+  }
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -49,6 +91,19 @@ export function PreInscricoesPage({ embutida = false }: { embutida?: boolean }) 
   }, [status]);
 
   useEffect(() => { void carregar(); }, [carregar]);
+
+  useEffect(() => {
+    const atualizarAoRetornar = () => {
+      if (document.visibilityState === "visible") void carregar();
+    };
+
+    window.addEventListener("focus", atualizarAoRetornar);
+    document.addEventListener("visibilitychange", atualizarAoRetornar);
+    return () => {
+      window.removeEventListener("focus", atualizarAoRetornar);
+      document.removeEventListener("visibilitychange", atualizarAoRetornar);
+    };
+  }, [carregar]);
 
   const abrir = async (id: string) => {
     try {
@@ -89,14 +144,43 @@ export function PreInscricoesPage({ embutida = false }: { embutida?: boolean }) 
 
   return (
     <div className="space-y-6">
-      {!embutida && <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
+      <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--g3-muted)]">Portal público</p>
-          <h1 className="mt-1 text-2xl font-bold text-[var(--g3-foreground)]">Pré-inscrições</h1>
+          {!embutida && <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--g3-muted)]">Portal público</p>}
+          <h1 className={`${embutida ? "text-lg" : "mt-1 text-2xl"} font-bold text-[var(--g3-foreground)]`}>Pré-inscrições</h1>
           <p className="mt-1 text-sm text-[var(--g3-muted)]">Analise e acompanhe as solicitações recebidas pela instituição.</p>
         </div>
-        <Button variant="outline" onClick={() => void carregar()} disabled={carregando}><RefreshCw className={`mr-2 h-4 w-4 ${carregando ? "animate-spin" : ""}`} /> Atualizar</Button>
-      </div>}
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <a href={linkInscricoesExternas} target="_blank" rel="noreferrer">
+              <ExternalLink className="mr-2 h-4 w-4" /> Acessar inscrições externas
+            </a>
+          </Button>
+          <Button variant="outline" onClick={() => void carregar()} disabled={carregando}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${carregando ? "animate-spin" : ""}`} /> Atualizar
+          </Button>
+        </div>
+      </div>
+
+      <Card className="border-[var(--g3-active)]/25 bg-[var(--g3-primary-soft)]/35">
+        <CardContent className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--g3-active)]">Divulgação</p>
+            <h2 className="mt-1 text-base font-semibold text-[var(--g3-foreground)]">Link público para inscrições</h2>
+            <p className="mt-1 text-sm text-[var(--g3-muted)]">Compartilhe este endereço ou o QR Code para receber novas pré-inscrições.</p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <code className="min-w-0 flex-1 break-all rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-2 text-xs text-[var(--g3-foreground)]">{urlPublicaInscricoes}</code>
+              <Button type="button" size="sm" variant="outline" onClick={() => void copiarLinkPublico()}>
+                <Copy className="mr-2 h-4 w-4" /> {linkCopiado ? "Link copiado" : "Copiar link"}
+              </Button>
+            </div>
+          </div>
+          {qrCodeUrl ? <div className="flex shrink-0 flex-col items-center gap-1 self-center rounded-lg bg-white p-2 shadow-sm" title="QR Code das inscrições públicas">
+            <img src={qrCodeUrl} alt="QR Code para acessar as inscrições públicas" className="h-28 w-28" />
+            <span className="text-[10px] font-medium text-slate-500">Aponte a câmera</span>
+          </div> : null}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-3">
         {indicadores.map((item) => <Card key={item.status} className="shadow-sm"><CardContent className="flex items-center gap-3 p-4"><span className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--g3-card-soft)] text-[var(--g3-active)]"><item.icon className="h-5 w-5" /></span><div><p className="text-sm text-[var(--g3-muted)]">{item.label}</p><strong className="text-2xl text-[var(--g3-foreground)]">{items.filter((registro) => registro.status === item.status).length}</strong></div></CardContent></Card>)}
@@ -117,9 +201,9 @@ export function PreInscricoesPage({ embutida = false }: { embutida?: boolean }) 
         <CardHeader><div className="flex items-center justify-between gap-3"><CardTitle>Solicitações recebidas</CardTitle><span className="text-sm text-[var(--g3-muted)]">{filtrados.length} registro(s)</span></div></CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[850px] text-left text-sm">
-              <thead className="border-b border-[var(--g3-border)] bg-[var(--g3-card-soft)] text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]"><tr><th className="px-4 py-3">Protocolo</th><th className="px-4 py-3">Participante</th><th className="px-4 py-3">Atividade</th><th className="px-4 py-3">Solicitação</th><th className="px-4 py-3">Situação</th><th className="px-4 py-3 text-right">Ação</th></tr></thead>
-              <tbody>{carregando ? <tr><td colSpan={6} className="p-10 text-center text-[var(--g3-muted)]"><Loader2 className="mx-auto h-5 w-5 animate-spin" /><p className="mt-2">Carregando pré-inscrições...</p></td></tr> : filtrados.map((item) => <tr key={item.id} onClick={() => void abrir(item.id)} className="cursor-pointer border-b border-[var(--g3-border)] transition hover:bg-[var(--g3-card-soft)]"><td className="px-4 py-3 font-semibold text-[var(--g3-foreground)]">{item.protocolo}</td><td className="px-4 py-3"><div className="font-medium">{item.nome_completo}</div><div className="text-xs text-[var(--g3-muted)]">CPF {mascararCpf(item.cpf)}</div></td><td className="px-4 py-3">{item.atividade || "—"}</td><td className="px-4 py-3">{formatarData(item.criado_em)}</td><td className="px-4 py-3"><span className="inline-flex rounded-full bg-[var(--g3-card-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--g3-foreground)]">{statusLabels[item.status] || item.status}</span></td><td className="px-4 py-3 text-right"><Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); void abrir(item.id); }}><Eye className="mr-2 h-4 w-4" /> Ver</Button></td></tr>)}{!carregando && !filtrados.length && <tr><td colSpan={6} className="p-12 text-center text-[var(--g3-muted)]"><ClipboardList className="mx-auto h-8 w-8 opacity-50" /><p className="mt-2 font-medium">Nenhuma pré-inscrição encontrada.</p><p className="mt-1 text-xs">Ajuste os filtros ou aguarde novas solicitações.</p></td></tr>}</tbody>
+            <table className="w-full min-w-[980px] text-left text-sm">
+              <thead className="border-b border-[var(--g3-border)] bg-[var(--g3-card-soft)] text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]"><tr><th className="px-4 py-3">Protocolo</th><th className="px-4 py-3">Participante</th><th className="px-4 py-3">Telefone</th><th className="px-4 py-3">Atividade</th><th className="px-4 py-3">Solicitação</th><th className="px-4 py-3">Situação</th><th className="px-4 py-3 text-right">Ação</th></tr></thead>
+              <tbody>{carregando ? <tr><td colSpan={7} className="p-10 text-center text-[var(--g3-muted)]"><Loader2 className="mx-auto h-5 w-5 animate-spin" /><p className="mt-2">Carregando pré-inscrições...</p></td></tr> : filtrados.map((item) => <tr key={item.id} onClick={() => void abrir(item.id)} className="cursor-pointer border-b border-[var(--g3-border)] transition hover:bg-[var(--g3-card-soft)]"><td className="px-4 py-3 font-semibold text-[var(--g3-foreground)]">{item.protocolo}</td><td className="px-4 py-3"><div className="font-medium">{item.nome_completo}</div><div className="text-xs text-[var(--g3-muted)]">CPF {mascararCpf(item.cpf)}</div></td><td className="px-4 py-3">{formatarTelefone(item.telefone)}</td><td className="px-4 py-3">{item.atividade || "—"}</td><td className="px-4 py-3">{formatarData(item.criado_em)}</td><td className="px-4 py-3"><span className="inline-flex rounded-full bg-[var(--g3-card-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--g3-foreground)]">{statusLabels[item.status] || item.status}</span></td><td className="px-4 py-3 text-right"><Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); void abrir(item.id); }}><Eye className="mr-2 h-4 w-4" /> Ver</Button></td></tr>)}{!carregando && !filtrados.length && <tr><td colSpan={7} className="p-12 text-center text-[var(--g3-muted)]"><ClipboardList className="mx-auto h-8 w-8 opacity-50" /><p className="mt-2 font-medium">Nenhuma pré-inscrição encontrada.</p><p className="mt-1 text-xs">Ajuste os filtros ou aguarde novas solicitações.</p></td></tr>}</tbody>
             </table>
           </div>
         </CardContent>
