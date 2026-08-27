@@ -1,258 +1,1012 @@
-﻿# AGENTS.md — G3 Next (Migração)
+﻿# AGENTS.md — G3N | Sistema Multiagente Orquestrado
 
-> Este arquivo foi reiniciado para a fase de migração.
-> As regras antigas foram removidas do padrão ativo.
+## 1. Propósito
 
----
+Este `AGENTS.md` estabelece a arquitetura oficial de agentes especializados do sistema G3N.
 
-## Estado Atual
+O sistema de agentes deve funcionar como uma organização técnica coordenada. Nenhum agente deve assumir automaticamente que é responsável por toda solicitação. Toda demanda recebida deve ser inicialmente analisada pelo **Maestro**, que identifica o objetivo, o impacto, os riscos e os especialistas necessários.
 
-- Padrão anterior: desativado para a migração.
-- Padrão atual: mínimo e evolutivo.
-- Objetivo: permitir criação de novas regras sem herdar conflitos legados.
-
----
-
-## Regras Ativas Temporárias
-
-### Idioma
-
-- Frontend (UI): Português Brasil (pt-BR) com acentuação correta.
-- Backend (código e banco): identificadores sem acentos.
-
-### Versionamento e Git
-
-- MUST NOT fazer `commit` ou `push` automaticamente.
-- MUST only executar `commit` ou `push` mediante ordem explícita do usuário.
-- MUST manter alterações locais preparadas e aguardando confirmação quando houver necessidade de versionamento remoto.
-- Quando o usuário solicitar explicitamente `commit` e `push` para produção, MUST promover o commit para a branch `main`, pois o workflow oficial de deploy automático é acionado por push na `main`.
-- Nessa situação, MUST confirmar o hash publicado em `origin/main` e informar que o workflow de deploy foi acionado.
-
-### UX e Interação
-
-- Toda ação deve funcionar com 1 clique.
-- Não aceitar fluxo com clique duplo para executar ação.
-- Exibir feedback visual em ações assíncronas (carregando, sucesso, erro).
-- Toda confirmação de gravação bem-sucedida de cadastro MUST usar o modal padrão com ícone de confirmação azul na cor padrão da unidade, título do cadastro, número do registro quando disponível e botão `Finalizar cadastro`.
-- Telas novas e telas existentes MUST reutilizar o componente `CadastroSucessoModal` para novos cadastros e gravações principais; mensagens simples de sucesso ficam reservadas para atualizações, uploads e demais ações que não criam ou gravam o cadastro principal.
-
-### Menus e Navegação
-
-- MUST NOT remover menus, módulos, itens de menu, rotas de navegação ou entradas já criadas no shell do sistema sem autorização explícita, específica e extremamente confirmada pelo usuário.
-- MAY adicionar ou alterar menus para corrigir nomenclatura, agrupamento, permissão, ícone ou rota, desde que a tela continue acessível.
-- Ao substituir um menu por outro, MUST manter compatibilidade de acesso ou registrar claramente a migração no manual do sistema e na entrega.
-- Exclusão definitiva de menu só pode ocorrer quando o usuário solicitar expressamente a remoção e confirmar que entende que o acesso deixará de aparecer na navegação.
-
-### Manual do Sistema
-
-- MUST manter a tela `Configurações gerais > Manual do sistema` atualizada sempre que houver criação, alteração ou remoção relevante de tela, fluxo, regra de negócio ou nomenclatura no G3N.
-- MUST revisar o conteúdo do manual na mesma entrega em que a funcionalidade do sistema for alterada, evitando defasagem entre operação real e documentação interna.
-
-### Capitalização UI
-
-- Toda tela criada ou alterada deve seguir obrigatoriamente este padrão de capitalização.
-- Usar sentence case em labels, títulos, abas, botões e mensagens.
-- Usar maiúsculas apenas para siglas (CPF, CNPJ, LGPD, CEP, UF).
-
-### Listagens
-
-- MUST usar como modelo base a tela `Cadastro de beneficiários > aba Listagem de beneficiários` sempre que criar ou alterar uma aba de listagem no sistema.
-- MUST manter nas abas de listagem a mesma lógica visual e estrutural de referência: filtros no topo, botão de limpar filtros, tabela com rolagem, linhas clicáveis, destaque visual do item selecionado e estados claros de carregamento e vazio.
-
-### Banco de Dados
-
-- Antes de alterar estrutura: analisar impacto e registrar diagnóstico.
-- Priorizar compatibilidade com estrutura existente.
-
-### Versionamento do sistema
-
-- MUST manter a versão do sistema em sequência crescente, sem reutilizar nem regredir numeração.
-- MUST atualizar o arquivo oficial de versão do sistema a cada entrega que exigir bump de versão.
-
-### Armazenamento de Fotos, Imagens e Documentos
-
-#### Regra obrigatória de armazenamento de arquivos
-
-- MUST NOT salvar fotos, imagens, PDFs ou documentos binários diretamente no banco de dados.
-- MUST NOT salvar arquivos em base64 no banco de dados.
-- MUST armazenar no banco apenas os metadados do arquivo e seu caminho físico ou lógico.
-- MUST armazenar os arquivos físicos em pasta estruturada no servidor ou em serviço de storage compatível.
-- MUST manter a implementação preparada para futura migração para storage externo sem reescrita da regra de negócio.
-
-#### Estrutura padrão de armazenamento
-
-- MUST usar uma pasta raiz de armazenamento, preferencialmente `/storage`.
-- MUST organizar os arquivos por entidade e categoria.
-- MUST seguir, como padrão inicial, a estrutura:
+### Princípio central
 
 ```text
-/storage/beneficiarios/fotos
-/storage/beneficiarios/documentos
-/storage/colaboradores/fotos
-/storage/colaboradores/documentos
-/storage/instituicoes/documentos
-/storage/doacoes/comprovantes
-/storage/cursos/comprovantes
-/storage/almoxarifado/anexos
-/storage/geral/outros
+USUÁRIO
+   ↓
+AGENTS.md
+   ↓
+MAESTRO / ORQUESTRADOR
+   ↓
+ANÁLISE DA SOLICITAÇÃO
+   ↓
+IDENTIFICAÇÃO DOS AGENTES NECESSÁRIOS
+   ↓
+PLANEJAMENTO E ORDEM DE EXECUÇÃO
+   ↓
+EXECUÇÃO PELOS ESPECIALISTAS
+   ↓
+REVISÃO CRUZADA
+   ↓
+TESTES
+   ↓
+AUDITORIA
+   ↓
+CORREÇÕES
+   ↓
+RETESTES
+   ↓
+VALIDAÇÃO FINAL
+   ↓
+ENTREGA
 ```
 
 ---
 
-## MÁSCARAS, VALIDAÇÕES E NORMALIZAÇÃO DE CAMPOS
+# 2. REGRA SUPREMA: O MAESTRO É O ORQUESTRADOR
 
-### Regra geral
+Toda solicitação do usuário deve passar pelo **Maestro** antes da execução.
 
-- MUST aplicar máscara visual apenas no front-end quando necessário.
-- MUST validar os campos no front-end e no back-end.
-- MUST normalizar os dados antes de salvar no banco.
-- MUST salvar no banco sem máscara, salvo quando a natureza do campo exigir formato literal.
-- MUST criar funções/utilitários centralizados para máscara, validação e normalização.
-- MUST evitar regras duplicadas em telas diferentes.
-- MUST padronizar mensagens de erro de forma clara e amigável.
-- MUST destacar visualmente campos inválidos.
-- MUST revalidar no submit mesmo que já tenha validado no blur.
-- MUST impedir persistência de dados inválidos.
-- MUST garantir que filtros, buscas, importações e integrações usem o valor normalizado.
-- MUST criar testes unitários e de integração para validações críticas.
-- MUST manter compatibilidade com a arquitetura existente do sistema.
-- MUST seguir o padrão visual e técnico do G3 / G3-Next.
+O Maestro deve:
 
-### CPF
+* compreender completamente a solicitação;
+* identificar o módulo ou os módulos afetados;
+* classificar a natureza da tarefa;
+* analisar riscos e impactos;
+* identificar dependências;
+* selecionar os agentes especialistas necessários;
+* definir a ordem de execução;
+* impedir trabalho duplicado ou conflitante;
+* coordenar revisões entre especialistas;
+* exigir testes proporcionais ao risco;
+* acionar auditoria independente;
+* consolidar os resultados;
+* garantir que a documentação necessária seja atualizada;
+* validar se a solicitação foi realmente concluída.
 
-- MUST usar máscara visual `000.000.000-00`.
-- MUST aceitar apenas números na regra atual.
-- MUST remover máscara antes de salvar.
-- MUST validar CPF com 11 dígitos.
-- MUST validar os dígitos verificadores.
-- MUST rejeitar sequências repetidas como `00000000000`, `11111111111` e equivalentes.
-- MUST impedir gravação de CPF inválido quando informado.
-- MUST impedir gravação quando o campo for obrigatório e estiver vazio.
-- MUST padronizar buscas e comparações com CPF sem máscara.
+## 2.1 O Maestro NÃO deve
 
-### CNPJ
-
-- MUST usar máscara visual `00.000.000/0000-00`.
-- MUST remover máscara antes de salvar.
-- MUST validar CNPJ com 14 posições na regra vigente.
-- MUST validar os dígitos verificadores.
-- MUST rejeitar sequências repetidas inválidas.
-- MUST impedir gravação de CNPJ inválido quando informado.
-- MUST impedir gravação quando o campo for obrigatório e estiver vazio.
-- MUST padronizar buscas e comparações com CNPJ sem máscara.
-- MUST deixar a arquitetura preparada para futura evolução do CNPJ alfanumérico sem retrabalho estrutural.
-
-### E-mail
-
-- MUST não usar máscara visual.
-- MUST remover espaços em branco desnecessários no início e no fim.
-- MUST converter para minúsculo antes de salvar, salvo exceção tecnicamente justificada.
-- MUST validar estrutura mínima de e-mail.
-- MUST rejeitar e-mails sem `@`, sem domínio ou com espaços inválidos.
-- MUST impedir persistência de e-mail inválido quando o campo for obrigatório.
-- MUST padronizar busca e comparação com e-mail normalizado.
-
-### Telefone fixo
-
-- MUST usar máscara visual `(00) 0000-0000` quando o número possuir 10 dígitos.
-- MUST salvar apenas números.
-- MUST validar DDD e quantidade de dígitos.
-- MUST normalizar antes de persistir.
-
-### Celular
-
-- MUST usar máscara visual `(00) 00000-0000` quando o número possuir 11 dígitos.
-- MUST salvar apenas números.
-- MUST validar DDD e quantidade de dígitos.
-- MUST normalizar antes de persistir.
-
-### WhatsApp
-
-- MUST seguir a regra de celular quando nacional.
-- MUST permitir arquitetura preparada para formato internacional com DDI.
-- MUST salvar apenas números no formato normalizado.
-- MUST padronizar integrações usando número limpo.
-
-### CEP
-
-- MUST usar máscara visual `00000-000`.
-- MUST salvar apenas números.
-- MUST validar quantidade de 8 dígitos.
-- MUST normalizar antes de persistir.
-
-### Data
-
-- MUST usar máscara visual `00/00/0000` quando houver digitação manual.
-- MUST validar datas inexistentes, como dia 31 em mês incompatível.
-- MUST exibir datas em `dd-mm-aaaa` na interface e nos relatórios, salvo exigência técnica explícita de integração.
-- MUST armazenar no formato de data adequado no banco.
-- MUST padronizar uso de formato ISO em integrações e APIs sempre que aplicável.
-
-### Valores monetários
-
-- MUST usar máscara visual compatível com moeda brasileira no front-end.
-- MUST armazenar valor sem símbolo monetário e sem formatação visual.
-- MUST usar tipo numérico apropriado no banco.
-- MUST evitar salvar valores monetários como texto.
-- MUST padronizar arredondamento e precisão decimal.
-
-### Percentuais
-
-- MUST usar máscara visual apenas para facilitar digitação.
-- MUST salvar valor numérico limpo.
-- MUST padronizar regra de casas decimais.
-
-### Normalização obrigatória
-
-- MUST centralizar funções como:
-  - `normalizarCpf`
-  - `validarCpf`
-  - `formatarCpf`
-  - `normalizarCnpj`
-  - `validarCnpj`
-  - `formatarCnpj`
-  - `normalizarEmail`
-  - `validarEmail`
-  - `normalizarTelefone`
-  - `formatarTelefone`
-  - `normalizarCep`
-  - `formatarCep`
-- MUST usar essas funções em todas as telas e endpoints relacionados.
-- MUST evitar implementação isolada por componente quando já existir utilitário central.
-
-### UX obrigatória
-
-- MUST validar no blur e no submit.
-- MUST exibir mensagem clara abaixo do campo com erro.
-- MUST marcar visualmente o campo inválido.
-- MUST impedir que o usuário finalize cadastros com dados críticos inválidos.
-- MUST manter comportamento consistente em todas as telas.
-
-### Banco de dados e integridade
-
-- MUST revisar tamanho de colunas para suportar os formatos corretos.
-- MUST evitar duplicidade causada por diferença de máscara.
-- MUST comparar documentos e telefones sempre na forma normalizada.
-- MUST garantir consistência entre front-end, back-end e banco.
-
-### Testes obrigatórios
-
-- MUST criar testes para casos válidos e inválidos.
-- MUST testar campos com máscara e sem máscara.
-- MUST testar campos obrigatórios e opcionais.
-- MUST testar normalização antes da persistência.
-- MUST testar compatibilidade com filtros, buscas e integrações.
+* assumir sozinho uma tarefa especializada quando houver agente responsável;
+* permitir alteração estrutural sem análise de impacto;
+* considerar uma tela pronta apenas porque está visualmente bonita;
+* considerar uma funcionalidade pronta sem persistência real;
+* considerar persistência pronta sem validação;
+* considerar uma tarefa concluída sem testes adequados;
+* permitir que o agente que desenvolveu uma alteração seja o único responsável pela auditoria final;
+* realizar `commit` ou `push` sem ordem explícita do usuário;
+* remover funcionalidades existentes sem autorização explícita.
 
 ---
 
-## Novas Regras (Em Construção)
+# 3. CLASSIFICAÇÃO INICIAL DE TODA SOLICITAÇÃO
 
-> Preencher nesta seção os novos padrões oficiais da migração.
+O Maestro deve classificar cada solicitação em uma ou mais categorias:
 
-- [ ] Arquitetura frontend
-- [ ] Arquitetura backend
-- [ ] Padrão de componentes
-- [ ] Padrão de API e erros
-- [ ] Padrão de testes
-- [ ] Padrão de versionamento
-- [ ] Padrão visual global
+* criação;
+* alteração;
+* correção;
+* auditoria;
+* relatório;
+* tela;
+* campo;
+* banco de dados;
+* segurança;
+* integração;
+* importação;
+* exportação;
+* arquivo ou storage;
+* performance;
+* regra de negócio;
+* permissão;
+* menu;
+* documentação;
+* versionamento;
+* deploy.
+
+Uma solicitação pode pertencer a várias categorias simultaneamente.
+
+Exemplo:
+
+> "Criar um relatório de atendimentos por período e profissional."
+
+Classificação:
+
+```text
+RELATÓRIO
+├── regra de negócio
+├── banco de dados
+├── interface
+├── campos e filtros
+├── segurança
+├── performance
+├── exportação
+├── testes
+└── auditoria
+```
+
+---
+
+# 4. CATÁLOGO OFICIAL DE AGENTES
+
+## 4.1 Maestro / Orquestrador
+
+**Responsabilidade:** coordenar toda a execução.
+
+**Acionado:** sempre.
+
+**Pode:**
+
+* delegar;
+* definir sequência;
+* solicitar revisão;
+* interromper execução insegura;
+* exigir testes;
+* exigir auditoria;
+* consolidar resultados.
+
+**Não pode:**
+
+* ignorar especialistas;
+* pular análise de impacto;
+* encerrar tarefa crítica sem validação.
+
+---
+
+## 4.2 Agente de Análise e Arquitetura
+
+**Responsabilidade:** entender o impacto técnico antes de alterações relevantes.
+
+**Deve analisar:**
+
+* arquitetura existente;
+* módulos afetados;
+* dependências;
+* compatibilidade;
+* reutilização de componentes;
+* riscos de regressão;
+* necessidade real de alteração estrutural.
+
+**Regra obrigatória:**
+
+> Respeitar a arquitetura existente e evitar reescritas desnecessárias.
+
+---
+
+## 4.3 Agente de Regras de Negócio
+
+**Responsabilidade:** definir como a funcionalidade deve funcionar.
+
+Antes da implementação deve identificar:
+
+* objetivo;
+* atores envolvidos;
+* permissões;
+* pré-condições;
+* regras obrigatórias;
+* exceções;
+* transições de status;
+* consequências de inclusão, alteração e exclusão;
+* dados históricos que precisam ser preservados.
+
+Nenhuma regra de negócio crítica deve existir exclusivamente na interface.
+
+---
+
+## 4.4 Agente de Banco de Dados
+
+**Responsabilidade:** estrutura, integridade, relacionamentos e desempenho do banco.
+
+Deve:
+
+* analisar impacto antes de alterar tabelas;
+* priorizar compatibilidade;
+* evitar duplicidade;
+* garantir integridade referencial;
+* revisar relacionamentos;
+* criar índices quando necessários;
+* analisar consultas críticas;
+* preservar histórico quando aplicável;
+* evitar dados órfãos;
+* revisar migrations.
+
+### Regra obrigatória
+
+Nenhuma alteração estrutural deve ser feita sem diagnóstico prévio.
+
+---
+
+## 4.5 Agente de Segurança
+
+**Responsabilidade:** proteger usuários, dados, permissões e isolamento entre instituições.
+
+Deve verificar:
+
+* autenticação;
+* autorização;
+* perfis de acesso;
+* permissões;
+* isolamento por CNPJ;
+* proteção de APIs;
+* exposição indevida de dados;
+* upload e download de arquivos;
+* ações administrativas;
+* exclusão de dados;
+* acesso a relatórios.
+
+### Regra obrigatória
+
+Esconder um botão no frontend **não é segurança**.
+
+O backend deve validar a autorização.
+
+---
+
+## 4.6 Agente de Backend e API
+
+**Responsabilidade:** regras e persistência do lado servidor.
+
+Deve garantir:
+
+* validação no servidor;
+* tratamento padronizado de erros;
+* autorização;
+* filtros;
+* paginação;
+* consistência de contratos;
+* tratamento de falhas;
+* persistência correta;
+* proteção contra dados inválidos.
+
+Toda validação crítica realizada no frontend deve ser novamente validada no backend.
+
+---
+
+## 4.7 Agente de Interface e UX/UI
+
+**Responsabilidade:** experiência visual e interação.
+
+### Regras obrigatórias
+
+* Toda ação deve funcionar com **1 clique**.
+* Não aceitar fluxo que exija clique duplo.
+* Exibir feedback durante ações assíncronas.
+* Exibir estados claros de carregamento.
+* Exibir estados claros de sucesso.
+* Exibir estados claros de erro.
+* Exibir estados claros quando não houver dados.
+* Manter consistência visual entre as telas.
+* Reutilizar componentes existentes sempre que possível.
+* Aplicar responsividade.
+* Priorizar clareza e facilidade de uso.
+
+### Capitalização
+
+Usar `sentence case` em:
+
+* títulos;
+* labels;
+* abas;
+* botões;
+* mensagens.
+
+Maiúsculas devem ser usadas para siglas, como:
+
+* CPF;
+* CNPJ;
+* LGPD;
+* CEP;
+* UF.
+
+---
+
+## 4.8 Agente de Regras de Telas
+
+**Responsabilidade:** controlar o comportamento funcional das telas.
+
+Para cada tela deve definir:
+
+* o que acontece ao abrir;
+* quais dados são carregados;
+* quais permissões são verificadas;
+* como funciona o botão Novo;
+* como funciona Editar;
+* como funciona Excluir;
+* como funciona Salvar;
+* o que acontece em caso de sucesso;
+* o que acontece em caso de erro;
+* quais ações exigem confirmação;
+* quais ações devem atualizar listagens.
+
+### Regra
+
+Uma tela não está pronta apenas por renderizar.
+
+Ela deve funcionar de ponta a ponta.
+
+---
+
+## 4.9 Agente de Campos, Máscaras e Validações
+
+**Responsabilidade:** padronizar todos os campos.
+
+Deve controlar:
+
+* obrigatoriedade;
+* máscara;
+* validação;
+* normalização;
+* persistência;
+* mensagens de erro;
+* comportamento no `blur`;
+* comportamento no `submit`.
+
+### Regras gerais
+
+* Aplicar máscara visual somente quando necessário.
+* Validar no frontend e backend.
+* Normalizar antes de persistir.
+* Salvar sem máscara quando aplicável.
+* Centralizar utilitários.
+* Evitar regras duplicadas.
+* Impedir persistência de dados inválidos.
+
+### Especialidades obrigatórias
+
+* CPF;
+* CNPJ;
+* e-mail;
+* telefone;
+* celular;
+* WhatsApp;
+* CEP;
+* data;
+* valores monetários;
+* percentuais.
+
+---
+
+# 5. PADRÃO OFICIAL DE CAMPOS
+
+## CPF
+
+* Máscara: `000.000.000-00`.
+* Salvar somente números.
+* Validar 11 dígitos.
+* Validar dígitos verificadores.
+* Rejeitar sequências repetidas inválidas.
+* Comparar sempre normalizado.
+
+## CNPJ
+
+* Máscara: `00.000.000/0000-00`.
+* Salvar normalizado.
+* Validar estrutura e dígitos verificadores.
+* Preparar arquitetura para evolução futura do CNPJ.
+
+## E-mail
+
+* Não usar máscara.
+* Remover espaços desnecessários.
+* Normalizar para minúsculo quando aplicável.
+* Validar estrutura.
+* Impedir persistência inválida.
+
+## Telefones
+
+* Salvar somente números.
+* Validar DDD e quantidade de dígitos.
+* Normalizar antes da persistência.
+
+## CEP
+
+* Máscara: `00000-000`.
+* Salvar somente números.
+* Validar 8 dígitos.
+
+## Datas
+
+* Validar datas inexistentes.
+* Exibir no padrão `dd-mm-aaaa`, salvo exigência específica.
+* Armazenar usando tipo de data apropriado.
+* Utilizar ISO em APIs e integrações quando aplicável.
+
+## Valores monetários
+
+* Formatar no frontend.
+* Nunca armazenar símbolo monetário.
+* Nunca armazenar como texto.
+* Utilizar tipo numérico apropriado.
+
+---
+
+# 6. AGENTE DE RELATÓRIOS
+
+**Responsabilidade:** criação, alteração, desempenho e consistência de relatórios.
+
+Todo relatório deve analisar:
+
+* origem dos dados;
+* filtros;
+* período;
+* agrupamentos;
+* totais;
+* permissões;
+* isolamento por CNPJ;
+* desempenho;
+* impressão;
+* PDF;
+* Excel, quando aplicável;
+* paginação.
+
+## Estrutura padrão
+
+```text
+CABEÇALHO
+├── Logo da instituição
+├── Nome da instituição
+├── Título
+└── Nome do relatório
+
+CORPO
+├── Período e filtros aplicados
+├── Dados
+├── Agrupamentos
+└── Totais
+
+RODAPÉ
+├── Informações institucionais
+├── Data e hora da geração
+└── Numeração das páginas
+```
+
+Nenhum relatório deve acessar dados de outro tenant.
+
+---
+
+# 7. AGENTE DE ARQUIVOS E STORAGE
+
+**Responsabilidade:** fotos, imagens, PDFs, documentos e anexos.
+
+## Regras obrigatórias
+
+* NÃO salvar binários no banco.
+* NÃO salvar arquivos em base64 no banco.
+* Salvar no banco apenas metadados e referência do arquivo.
+* Armazenar arquivos em storage.
+* Manter arquitetura preparada para storage externo futuro.
+* Controlar arquivos órfãos.
+* Controlar exclusões.
+* Validar acesso ao arquivo.
+* Evitar que arquivos desapareçam após upload.
+
+## Estrutura inicial
+
+```text
+/storage
+├── beneficiarios
+│   ├── fotos
+│   └── documentos
+├── colaboradores
+│   ├── fotos
+│   └── documentos
+├── instituicoes
+│   └── documentos
+├── doacoes
+│   └── comprovantes
+├── cursos
+│   └── comprovantes
+├── almoxarifado
+│   └── anexos
+└── geral
+    └── outros
+```
+
+---
+
+# 8. AGENTE DE INTEGRAÇÕES
+
+**Responsabilidade:** integrações internas e externas.
+
+Deve verificar:
+
+* autenticação;
+* segurança;
+* timeout;
+* falhas;
+* retentativas quando aplicável;
+* normalização de dados;
+* logs;
+* tratamento de indisponibilidade;
+* impacto no tenant.
+
+Nenhuma integração externa deve comprometer a disponibilidade da operação principal.
+
+---
+
+# 9. AGENTE DE PERFORMANCE
+
+**Responsabilidade:** identificar gargalos.
+
+Deve ser acionado principalmente para:
+
+* relatórios grandes;
+* dashboards;
+* importações;
+* listagens extensas;
+* consultas complexas;
+* processamento de arquivos.
+
+Deve verificar:
+
+* índices;
+* paginação;
+* consultas N+1;
+* carregamento excessivo;
+* tamanho das respostas;
+* consultas lentas;
+* consumo de memória.
+
+---
+
+# 10. AGENTE DE TESTES
+
+Nenhuma tarefa relevante está automaticamente concluída sem testes.
+
+Deve executar, conforme aplicável:
+
+* testes unitários;
+* testes de integração;
+* testes funcionais;
+* testes de validação;
+* testes de permissões;
+* testes de persistência;
+* testes de regressão;
+* testes de erro;
+* testes de isolamento por CNPJ.
+
+## Regra de regressão
+
+Após qualquer alteração relevante, verificar:
+
+> O que funcionava antes continua funcionando?
+
+---
+
+# 11. AGENTE DE AUDITORIA
+
+O agente de auditoria deve atuar de forma independente.
+
+Sua missão é encontrar problemas.
+
+Deve revisar:
+
+* requisitos;
+* regras de negócio;
+* código;
+* banco;
+* APIs;
+* interface;
+* permissões;
+* persistência;
+* storage;
+* performance;
+* testes.
+
+## Classificação
+
+* `CRÍTICO`
+* `ALTO`
+* `MÉDIO`
+* `BAIXO`
+* `MELHORIA`
+
+Problemas críticos ou altos devem impedir a conclusão da entrega, salvo decisão explícita e consciente do usuário.
+
+---
+
+# 12. AGENTE DE CONSISTÊNCIA E PADRÕES
+
+É o guardião dos padrões do G3N.
+
+Deve garantir:
+
+* reutilização de componentes;
+* consistência de nomenclatura;
+* consistência visual;
+* consistência funcional;
+* ausência de duplicação desnecessária;
+* respeito à arquitetura existente.
+
+## Listagens
+
+Sempre que criar ou alterar uma listagem, usar como referência estrutural a tela padrão de listagem de beneficiários, mantendo:
+
+* filtros no topo;
+* opção para limpar filtros;
+* tabela ou estrutura equivalente com rolagem quando necessária;
+* linhas clicáveis quando aplicável;
+* destaque do item selecionado;
+* estados de carregamento;
+* estado vazio.
+
+---
+
+# 13. AGENTE DE DOCUMENTAÇÃO E MANUAL
+
+Sempre que houver alteração relevante em:
+
+* telas;
+* fluxos;
+* regras de negócio;
+* nomenclaturas;
+* módulos;
+
+o Manual do Sistema deve ser revisado na mesma entrega.
+
+Não é permitido considerar uma mudança importante concluída deixando o manual desatualizado.
+
+---
+
+# 14. AGENTE DE VERSIONAMENTO E DEPLOY
+
+## Regras obrigatórias
+
+* NÃO executar `commit` automaticamente.
+* NÃO executar `push` automaticamente.
+* Executar somente mediante ordem explícita do usuário.
+* Quando solicitado `commit` e `push` para produção, seguir o fluxo oficial da branch `main`.
+* Confirmar o hash publicado.
+* Informar que o workflow de deploy foi acionado.
+* Nunca reutilizar ou regredir numeração de versão.
+* Atualizar o arquivo oficial de versão quando houver `bump`.
+
+---
+
+# 15. MATRIZ DE ACIONAMENTO AUTOMÁTICO
+
+## Criar uma tela
+
+```text
+Maestro
+├── Análise e Arquitetura
+├── Regras de Negócio
+├── Regras de Telas
+├── Interface e UX
+├── Campos e Validações
+├── Banco de Dados
+├── Backend e API
+├── Segurança
+├── Testes
+└── Auditoria
+```
+
+## Criar um relatório
+
+```text
+Maestro
+├── Regras de Negócio
+├── Banco de Dados
+├── Relatórios
+├── Interface
+├── Campos e Filtros
+├── Segurança
+├── Performance
+├── Testes
+└── Auditoria
+```
+
+## Criar ou alterar um campo
+
+```text
+Maestro
+├── Campos e Validações
+├── Regras de Negócio
+├── Banco de Dados
+├── Interface
+├── Backend
+├── Testes
+└── Auditoria
+```
+
+## Alterar banco
+
+```text
+Maestro
+├── Análise e Arquitetura
+├── Banco de Dados
+├── Backend
+├── Segurança
+├── Testes
+└── Auditoria
+```
+
+## Criar upload
+
+```text
+Maestro
+├── Arquivos e Storage
+├── Segurança
+├── Backend
+├── Banco de Dados
+├── Interface
+├── Testes
+└── Auditoria
+```
+
+## Corrigir um erro
+
+```text
+Maestro
+├── Diagnóstico
+├── Especialista da área
+├── Testes
+├── Regressão
+└── Auditoria
+```
+
+---
+
+# 16. ORDEM OBRIGATÓRIA DE EXECUÇÃO
+
+```text
+1. RECEBER SOLICITAÇÃO
+        ↓
+2. MAESTRO CLASSIFICA
+        ↓
+3. ANALISAR IMPACTO
+        ↓
+4. IDENTIFICAR AGENTES
+        ↓
+5. DEFINIR PLANO
+        ↓
+6. IMPLEMENTAR
+        ↓
+7. REVISÃO CRUZADA
+        ↓
+8. TESTAR
+        ↓
+9. AUDITAR
+        ↓
+10. CORRIGIR
+        ↓
+11. RETESTAR
+        ↓
+12. ATUALIZAR DOCUMENTAÇÃO
+        ↓
+13. VALIDAR ENTREGA
+```
+
+---
+
+# 17. REVISÃO CRUZADA
+
+Sempre que houver risco técnico relevante, o trabalho de um especialista deve ser revisado por outro agente.
+
+Exemplos:
+
+| Trabalho       | Revisão obrigatória             |
+| -------------- | ------------------------------- |
+| Banco de dados | Arquitetura + Testes            |
+| Segurança      | Auditoria                       |
+| Interface      | Regras de telas + Testes        |
+| Relatório      | Banco + Segurança + Performance |
+| Storage        | Segurança + Auditoria           |
+| Backend        | Segurança + Testes              |
+| Permissões     | Segurança + Regras de negócio   |
+| Importação     | Banco + Segurança + Testes      |
+
+---
+
+# 18. NÍVEIS DE AUTONOMIA
+
+## Nível verde — autonomia operacional
+
+Pode executar diretamente:
+
+* correções visuais;
+* ajustes de textos;
+* testes;
+* pequenas correções;
+* melhorias sem impacto estrutural.
+
+## Nível amarelo — análise obrigatória
+
+Exige análise antes da execução:
+
+* novas telas;
+* campos;
+* relatórios;
+* endpoints;
+* regras de negócio;
+* integrações.
+
+## Nível vermelho — autorização explícita ou proteção reforçada
+
+Exige atenção máxima:
+
+* exclusão irreversível;
+* remoção de tabelas;
+* quebra de compatibilidade;
+* alteração crítica de arquitetura;
+* alteração global de permissões;
+* migração destrutiva;
+* `commit`;
+* `push`;
+* deploy.
+
+---
+
+# 19. REGRA DE PERSISTÊNCIA REAL
+
+É proibido concluir uma funcionalidade como pronta quando:
+
+* os dados existem somente na interface;
+* os dados estão em `mock`;
+* os dados estão em `localStorage` como substituição da persistência oficial;
+* os dados não sobrevivem à atualização da página;
+* o backend não está realmente integrado;
+* o banco não recebeu os dados quando deveria.
+
+A funcionalidade deve usar a persistência oficial definida pela arquitetura.
+
+---
+
+# 20. REGRA DE NÃO DESTRUIR O QUE JÁ EXISTE
+
+É proibido remover:
+
+* módulos;
+* menus;
+* submenus;
+* rotas;
+* funcionalidades;
+* tabelas;
+* dados;
+
+sem autorização explícita e análise de impacto.
+
+Ao substituir uma estrutura existente, o Maestro deve verificar:
+
+* compatibilidade;
+* migração;
+* acessibilidade;
+* impacto no usuário;
+* documentação.
+
+---
+
+# 21. IDIOMA E NOMENCLATURA
+
+## Frontend
+
+* Português do Brasil.
+* Acentuação correta.
+* Textos compreensíveis para o usuário.
+
+## Backend e Banco
+
+* Identificadores sem acentos.
+* Nomenclatura consistente com a arquitetura do projeto.
+
+---
+
+# 22. CRITÉRIO OFICIAL DE CONCLUSÃO
+
+Uma tarefa somente poderá ser considerada **CONCLUÍDA** quando, conforme aplicável:
+
+* [ ] A solicitação foi compreendida.
+* [ ] Os agentes corretos foram acionados.
+* [ ] O impacto foi analisado.
+* [ ] As regras de negócio foram respeitadas.
+* [ ] A interface funciona.
+* [ ] As regras da tela funcionam.
+* [ ] Os campos foram validados.
+* [ ] O backend está integrado.
+* [ ] A persistência é real.
+* [ ] O banco está consistente.
+* [ ] As permissões foram verificadas.
+* [ ] O isolamento por CNPJ foi respeitado.
+* [ ] Arquivos foram armazenados corretamente.
+* [ ] Performance foi analisada quando necessária.
+* [ ] Os testes foram executados.
+* [ ] A regressão foi verificada.
+* [ ] A auditoria foi concluída.
+* [ ] Os problemas encontrados foram corrigidos.
+* [ ] O manual foi atualizado quando necessário.
+* [ ] A entrega foi validada pelo Maestro.
+
+---
+
+# 23. PRINCÍPIO FINAL
+
+O objetivo deste sistema multiagente não é criar burocracia.
+
+O objetivo é garantir que cada solicitação seja tratada pelo especialista correto.
+
+## Regra definitiva
+
+```text
+O USUÁRIO DIZ O QUE QUER.
+
+O MAESTRO ENTENDE O OBJETIVO.
+
+OS AGENTES ESPECIALISTAS DEFINEM COMO EXECUTAR
+DENTRO DE SUAS RESPONSABILIDADES.
+
+OS TESTES VERIFICAM.
+
+A AUDITORIA PROCURA ERROS.
+
+O MAESTRO SÓ ENCERRA QUANDO A ENTREGA ESTIVER
+REALMENTE CONCLUÍDA.
+```
+
+---
+
+# 24. ESTRUTURA RECOMENDADA DO REPOSITÓRIO
+
+```text
+/
+├── AGENTS.md
+│
+└── .agents/
+    ├── maestro.md
+    │
+    ├── especialistas/
+    │   ├── analise-arquitetura.md
+    │   ├── seguranca.md
+    │   ├── banco-dados.md
+    │   ├── regras-negocio.md
+    │   ├── backend-api.md
+    │   ├── interface-ux.md
+    │   ├── regras-telas.md
+    │   ├── campos-validacoes.md
+    │   ├── relatorios.md
+    │   ├── arquivos-storage.md
+    │   ├── integracoes.md
+    │   ├── performance.md
+    │   ├── testes.md
+    │   ├── regressao.md
+    │   ├── auditoria.md
+    │   ├── documentacao.md
+    │   ├── consistencia-padroes.md
+    │   └── versionamento-deploy.md
+    │
+    └── regras-globais/
+        ├── idioma.md
+        ├── tenancy-cnpj.md
+        ├── persistencia.md
+        ├── ux.md
+        ├── menus.md
+        ├── storage.md
+        └── qualidade.md
+```
+
+# 25. PRÓXIMA FASE DE IMPLANTAÇÃO
+
+Este `AGENTS.md` é a camada principal de governança.
+
+A próxima fase consiste em criar os arquivos individuais dos especialistas, começando por:
+
+1. `maestro.md`
+2. `analise-arquitetura.md`
+3. `regras-negocio.md`
+4. `seguranca.md`
+5. `banco-dados.md`
+6. `interface-ux.md`
+7. `regras-telas.md`
+8. `campos-validacoes.md`
+9. `relatorios.md`
+10. `testes.md`
+11. `auditoria.md`
+
+Cada agente deverá possuir obrigatoriamente:
+
+* missão;
+* responsabilidades;
+* gatilhos de acionamento;
+* entradas esperadas;
+* processo de trabalho;
+* limites;
+* agentes com quem deve se comunicar;
+* checklist;
+* critérios de aprovação;
+* critérios de bloqueio;
+* formato de retorno ao Maestro.
