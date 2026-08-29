@@ -709,11 +709,11 @@ export function LoginPage() {
   const etapaNumero = etapa === "instituicao" ? 1 : etapa === "credenciais" ? 2 : 3;
 
   return (
-    <main className="relative min-h-dvh overflow-x-hidden overflow-y-auto bg-[#071b2d] text-slate-900">
+    <main className="relative h-dvh overflow-hidden bg-[#071b2d] text-slate-900">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(20,184,166,0.28),transparent_32%),linear-gradient(135deg,#071b2d_0%,#0f3a3a_48%,#f8fafc_48%,#ffffff_100%)]" />
-      <section className="relative z-10 grid min-h-dvh lg:grid-cols-[1.05fr_0.95fr]">
-        <aside className="hidden min-h-dvh flex-col justify-center gap-5 p-6 text-white lg:flex xl:gap-7 xl:p-8">
-          <div className="space-y-5 xl:space-y-7">
+      <section className="relative z-10 grid h-full min-h-0 lg:grid-cols-[1.05fr_0.95fr]">
+        <aside className="hidden h-full min-h-0 flex-col justify-center gap-3 p-5 text-white lg:flex xl:gap-4 xl:p-6">
+          <div className="space-y-3 xl:space-y-4">
             <div className="inline-flex items-center gap-3 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm">
               <Sparkles className="h-4 w-4 text-cyan-200" />
               Login inteligente G3 Next
@@ -740,14 +740,14 @@ export function LoginPage() {
             </div>
           </div>
           <div className="max-w-2xl overflow-hidden rounded-lg border border-white/10 bg-white/10 shadow-2xl shadow-black/20">
-            <img src={FOTO_LATERAL_URL} alt="Atendimento social institucional" className="h-[clamp(16rem,34vh,25rem)] w-full object-cover" />
+            <img src={FOTO_LATERAL_URL} alt="Atendimento social institucional" className="h-[clamp(9rem,25vh,18rem)] w-full object-cover" />
           </div>
           <p className="text-xs text-slate-300">Versão do sistema: {versaoSistema}</p>
         </aside>
 
-        <section className="flex min-h-dvh items-start justify-center px-3 py-4 sm:items-center sm:px-5 sm:py-6 lg:px-8">
-          <div className="w-full max-w-xl space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-2xl shadow-slate-950/20 sm:p-6 xl:p-7">
-            <header className="space-y-4">
+        <section className="flex h-full min-h-0 items-center justify-center px-3 py-2 sm:px-5 sm:py-3 lg:px-8">
+          <div className="g3-login-card flex w-full max-w-xl flex-col gap-3 overflow-visible rounded-xl border border-slate-200 bg-white p-3 shadow-2xl shadow-slate-950/20 sm:gap-4 sm:p-5 xl:p-6">
+            <header className="g3-login-header space-y-2 sm:space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Acesso ao sistema</p>
@@ -808,7 +808,7 @@ export function LoginPage() {
               </div>
             </header>
 
-            <form className="space-y-4" onSubmit={onSubmit}>
+            <form className="g3-login-form space-y-3 sm:space-y-4" onSubmit={onSubmit}>
               {etapa === "instituicao" ? (
                 <div className="space-y-3">
                   <div>

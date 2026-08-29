@@ -79,6 +79,64 @@ a {
   color: var(--g3-foreground) !important;
 }
 
+/* A tela de login ocupa a viewport sem criar uma segunda barra de rolagem. */
+.g3-login-card {
+  transform-origin: center;
+}
+
+@media (max-height: 900px) {
+  .g3-login-card {
+    transform: scale(0.94);
+  }
+}
+
+@media (max-height: 760px) {
+  .g3-login-card {
+    gap: 0.65rem;
+    padding: 0.75rem;
+    transform: scale(0.9);
+  }
+
+  .g3-login-header > :not([hidden]) ~ :not([hidden]),
+  .g3-login-form > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.65rem;
+  }
+
+  .g3-login-card h2 {
+    font-size: 1.25rem;
+    line-height: 1.5rem;
+  }
+
+  .g3-login-card .g3-login-form .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.65rem;
+  }
+}
+
+@media (max-height: 620px) {
+  .g3-login-card {
+    gap: 0.45rem;
+    padding: 0.65rem;
+    transform: scale(0.82);
+  }
+
+  .g3-login-card .g3-login-header > :not([hidden]) ~ :not([hidden]),
+  .g3-login-card .g3-login-form > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.45rem;
+  }
+
+  .g3-login-card .g3-login-header > div:nth-child(2),
+  .g3-login-card .g3-login-header > div:nth-child(3) {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+}
+
+@media (max-height: 520px) {
+  .g3-login-card {
+    transform: scale(0.76);
+  }
+}
+
 .text-slate-700,
 .text-slate-600,
 .text-slate-500,

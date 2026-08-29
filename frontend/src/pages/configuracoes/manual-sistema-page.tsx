@@ -62,6 +62,7 @@ const secoesManual: ManualSecao[] = [
           "O card Catálogo e vagas de matrículas mostra o resumo de cursos no catálogo e vagas disponíveis na grade principal.",
           "Os cards da Visão geral funcionam como atalhos: ao clicar em cada indicador, o sistema abre a tela correspondente para aprofundar a análise ou continuar a operação.",
           "No acesso local pela tela de login, o botão Entrar com Google depende do client ID configurado no ambiente do frontend e do backend.",
+          "A tela de login ocupa a altura disponível da janela sem barra de rolagem na página principal; o layout reduz espaçamentos e redimensiona a distribuição conforme a altura da tela.",
           "Quando o backend estiver em desenvolvimento sem envio de e-mail configurado, a recuperação de senha conclui localmente e grava a senha temporária no log do servidor."
         ],
         atencoes: [
