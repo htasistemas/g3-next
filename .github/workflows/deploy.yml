@@ -40,6 +40,7 @@ jobs:
       - name: Atualizar codigo no servidor
         env:
           GITHUB_SHA: ${{ github.sha }}
+          DEPLOY_REPOSITORY: https://github.com/torresoftbrasil/g3-next.git
         run: |
           set -euo pipefail
 
@@ -66,9 +67,12 @@ jobs:
             echo "Backup local salvo em $BACKUP_DIR"
           fi
 
-          git fetch origin main
+          # O checkout de produção pode ter um remote origin legado. Buscar
+          # explicitamente o repositório oficial evita publicar outro main.
+          git fetch "$DEPLOY_REPOSITORY" main
           git checkout main
-          git reset --hard origin/main
+          git reset --hard "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           git clean -fd
 
       - name: Executar deploy
