@@ -621,8 +621,10 @@ const secoesManual: ManualSecao[] = [
           "Ao salvar, o sistema grava o evento, envia as fotos pendentes, define a capa e mantém o fluxo completo sincronizado entre cadastro, listagem e galeria.",
           "Quando o evento for salvo com sucesso, a tela passa a confirmar corretamente o cadastro sem exibir mensagem indevida de erro, mesmo quando houver fotos pendentes no mesmo fluxo.",
           "Na aba Álbum do evento, o card principal agora mostra a foto em destaque no topo e, abaixo dela, status, capa definida, nome do evento, data, local e as ações Adicionar fotos e Editar evento.",
-          "Na aba Álbum do evento, as fotos protegidas também são carregadas por acesso autenticado para que álbuns já cadastrados voltem a exibir todas as imagens.",
-          "Na aba Álbum do evento, use Adicionar fotos para complementar o álbum, Definir capa para trocar a imagem principal, Reordenar para ajustar a sequência visual e Excluir foto para remover itens específicos.",
+           "Na aba Álbum do evento, as fotos protegidas também são carregadas por acesso autenticado para que álbuns já cadastrados voltem a exibir todas as imagens.",
+           "Durante o envio de fotos, a tela exibe uma barra de progresso com o percentual do lote até a confirmação da persistência.",
+           "No mural do álbum, clique em qualquer foto para abrir a visualização em tamanho normal; use o botão Fechar ou a tecla Esc para retornar.",
+           "Na aba Álbum do evento, use Adicionar fotos para complementar o álbum, Definir capa para trocar a imagem principal, Reordenar para ajustar a sequência visual e Excluir foto para remover itens específicos.",
           "Use Publicar evento quando o álbum já estiver consistente e o status precisar ser ajustado para realizado sem voltar para o formulário."
         ],
         atencoes: [

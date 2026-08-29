@@ -22,6 +22,7 @@ import {
   Upload,
   X
 } from "lucide-react";
+import type { AxiosProgressEvent } from "axios";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -43,7 +44,7 @@ import {
 import { obterUrlArquivoAutenticado, resolverUrlArquivo } from "@/lib/arquivos";
 import { lerArquivoComoDataUrl } from "@/lib/foto-3x4";
 import { imprimirConteudoAtual } from "@/lib/report-utils";
-import type { FotoEventoFotoPayload, FotoEventoPayload, FotoUploadPayload } from "@/types/fotos-eventos";
+import type { FotoEventoFotoPayload, FotoEventoItem, FotoEventoPayload, FotoUploadPayload } from "@/types/fotos-eventos";
 
 type AbaId = "lista" | "cards" | "cadastro" | "detalhe";
 
@@ -330,6 +331,29 @@ function ImagemArquivoAutenticado({
   );
 }
 
+function BarraProgressoUpload({ progresso, texto }: { progresso: number; texto: string }) {
+  const valor = Math.max(0, Math.min(100, progresso));
+
+  return (
+    <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/35 p-3" aria-live="polite">
+      <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+        <span className="font-medium text-[var(--g3-foreground)]">{texto}</span>
+        <span className="font-semibold text-[var(--g3-active)]">{valor}%</span>
+      </div>
+      <div
+        className="h-2 overflow-hidden rounded-full bg-[var(--g3-border)]/60"
+        role="progressbar"
+        aria-label={texto}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={valor}
+      >
+        <div className="h-full rounded-full bg-[var(--g3-active)] transition-[width] duration-200" style={{ width: `${valor}%` }} />
+      </div>
+    </div>
+  );
+}
+
 export function FotosEventosPage() {
   const navigate = useNavigate();
   const [abaAtiva, setAbaAtiva] = useState<AbaId>("lista");
@@ -342,6 +366,19 @@ export function FotosEventosPage() {
   const [confirmarExcluirFotoId, setConfirmarExcluirFotoId] = useState<number | null>(null);
   const [uploadsPendentes, setUploadsPendentes] = useState<UploadPendente[]>([]);
   const [importandoPastas, setImportandoPastas] = useState(false);
+  const [progressoUpload, setProgressoUpload] = useState<number | null>(null);
+  const [fotoAmpliada, setFotoAmpliada] = useState<FotoEventoItem | null>(null);
+
+  useEffect(() => {
+    if (!fotoAmpliada) return;
+
+    function fecharComEsc(evento: KeyboardEvent) {
+      if (evento.key === "Escape") setFotoAmpliada(null);
+    }
+
+    window.addEventListener("keydown", fecharComEsc);
+    return () => window.removeEventListener("keydown", fecharComEsc);
+  }, [fotoAmpliada]);
 
   const { data, isLoading } = useFotosEventos({
     busca,
@@ -625,9 +662,14 @@ export function FotosEventosPage() {
       payload: {
         fotos: fotosPayload,
         fotoPrincipalIndex: 0
+      },
+      onUploadProgress: (evento: AxiosProgressEvent) => {
+        const total = evento.total ?? 0;
+        setProgressoUpload(total > 0 ? Math.max(1, Math.min(99, Math.round((evento.loaded * 100) / total))) : 50);
       }
     });
 
+    setProgressoUpload(100);
     limparUploadsPendentes();
   }
 
@@ -672,6 +714,7 @@ export function FotosEventosPage() {
       setAbaAtiva("detalhe");
 
       try {
+        setProgressoUpload(quantidadeUploadsPendentes > 0 ? 0 : null);
         await persistirUploadsPendentes(response.id);
         setPopupMensagem({
           tipo: "sucesso",
@@ -689,6 +732,9 @@ export function FotosEventosPage() {
             error?.response?.data?.message ??
             "O evento foi salvo, mas não foi possível concluir o envio das fotos."
         });
+      }
+      finally {
+        setProgressoUpload(null);
       }
     } catch (error: any) {
       setPopupMensagem({
@@ -768,6 +814,7 @@ export function FotosEventosPage() {
     if (!lista.length) return;
 
     try {
+      setProgressoUpload(0);
       const fotosPayload: FotoEventoFotoPayload[] = [];
       for (let index = 0; index < lista.length; index += 1) {
         const arquivo = await arquivoParaUpload(lista[index]);
@@ -780,9 +827,14 @@ export function FotosEventosPage() {
 
       await adicionarFotosLoteMutation.mutateAsync({
         id: form.id,
-        payload: { fotos: fotosPayload }
+        payload: { fotos: fotosPayload },
+        onUploadProgress: (evento: AxiosProgressEvent) => {
+          const total = evento.total ?? 0;
+          setProgressoUpload(total > 0 ? Math.max(1, Math.min(99, Math.round((evento.loaded * 100) / total))) : 50);
+        }
       });
 
+      setProgressoUpload(100);
       setPopupMensagem({
         tipo: "sucesso",
         titulo: "Confirmação",
@@ -794,6 +846,8 @@ export function FotosEventosPage() {
         titulo: "Erro",
         texto: error?.response?.data?.message ?? "Não foi possível adicionar as fotos."
       });
+    } finally {
+      window.setTimeout(() => setProgressoUpload(null), 500);
     }
   }
 
@@ -1075,20 +1129,46 @@ export function FotosEventosPage() {
                 </Card>
               ) : eventos.length ? (
                 eventos.map((item) => (
-                  <button
+                  <div
                     key={item.id}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                     className="overflow-hidden rounded-2xl border border-[var(--g3-border)] bg-[var(--g3-card)] text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--g3-active)] hover:shadow-md"
                     onClick={() => selecionar(item.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        selecionar(item.id);
+                      }
+                    }}
                   >
                     <div className="relative aspect-[4/3] overflow-hidden bg-[var(--g3-primary-soft)]">
                       {item.fotoPrincipalUrl ? (
-                        <ImagemArquivoAutenticado
-                          valor={item.fotoPrincipalUrl}
-                          alt={item.titulo}
-                          className="h-full w-full object-cover"
-                          placeholder="Sem foto principal"
-                        />
+                        <button
+                          type="button"
+                          className="group h-full w-full cursor-zoom-in text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g3-active)] focus-visible:ring-inset"
+                          aria-label={`Visualizar foto principal de ${item.titulo} em tamanho normal`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setFotoAmpliada({
+                              id: item.fotoPrincipalId ?? item.id,
+                              eventoId: item.id,
+                              arquivoUrl: item.fotoPrincipalUrl,
+                              nomeArquivo: item.titulo,
+                              legenda: `Foto principal de ${item.titulo}`
+                            });
+                          }}
+                        >
+                          <ImagemArquivoAutenticado
+                            valor={item.fotoPrincipalUrl}
+                            alt={item.titulo}
+                            className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.02]"
+                            placeholder="Sem foto principal"
+                          />
+                          <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/65 to-transparent px-3 pb-3 pt-8 text-xs font-medium text-white opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">
+                            Clique para visualizar em tamanho normal
+                          </span>
+                        </button>
                       ) : (
                         <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-[var(--g3-muted)]">
                           <Images className="h-8 w-8" />
@@ -1115,7 +1195,7 @@ export function FotosEventosPage() {
                         <span>{item.totalFotos ?? 0} fotos</span>
                       </div>
                     </div>
-                  </button>
+                  </div>
                 ))
               ) : (
                 <Card className="sm:col-span-2 xl:col-span-3 2xl:col-span-4 border-[var(--g3-border)]">
@@ -1269,8 +1349,16 @@ export function FotosEventosPage() {
                         {importandoPastas ? "Importando..." : "Importar pastas"}
                       </Button>
                     </div>
-                  </CardHeader>
+                </CardHeader>
                 <CardContent>
+                  {progressoUpload !== null ? (
+                    <div className="mb-4">
+                      <BarraProgressoUpload
+                        progresso={progressoUpload}
+                        texto={progressoUpload >= 100 ? "Fotos enviadas" : "Enviando fotos..."}
+                      />
+                    </div>
+                  ) : null}
                   {uploadsPendentes.length ? (
                     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                       {uploadsPendentes.map((item, index) => {
@@ -1480,6 +1568,12 @@ export function FotosEventosPage() {
                         Editar evento
                       </Button>
                     </div>
+                    {progressoUpload !== null ? (
+                      <BarraProgressoUpload
+                        progresso={progressoUpload}
+                        texto={progressoUpload >= 100 ? "Fotos enviadas" : "Enviando fotos..."}
+                      />
+                    ) : null}
                   </CardContent>
                 </div>
               </Card>
@@ -1513,12 +1607,22 @@ export function FotosEventosPage() {
                     >
                       <div className="relative aspect-video bg-slate-100">
                         {item.arquivoUrl ? (
-                          <ImagemArquivoAutenticado
-                            valor={item.arquivoUrl}
-                            alt={item.legenda ?? "Foto do evento"}
-                            className="h-full w-full object-cover"
-                            placeholder="Sem visualização"
-                          />
+                          <button
+                            type="button"
+                            className="group h-full w-full cursor-zoom-in text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g3-active)] focus-visible:ring-inset"
+                            aria-label={`Visualizar foto ${item.nomeArquivo ?? "do evento"} em tamanho normal`}
+                            onClick={() => setFotoAmpliada(item)}
+                          >
+                            <ImagemArquivoAutenticado
+                              valor={item.arquivoUrl}
+                              alt={item.legenda ?? "Foto do evento"}
+                              className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.02]"
+                              placeholder="Sem visualização"
+                            />
+                            <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/65 to-transparent px-3 pb-3 pt-8 text-xs font-medium text-white opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">
+                              Clique para visualizar em tamanho normal
+                            </span>
+                          </button>
                         ) : (
                           <div className="flex h-full items-center justify-center text-sm text-[var(--g3-muted)]">
                             Sem visualização
@@ -1643,6 +1747,36 @@ export function FotosEventosPage() {
         onConfirm={() => void confirmarExclusaoFoto()}
         confirmarTexto="Excluir"
       />
+
+      {fotoAmpliada?.arquivoUrl ? (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Visualização da foto ${fotoAmpliada.nomeArquivo ?? "do evento"}`}
+          onClick={() => setFotoAmpliada(null)}
+        >
+          <div
+            className="relative flex max-h-[calc(100vh-2rem)] max-w-[min(96vw,1200px)] items-center justify-center rounded-2xl bg-black/30 p-2 shadow-2xl"
+            onClick={(evento) => evento.stopPropagation()}
+          >
+            <ImagemArquivoAutenticado
+              valor={fotoAmpliada.arquivoUrl}
+              alt={fotoAmpliada.legenda ?? fotoAmpliada.nomeArquivo ?? "Foto do evento"}
+              className="max-h-[calc(100vh-4rem)] max-w-full object-contain"
+              placeholder="Não foi possível carregar a foto"
+            />
+            <button
+              type="button"
+              className="absolute right-3 top-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/65 text-white transition hover:bg-black/85 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              aria-label="Fechar visualização da foto"
+              onClick={() => setFotoAmpliada(null)}
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }

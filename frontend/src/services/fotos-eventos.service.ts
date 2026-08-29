@@ -1,4 +1,5 @@
 import { httpClient } from "./http-client";
+import type { AxiosProgressEvent } from "axios";
 import type {
   FotoEvento,
   FotoEventoFotosLotePayload,
@@ -62,10 +63,15 @@ export const fotosEventosService = {
     return data;
   },
 
-  async adicionarFotosLote(id: number, payload: FotoEventoFotosLotePayload) {
+  async adicionarFotosLote(
+    id: number,
+    payload: FotoEventoFotosLotePayload,
+    options?: { onUploadProgress?: (progressEvent: AxiosProgressEvent) => void }
+  ) {
     const { data } = await httpClient.post<{ fotos: FotoEventoItem[] }>(
       `/api/fotos-eventos/${id}/fotos/lote`,
-      payload
+      payload,
+      { timeout: 300000, onUploadProgress: options?.onUploadProgress }
     );
     return data.fotos;
   },

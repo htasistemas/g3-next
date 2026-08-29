@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { fotosEventosService } from "@/services/fotos-eventos.service";
 import type { FotoEventoFotosLotePayload, FotoEventoPayload } from "@/types/fotos-eventos";
+import type { AxiosProgressEvent } from "axios";
 
 type FiltrosFotoEvento = {
   busca?: string;
@@ -81,8 +82,15 @@ export function useAdicionarFotoEvento() {
 export function useAdicionarFotosEventoLote() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, payload }: { id: number; payload: FotoEventoFotosLotePayload }) =>
-      fotosEventosService.adicionarFotosLote(id, payload),
+    mutationFn: ({
+      id,
+      payload,
+      onUploadProgress
+    }: {
+      id: number;
+      payload: FotoEventoFotosLotePayload;
+      onUploadProgress?: (progressEvent: AxiosProgressEvent) => void;
+    }) => fotosEventosService.adicionarFotosLote(id, payload, { onUploadProgress }),
     onSuccess: async (_response, vars) => {
       await queryClient.invalidateQueries({ queryKey: ["fotos-eventos"] });
       await queryClient.invalidateQueries({ queryKey: ["fotos-eventos", "detalhe", vars.id] });
