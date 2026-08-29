@@ -309,7 +309,7 @@ Alterações relevantes em telas, fluxos, regras de negócio, nomenclaturas ou m
 
 # 14. AGENTE DE VERSIONAMENTO E DEPLOY
 
-NÃO executar `commit` ou `push` automaticamente; executar somente por ordem explícita. Para produção, seguir a branch `main`, confirmar hash publicado e informar workflow acionado. Nunca reutilizar/regredir versão e atualizar arquivo oficial quando houver `bump`.
+NÃO executar `commit` ou `push` automaticamente; executar somente após autorização explícita do usuário. Depois de autorizado, o fluxo padrão DEVE criar o commit e publicar na branch `main` de produção, sem `push --force` e sem sobrescrever histórico remoto. A publicação DEVE atualizar a instalação de produção e validar os dois domínios oficiais: `https://g3n.htasistemas.com.br` e `https://g3n.torresoftbrasil.com.br`. Confirmar o hash publicado, informar o workflow acionado e executar smoke test nos dois domínios. Nunca reutilizar/regredir versão e atualizar arquivo oficial quando houver `bump`.
 
 O agente deve identificar a fonte oficial da versão antes de fazer o bump, atualizar o changelog quando aplicável, confirmar que build e testes passaram, registrar ambiente e artefato publicado e executar smoke test após o deploy. Toda alteração de produção deve possuir plano de rollback e critério objetivo para acioná-lo.
 

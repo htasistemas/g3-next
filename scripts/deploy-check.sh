@@ -7,7 +7,7 @@ HOST_API_PORT="${HOST_API_PORT:-3333}"
 HOST_FRONTEND_PORT="${HOST_FRONTEND_PORT:-3200}"
 BACKEND_URL="${BACKEND_URL:-http://127.0.0.1:${HOST_API_PORT}}"
 FRONTEND_URL="${FRONTEND_URL:-http://127.0.0.1:${HOST_FRONTEND_PORT}}"
-PUBLIC_FRONTEND_URL="${PUBLIC_FRONTEND_URL:-${APP_PUBLIC_URL:-https://g3n.htasistemas.com.br}}"
+PUBLIC_FRONTEND_URLS="${PUBLIC_FRONTEND_URLS:-https://g3n.htasistemas.com.br https://g3n.torresoftbrasil.com.br}"
 LOGIN_USER="${LOGIN_USER:-}"
 LOGIN_PASS="${LOGIN_PASS:-}"
 
@@ -77,9 +77,11 @@ if [ "$frontend_status" != "200" ]; then
 fi
 log "Frontend OK"
 checar_login_atual "$FRONTEND_URL" "local"
-if [ "$PUBLIC_FRONTEND_URL" != "$FRONTEND_URL" ]; then
-  checar_login_atual "$PUBLIC_FRONTEND_URL" "publico"
-fi
+for public_url in $PUBLIC_FRONTEND_URLS; do
+  if [ "$public_url" != "$FRONTEND_URL" ]; then
+    checar_login_atual "$public_url" "publico-${public_url#https://}"
+  fi
+done
 
 portal_routes=(
   "/portal-doador"

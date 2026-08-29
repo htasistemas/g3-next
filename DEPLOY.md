@@ -29,6 +29,11 @@ Checklist rapido:
 - `curl -fsS http://127.0.0.1:3200/`
 - `bash ./scripts/deploy-check.sh`
 
+Regra de publicação:
+- Após autorização explícita do usuário, o commit deve ser publicado na branch `main` de produção.
+- O deploy só é considerado concluído após validar o login e a saúde da aplicação nos dois domínios: `https://g3n.htasistemas.com.br` e `https://g3n.torresoftbrasil.com.br`.
+- Nunca usar `push --force` nem sobrescrever histórico remoto.
+
 Cloudflare Tunnel:
 - Preencha o `.env` com `TUNNEL_TOKEN`.
 - `g3n.htasistemas.com.br` e `g3n.torresoftbrasil.com.br` devem apontar para `http://nginx-g3n:80`.
