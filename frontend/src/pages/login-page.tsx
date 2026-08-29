@@ -29,7 +29,6 @@ import { precarregarRota } from "@/routes/route-modules";
 import { authService } from "@/services/auth.service";
 import type { AmbienteAutorizado, LoginMfaRequired, TenantContextoLogin } from "@/types/auth";
 
-const FOTO_LATERAL_URL = "/images/loguim.jpg";
 const LEMBRAR_ACESSO_STORAGE_KEY = "g3n_login_lembrar_acesso";
 const CNPJ_STORAGE_KEY = "g3n_login_cnpj";
 const EMAIL_MASTER_SEM_TENANT = "htasistemas@gmail.com";
@@ -712,26 +711,26 @@ export function LoginPage() {
     <main className="relative h-dvh overflow-hidden bg-[#071b2d] text-slate-900">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(20,184,166,0.28),transparent_32%),linear-gradient(135deg,#071b2d_0%,#0f3a3a_48%,#f8fafc_48%,#ffffff_100%)]" />
       <section className="relative z-10 grid h-full min-h-0 lg:grid-cols-[1.05fr_0.95fr]">
-        <aside className="hidden h-full min-h-0 flex-col justify-center gap-3 p-5 text-white lg:flex xl:gap-4 xl:p-6">
-          <div className="space-y-3 xl:space-y-4">
+        <aside className="relative hidden h-full min-h-0 flex-col justify-center gap-3 p-5 text-white lg:flex xl:gap-4 xl:p-6">
+          <div className="-translate-y-16 space-y-3 xl:-translate-y-[4.5rem] xl:space-y-4">
             <div className="inline-flex items-center gap-3 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm">
               <Sparkles className="h-4 w-4 text-cyan-200" />
               Login inteligente G3 Next
             </div>
             <div className="max-w-xl space-y-4 xl:space-y-5">
-              <h1 className="text-4xl font-semibold leading-tight xl:text-5xl">Acesso seguro para uma gestão mais inteligente.</h1>
+              <h1 className="text-4xl font-semibold leading-tight xl:text-5xl">Tecnologia que fortalece quem transforma vidas.</h1>
               <p className="max-w-lg text-base leading-7 text-slate-200">
-                Autenticação por instituição, senha, Google, MFA e passkey em uma experiência única,
-                profissional e preparada para IA.
+                Acesso inteligente e protegido, com múltiplas formas de autenticação em uma experiência
+                moderna, segura e preparada para o futuro.
               </p>
             </div>
-            <div className="grid max-w-xl gap-3 sm:grid-cols-3">
+            <div className="grid max-w-xl gap-3 sm:grid-cols-2">
               {[
                 { label: "Acesso seguro", description: "Senha, código e permissões.", Icon: ShieldCheck },
                 { label: "Dados protegidos", description: "Cada instituição vê seus dados.", Icon: LockKeyhole },
                 { label: "Entrada inteligente", description: "CNPJ, e-mail, Google ou passkey.", Icon: Fingerprint }
-              ].map(({ label, description, Icon }) => (
-                <div key={String(label)} className="min-h-28 rounded-lg border border-white/15 bg-white/10 p-3">
+              ].map(({ label, description, Icon }, index) => (
+                <div key={String(label)} className={`min-h-28 rounded-lg border border-white/15 bg-white/10 p-3 ${index === 2 ? "sm:col-start-1" : ""}`}>
                   <Icon className="h-5 w-5 text-cyan-200" />
                   <p className="mt-3 text-sm font-medium">{label}</p>
                   <p className="mt-1 text-xs leading-4 text-slate-200">{description}</p>
@@ -739,10 +738,7 @@ export function LoginPage() {
               ))}
             </div>
           </div>
-          <div className="max-w-2xl overflow-hidden rounded-lg border border-white/10 bg-white/10 shadow-2xl shadow-black/20">
-            <img src={FOTO_LATERAL_URL} alt="Atendimento social institucional" className="h-[clamp(9rem,25vh,18rem)] w-full object-cover" />
-          </div>
-          <p className="text-xs text-slate-300">Versão do sistema: {versaoSistema}</p>
+          <p className="absolute right-5 top-6 text-xs text-slate-300 xl:right-6">Versão do sistema: {versaoSistema}</p>
         </aside>
 
         <section className="flex h-full min-h-0 items-center justify-center px-3 py-2 sm:px-5 sm:py-3 lg:px-8">
