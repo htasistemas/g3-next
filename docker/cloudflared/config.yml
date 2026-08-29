@@ -1,4 +1,6 @@
 ingress:
   - hostname: g3n.htasistemas.com.br
     service: http://nginx-g3n:80
+  - hostname: g3n.torresoftbrasil.com.br
+    service: http://nginx-g3n:80
   - service: http_status:404

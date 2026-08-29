@@ -48,7 +48,7 @@ services:
       API_HOST: 0.0.0.0
       APP_MAINTENANCE_FLAG_PATH: ${APP_MAINTENANCE_FLAG_PATH:-/var/run/g3n/maintenance.enable}
       DATABASE_URL: postgresql://${DB_USERNAME:-g3n}:${DB_PASSWORD:-admin}@g3n-db:5432/${DB_NAME:-g3n}?schema=public
-      CORS_ORIGIN: ${CORS_ORIGIN:-https://g3n.htasistemas.com.br,http://localhost:5173,http://127.0.0.1:5173,http://0.0.0.0:5173,http://localhost:4200,http://127.0.0.1:4200,http://0.0.0.0:4200}
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://g3n.htasistemas.com.br,https://g3n.torresoftbrasil.com.br,http://localhost:5173,http://127.0.0.1:5173,http://0.0.0.0:5173,http://localhost:4200,http://127.0.0.1:4200,http://0.0.0.0:4200}
       APP_AUTH_TOKEN_SECRET: ${APP_AUTH_TOKEN_SECRET:-g3-next-dev-token-secret-2026}
       APP_AUTH_TOKEN_EXPIRATION_MINUTES: ${APP_AUTH_TOKEN_EXPIRATION_MINUTES:-480}
       APP_AUTH_COOKIE_NAME: ${APP_AUTH_COOKIE_NAME:-g3n_auth_token}
@@ -103,7 +103,7 @@ services:
     container_name: g3n-frontend
     restart: unless-stopped
     environment:
-      API_BASE_URL: ${API_BASE_URL:-https://g3n.htasistemas.com.br}
+      API_BASE_URL: ${API_BASE_URL:-}
     ports:
       - "127.0.0.1:${HOST_FRONTEND_PORT:-3200}:80"
     depends_on:
@@ -123,7 +123,7 @@ services:
     container_name: nginx-g3n
     restart: unless-stopped
     environment:
-      APP_PUBLIC_HOST: ${APP_PUBLIC_HOST:-g3n.htasistemas.com.br}
+      APP_PUBLIC_HOST: ${APP_PUBLIC_HOST:-g3n.htasistemas.com.br g3n.torresoftbrasil.com.br}
       APP_PUBLIC_URL: ${APP_PUBLIC_URL:-https://g3n.htasistemas.com.br}
       APP_FRONTEND_UPSTREAM: ${APP_FRONTEND_UPSTREAM:-g3n-frontend:80}
       APP_API_UPSTREAM: ${APP_API_UPSTREAM:-g3n-backend:3333}

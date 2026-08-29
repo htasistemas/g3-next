@@ -31,11 +31,13 @@ Checklist rapido:
 
 Cloudflare Tunnel:
 - Preencha o `.env` com `TUNNEL_TOKEN`.
-- `g3n.htasistemas.com.br` deve apontar para `http://nginx-g3n:80`.
+- `g3n.htasistemas.com.br` e `g3n.torresoftbrasil.com.br` devem apontar para `http://nginx-g3n:80`.
+- O DNS de cada dominio deve encaminhar para o mesmo Cloudflare Tunnel; a configuracao versionada nao cria registros DNS.
 
 Observacoes:
 - Nao use `docker-compose.tunnel.yml` em paralelo com este fluxo.
 - O `deploy.sh` publica exatamente a versao versionada em `updates/version.txt`; o bump deve ser feito antes do commit quando a entrega exigir nova versao.
 - O frontend e reconstruido sem cache para evitar publicar bundle antigo de login ou rotas publicas.
+- O frontend usa a origem atual como API por padrao, permitindo acesso pelos dois dominios; `API_BASE_URL` so deve ser definido quando houver uma API central intencional.
 - O estado local de deploy fica em `~/.g3n-deploy`, incluindo backups do checkout e o ultimo numero de versao publicado.
 - A flag de manutencao usada pelo proxy fica em `docker/runtime/maintenance.enable`.
