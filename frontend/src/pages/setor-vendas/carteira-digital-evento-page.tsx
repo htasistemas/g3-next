@@ -1,7 +1,9 @@
 ﻿import { useEffect, useMemo, useState } from "react";
+import { useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import JsBarcode from "jsbarcode";
 import QRCode from "qrcode";
-import { BadgeDollarSign, QrCode, ReceiptText, RefreshCcw, Save, Store, WalletCards } from "lucide-react";
+import { BadgeDollarSign, QrCode, ReceiptText, RefreshCcw, Save, ShieldCheck, Store, WalletCards } from "lucide-react";
 import { AdminPageLayout, type AdminAction, type AdminTab } from "@/components/admin/admin-page-layout";
 import { PopupMensagem, type PopupMensagemState } from "@/components/admin/admin-popups";
 import { Button } from "@/components/ui/button";
@@ -31,14 +33,15 @@ import type {
   VendaCarteira
 } from "@/types/carteira-evento";
 
-type AbaId = "dashboard" | "cadastros" | "carteiras" | "operacao" | "fechamento";
+type AbaId = "dashboard" | "cadastros" | "carteiras" | "operacao" | "fechamento" | "auditoria";
 
 const abas: AdminTab[] = [
   { id: "dashboard", label: "Dashboard", icon: BadgeDollarSign },
   { id: "cadastros", label: "Cadastros", icon: Store },
   { id: "carteiras", label: "Carteiras", icon: WalletCards },
   { id: "operacao", label: "Operação", icon: QrCode },
-  { id: "fechamento", label: "Fechamento", icon: ReceiptText }
+  { id: "fechamento", label: "Fechamento", icon: ReceiptText },
+  { id: "auditoria", label: "Auditoria", icon: ShieldCheck }
 ];
 
 const tiposEvento = ["FESTA_BARRACAS", "BAZAR", "CANTINA", "QUERMESSE", "FEIRA_SOLIDARIA", "CAMPANHA_BENEFICENTE", "OUTROS"];
@@ -79,6 +82,10 @@ function classesCampoInvalido(erro?: string) {
 
 function novaChaveOperacao() {
   return `g3n-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function escaparHtml(valor: string) {
+  return valor.replace(/[&<>"']/g, (caractere) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[caractere] ?? caractere);
 }
 
 function criarEventoFormPadrao() {
@@ -156,6 +163,7 @@ function validarInteiroNaoNegativo(valor: string) {
 }
 
 export function CarteiraDigitalEventoPage() {
+  const navigate = useNavigate();
   const [abaAtiva, setAbaAtiva] = useState<AbaId>("dashboard");
   const [popup, setPopup] = useState<PopupMensagemState | null>(null);
   const [carregando, setCarregando] = useState(false);
@@ -165,6 +173,7 @@ export function CarteiraDigitalEventoPage() {
   const [itens, setItens] = useState<ItemEventoCarteira[]>([]);
   const [dashboard, setDashboard] = useState<DashboardCarteiraEvento | null>(null);
   const [fechamento, setFechamento] = useState<Record<string, unknown> | null>(null);
+  const [auditoria, setAuditoria] = useState<Array<any>>([]);
   const [eventoSelecionadoId, setEventoSelecionadoId] = useState(0);
   const [participanteSelecionado, setParticipanteSelecionado] = useState<ParticipanteCarteira | null>(null);
   const [extrato, setExtrato] = useState<MovimentacaoCarteira[]>([]);
@@ -176,6 +185,12 @@ export function CarteiraDigitalEventoPage() {
   const [itensVenda, setItensVenda] = useState<Array<{ item: ItemEventoCarteira; quantidade: number }>>([]);
   const [ultimaVenda, setUltimaVenda] = useState<VendaCarteira | null>(null);
   const [chaveOperacao, setChaveOperacao] = useState(novaChaveOperacao());
+  const [buscaCarteiras, setBuscaCarteiras] = useState("");
+  const [filtroCarteiras, setFiltroCarteiras] = useState("TODAS");
+  const [carteirasSelecionadasImpressao, setCarteirasSelecionadasImpressao] = useState<number[]>([]);
+  const [leitorQrAtivo, setLeitorQrAtivo] = useState(false);
+  const videoQrRef = useRef<HTMLVideoElement | null>(null);
+  const streamQrRef = useRef<MediaStream | null>(null);
 
   const [eventoForm, setEventoForm] = useState(criarEventoFormPadrao);
   const [participanteForm, setParticipanteForm] = useState(criarParticipanteFormPadrao);
@@ -195,6 +210,8 @@ export function CarteiraDigitalEventoPage() {
   const [errosBarraca, setErrosBarraca] = useState<Record<string, string | undefined>>({});
   const [errosItem, setErrosItem] = useState<Record<string, string | undefined>>({});
   const [consultaSaldoId, setConsultaSaldoId] = useState("");
+  const [consultaCartaoCodigo, setConsultaCartaoCodigo] = useState("");
+  const [consultaCartaoResultado, setConsultaCartaoResultado] = useState<ParticipanteCarteira | null>(null);
 
   const eventoSelecionado = useMemo(() => eventos.find((item) => item.id === eventoSelecionadoId) ?? null, [eventos, eventoSelecionadoId]);
   const barracasEvento = useMemo(() => barracas.filter((item) => item.eventoId === eventoSelecionadoId), [barracas, eventoSelecionadoId]);
@@ -211,6 +228,26 @@ export function CarteiraDigitalEventoPage() {
     () => participantes.find((item) => item.id === Number(consultaSaldoId || 0)) ?? participanteSelecionado ?? null,
     [consultaSaldoId, participanteSelecionado, participantes]
   );
+  const participantesFiltrados = useMemo(() => {
+    const termo = buscaCarteiras.trim().toLocaleLowerCase("pt-BR");
+    const impressos = new Set(auditoria.filter((item) => ["IMPRESSAO_CARTAO", "REIMPRESSAO_CARTAO"].includes(item.tipoEvento)).map((item) => item.participanteId));
+    return participantes.filter((item) => {
+      const correspondeBusca = !termo || [item.nome, item.numeroCarteira, item.cpf].some((valor) => valor?.toLocaleLowerCase("pt-BR").includes(termo));
+      const correspondeStatus = filtroCarteiras === "TODAS"
+        || (filtroCarteiras === "ATIVAS" && item.status === "ATIVO")
+        || (filtroCarteiras === "COM_SALDO" && item.saldoAtual > 0)
+        || (filtroCarteiras === "SEM_SALDO" && item.saldoAtual <= 0)
+        || (filtroCarteiras === "SEM_CARTAO" && !impressos.has(item.id));
+      return correspondeBusca && correspondeStatus;
+    });
+  }, [auditoria, buscaCarteiras, filtroCarteiras, participantes]);
+  const recomendacao = !dashboard || dashboard.quantidadeCarteiras === 0
+    ? { titulo: "Ainda não existem carteiras criadas.", texto: "Comece selecionando ou cadastrando o primeiro participante do evento.", acao: "Criar primeira carteira" }
+    : dashboard.carteirasSemSaldo > 0
+      ? { titulo: `${dashboard.carteirasSemSaldo} carteira(s) ainda estão sem saldo.`, texto: "Abasteça as carteiras para que os participantes possam comprar.", acao: "Abastecer carteiras" }
+      : dashboard.carteirasAguardandoImpressao > 0
+        ? { titulo: `${dashboard.carteirasAguardandoImpressao} participante(s) aguardam cartão.`, texto: "Gere o QR Code e imprima a comanda antes do evento.", acao: "Imprimir cartões" }
+        : { titulo: "As carteiras estão prontas para utilização.", texto: "Abra a Frente de Caixa para iniciar as vendas.", acao: "Abrir Frente de Caixa" };
 
   const actions: AdminAction[] = [
     { label: "Atualizar", icon: RefreshCcw, onClick: () => void carregarBase(eventoSelecionadoId), variant: "outline" }
@@ -225,18 +262,20 @@ export function CarteiraDigitalEventoPage() {
       setEventos(listaEventos);
       setEventoSelecionadoId(eventoId);
       if (!eventoId) return;
-      const [participantesData, barracasData, itensData, dashboardData, fechamentoData] = await Promise.all([
+      const [participantesData, barracasData, itensData, dashboardData, fechamentoData, auditoriaData] = await Promise.all([
         carteiraEventoService.listarParticipantes({ evento_id: eventoId }),
         carteiraEventoService.listarBarracas({ evento_id: eventoId }),
         carteiraEventoService.listarItens({ evento_id: eventoId }),
         carteiraEventoService.dashboard(eventoId),
-        carteiraEventoService.fechamento(eventoId)
+        carteiraEventoService.fechamento(eventoId),
+        carteiraEventoService.auditoria(eventoId)
       ]);
       setParticipantes(participantesData.participantes);
       setBarracas(barracasData.barracas);
       setItens(itensData.itens);
       setDashboard(dashboardData);
       setFechamento(fechamentoData);
+      setAuditoria(auditoriaData.registros as Array<any>);
     } catch (error: any) {
       setPopup({ tipo: "erro", titulo: "Carteira digital do evento", texto: error?.response?.data?.message ?? "Não foi possível carregar o módulo." });
     } finally {
@@ -275,6 +314,39 @@ export function CarteiraDigitalEventoPage() {
     }
     void carteiraEventoService.extrato(participanteSelecionado.id).then((data) => setExtrato(data.movimentacoes)).catch(() => setExtrato([]));
   }, [participanteSelecionado]);
+
+  useEffect(() => {
+    if (!leitorQrAtivo) return;
+    let intervalo: number | undefined;
+    let cancelado = false;
+    const iniciar = async () => {
+      const Detector = (window as any).BarcodeDetector;
+      if (!Detector || !navigator.mediaDevices?.getUserMedia) {
+        setLeitorQrAtivo(false);
+        setPopup({ tipo: "erro", titulo: "Leitura por câmera", texto: "Este navegador não oferece leitura de QR Code. Digite o código da carteira para continuar." });
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+        if (cancelado || !videoQrRef.current) { stream.getTracks().forEach((track) => track.stop()); return; }
+        streamQrRef.current = stream;
+        videoQrRef.current.srcObject = stream;
+        await videoQrRef.current.play();
+        const detector = new Detector({ formats: ["qr_code"] });
+        intervalo = window.setInterval(async () => {
+          if (!videoQrRef.current || videoQrRef.current.readyState < 2) return;
+          const encontrados = await detector.detect(videoQrRef.current).catch(() => []);
+          const valor = encontrados[0]?.rawValue?.trim();
+          if (valor) { setTokenOperacao(valor); setLeitorQrAtivo(false); }
+        }, 350);
+      } catch {
+        setLeitorQrAtivo(false);
+        setPopup({ tipo: "erro", titulo: "Leitura por câmera", texto: "Não foi possível acessar a câmera. Digite o código da carteira para continuar." });
+      }
+    };
+    void iniciar();
+    return () => { cancelado = true; if (intervalo) window.clearInterval(intervalo); streamQrRef.current?.getTracks().forEach((track) => track.stop()); streamQrRef.current = null; };
+  }, [leitorQrAtivo]);
 
   function selecionarEvento(item: EventoCarteira) {
     setEventoForm({
@@ -534,6 +606,7 @@ export function CarteiraDigitalEventoPage() {
       setParticipanteSelecionado(participante);
       setRecargaValor("");
       setErrosOperacao((atual) => ({ ...atual, recargaValor: undefined }));
+      setPopup({ tipo: "sucesso", titulo: "Carteira abastecida", texto: `${formatarMoeda(valorRecarga)} adicionados. Novo saldo: ${formatarMoeda(participante.saldoAtual)}.` });
     } catch (error: any) {
       setPopup({ tipo: "erro", titulo: "Recarga", texto: error?.response?.data?.message ?? "Não foi possível realizar a recarga." });
     }
@@ -627,6 +700,32 @@ export function CarteiraDigitalEventoPage() {
     }
   }
 
+  async function consultarSaldoCartao() {
+    if (!eventoSelecionadoId || !consultaCartaoCodigo.trim()) return;
+    try {
+      const participante = await carteiraEventoService.consultarToken({ evento_id: eventoSelecionadoId, token: consultaCartaoCodigo.trim() });
+      setConsultaCartaoResultado(participante);
+      setParticipanteSelecionado(participante);
+    } catch (error: any) {
+      setConsultaCartaoResultado(null);
+      setPopup({ tipo: "erro", titulo: "Consulta de saldo", texto: error?.response?.data?.message ?? "Cartão não encontrado neste evento." });
+    }
+  }
+
+  async function estornarUltimaVenda() {
+    if (!ultimaVenda || !eventoSelecionado?.permiteEstorno) return;
+    const motivo = window.prompt("Informe o motivo do estorno:", "Solicitado pelo operador")?.trim();
+    if (!motivo) return;
+    try {
+      await carteiraEventoService.estornarVenda(ultimaVenda.id, motivo);
+      setPopup({ tipo: "sucesso", titulo: "Estorno concluído", texto: "O saldo foi devolvido e o estoque foi restaurado." });
+      await carregarBase(eventoSelecionadoId);
+      setUltimaVenda(null);
+    } catch (error: any) {
+      setPopup({ tipo: "erro", titulo: "Estorno", texto: error?.response?.data?.message ?? "Não foi possível estornar a venda." });
+    }
+  }
+
   function alternarItemVenda(item: ItemEventoCarteira) {
     if (!barracaOperacaoId && item.barracaId) {
       setBarracaOperacaoId(item.barracaId);
@@ -645,12 +744,37 @@ export function CarteiraDigitalEventoPage() {
     });
   }
 
-  function imprimirCartaoQr() {
+  async function imprimirCartaoQr() {
     if (!participanteSelecionado || !qrCodeUrl || !eventoSelecionado) return;
+    try {
+      await carteiraEventoService.registrarImpressao(participanteSelecionado.id);
+    } catch (error: any) {
+      setPopup({ tipo: "erro", titulo: "Impressão", texto: error?.response?.data?.message ?? "Não foi possível registrar a impressão." });
+      return;
+    }
     const popup = window.open("", "_blank", "width=420,height=620");
     if (!popup) return;
-    popup.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Carteira digital do evento</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#0f172a}img{width:220px;height:220px;display:block;margin:16px auto}.barcode{display:flex;justify-content:center;margin:12px 0}.token{font-size:12px;word-break:break-all;color:#475569}section{border:2px solid #0f766e;border-radius:18px;padding:20px}</style></head><body><section><h1>${eventoSelecionado.nomeEvento}</h1><h2>${participanteSelecionado.nome}</h2><p>Carteira ${participanteSelecionado.numeroCarteira}</p><img src="${qrCodeUrl}" alt="QR Code"><div class="barcode">${barcodeSvg || ""}</div><p class="token">Número da carteira: ${participanteSelecionado.numeroCarteira}</p><p class="token">Token seguro interno: ${participanteSelecionado.qrCodeTokenUnico}</p><p>Apresente o QR Code ou o código de barras nas barracas ou pontos de venda.</p></section><script>window.onload=()=>window.print();</script></body></html>`);
+    popup.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Carteira digital do evento</title><style>@page{size:85.60mm 53.98mm;margin:0}*{box-sizing:border-box}html,body{width:85.60mm;height:53.98mm;margin:0;padding:0}body{font-family:Arial,sans-serif;color:#0f172a}.card{width:85.60mm;height:53.98mm;padding:4mm;border:0.35mm solid #0f766e;border-radius:3mm;overflow:hidden}.event{font-size:3mm;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.label{font-size:2.4mm;color:#475569;text-transform:uppercase;letter-spacing:.25mm}.name{margin-top:2mm;font-size:4.2mm;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.content{display:flex;align-items:center;gap:4mm;margin-top:2mm}.qr{width:25mm;height:25mm;display:block}.code{font-size:3.4mm;font-weight:700}.help{margin-top:3mm;font-size:2.5mm;line-height:1.3}</style></head><body><main class="card"><div class="event">${eventoSelecionado.nomeEvento}</div><div class="label">Carteira digital do evento</div><div class="name">${participanteSelecionado.nome}</div><div class="content"><img class="qr" src="${qrCodeUrl}" alt="QR Code da carteira digital"><div><div class="label">Código alternativo</div><div class="code">${participanteSelecionado.numeroCarteira}</div></div></div><div class="help">Apresente este cartão no ponto de venda. O saldo será validado pelo sistema.</div></main><script>window.onload=()=>window.print();</script></body></html>`);
     popup.document.close();
+  }
+
+  async function imprimirCartoesSelecionados() {
+    if (!eventoSelecionado || !carteirasSelecionadasImpressao.length) return;
+    const selecionados = participantesFiltrados.filter((item) => carteirasSelecionadasImpressao.includes(item.id));
+    const janela = window.open("", "_blank", "width=520,height=720");
+    if (!janela) return;
+    try {
+      const qrCodes = await Promise.all(selecionados.map((item) => QRCode.toDataURL(item.qrCodeTokenUnico, { margin: 1, width: 320 })));
+      await Promise.all(selecionados.map((item) => carteiraEventoService.registrarImpressao(item.id)));
+      const cartoes = selecionados.map((item, index) => `<main class="card"><div class="event">${escaparHtml(eventoSelecionado.nomeEvento)}</div><div class="label">Carteira digital do evento</div><div class="name">${escaparHtml(item.nome)}</div><div class="content"><img class="qr" src="${qrCodes[index]}" alt="QR Code da carteira digital"><div><div class="label">Código alternativo</div><div class="code">${escaparHtml(item.numeroCarteira)}</div></div></div><div class="help">Apresente este cartão no ponto de venda. O saldo será validado pelo sistema.</div></main>`).join("");
+      janela.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Cartões do evento</title><style>@page{size:85.60mm 53.98mm;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0}body{font-family:Arial,sans-serif;color:#0f172a}.card{width:85.60mm;height:53.98mm;padding:4mm;border:.35mm solid #0f766e;border-radius:3mm;overflow:hidden;break-after:page;page-break-after:always}.event{font-size:3mm;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.label{font-size:2.4mm;color:#475569;text-transform:uppercase;letter-spacing:.25mm}.name{margin-top:2mm;font-size:4.2mm;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.content{display:flex;align-items:center;gap:4mm;margin-top:2mm}.qr{width:25mm;height:25mm;display:block}.code{font-size:3.4mm;font-weight:700}.help{margin-top:3mm;font-size:2.5mm;line-height:1.3}</style></head><body>${cartoes}<script>window.onload=()=>window.print();</script></body></html>`);
+      janela.document.close();
+      setCarteirasSelecionadasImpressao([]);
+      await carregarBase(eventoSelecionadoId);
+    } catch (error: any) {
+      janela.close();
+      setPopup({ tipo: "erro", titulo: "Impressão em lote", texto: error?.response?.data?.message ?? "Não foi possível gerar os cartões selecionados." });
+    }
   }
 
   return (
@@ -664,8 +788,19 @@ export function CarteiraDigitalEventoPage() {
       actions={actions}
     >
       <section className="space-y-4">
+        {abaAtiva === "dashboard" ? <Card className="border-[color:color-mix(in_srgb,var(--g3-primary)_30%,white)] bg-[var(--g3-primary-soft)]">
+          <CardHeader><CardTitle>Como funciona a carteira digital?</CardTitle><p className="text-sm text-[var(--g3-muted)]">Siga os quatro passos para preparar o participante e começar as vendas.</p></CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {[
+              ["1. Criar carteira", "Cadastre ou selecione o participante do evento.", "carteiras" as AbaId],
+              ["2. Adicionar saldo", "Inclua créditos para o participante comprar.", "carteiras" as AbaId],
+              ["3. QR Code ou cartão", "Gere o QR Code e imprima a comanda.", "carteiras" as AbaId],
+              ["4. Realizar compras", "Abra a operação de venda no PDV.", "operacao" as AbaId]
+            ].map(([titulo, texto, aba], index) => <button key={titulo} type="button" onClick={() => aba === "operacao" ? navigate("/setor-vendas/frente-caixa") : setAbaAtiva(aba as AbaId)} className="rounded-2xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--g3-active)] hover:shadow-md"><span className="text-xs font-black uppercase tracking-[0.16em] text-[var(--g3-active)]">Passo {index + 1}</span><p className="mt-2 font-black">{titulo}</p><p className="mt-1 text-sm text-[var(--g3-muted)]">{texto}</p><span className="mt-3 inline-block text-sm font-bold text-[var(--g3-active)]">Abrir etapa →</span></button>)}
+          </CardContent>
+        </Card> : null}
         <Card>
-          <CardContent className="grid gap-3 p-4 lg:grid-cols-[minmax(0,1fr)_repeat(3,180px)]">
+          <CardContent className="grid gap-3 p-4 lg:grid-cols-[minmax(0,1fr)_repeat(6,minmax(130px,1fr))]">
             <div>
               <Label>Evento em operação</Label>
               <Select
@@ -684,18 +819,26 @@ export function CarteiraDigitalEventoPage() {
                 ))}
               </Select>
             </div>
-            <div className="rounded-xl border border-[var(--g3-border)] px-3 py-2">
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--g3-muted)]">Participantes</p>
-              <p className="mt-2 text-2xl font-black">{dashboard?.quantidadeParticipantes ?? 0}</p>
-            </div>
-            <div className="rounded-xl border border-[var(--g3-border)] px-3 py-2">
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--g3-muted)]">Total carregado</p>
-              <p className="mt-2 text-xl font-black">{formatarMoeda(dashboard?.totalCarregado ?? 0)}</p>
-            </div>
-            <div className="rounded-xl border border-[var(--g3-border)] px-3 py-2">
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--g3-muted)]">Total consumido</p>
-              <p className="mt-2 text-xl font-black">{formatarMoeda(dashboard?.totalConsumido ?? 0)}</p>
-            </div>
+            <button type="button" onClick={() => setAbaAtiva("carteiras")} title="Quantidade de carteiras criadas no evento" className="rounded-xl border border-[var(--g3-border)] px-3 py-2 text-left hover:border-[var(--g3-active)]">
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--g3-muted)]">Carteiras criadas</p>
+              <p className="mt-2 text-2xl font-black">{dashboard?.quantidadeCarteiras ?? 0}</p>
+              <p className="text-xs text-[var(--g3-muted)]">{dashboard?.carteirasAtivas ?? 0} ativas</p>
+            </button>
+            <button type="button" onClick={() => setAbaAtiva("carteiras")} title="Saldo disponível nas carteiras do evento" className="rounded-xl border border-[var(--g3-border)] px-3 py-2 text-left hover:border-[var(--g3-active)]">
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--g3-muted)]">Saldo disponível</p>
+              <p className="mt-2 text-xl font-black">{formatarMoeda(dashboard?.saldoRemanescente ?? 0)}</p>
+            </button>
+            <div className="rounded-xl border border-[var(--g3-border)] px-3 py-2"><p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--g3-muted)]">Total de créditos</p><p className="mt-2 text-xl font-black">{formatarMoeda(dashboard?.totalCarregado ?? 0)}</p></div>
+            <div className="rounded-xl border border-[var(--g3-border)] px-3 py-2"><p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--g3-muted)]">Total utilizado</p><p className="mt-2 text-xl font-black">{formatarMoeda(dashboard?.totalConsumido ?? 0)}</p></div>
+            <button type="button" onClick={() => setAbaAtiva("operacao")} title="Compras aprovadas no evento" className="rounded-xl border border-[var(--g3-border)] px-3 py-2 text-left hover:border-[var(--g3-active)]"><p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--g3-muted)]">Compras realizadas</p><p className="mt-2 text-2xl font-black">{dashboard?.quantidadeVendas ?? 0}</p></button>
+            <button type="button" onClick={() => setAbaAtiva("carteiras")} title="Carteiras sem registro de impressão" className="rounded-xl border border-[var(--g3-border)] px-3 py-2 text-left hover:border-[var(--g3-active)]"><p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--g3-muted)]">Aguardando impressão</p><p className="mt-2 text-2xl font-black">{dashboard?.carteirasAguardandoImpressao ?? 0}</p><p className="text-xs text-[var(--g3-muted)]">cartão/comanda</p></button>
+          </CardContent>
+        </Card>
+
+        <Card className="border-[color:color-mix(in_srgb,var(--g3-active)_35%,white)]">
+          <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div><p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--g3-active)]">Próxima ação recomendada</p><p className="mt-1 text-lg font-black">{recomendacao.titulo}</p><p className="text-sm text-[var(--g3-muted)]">{recomendacao.texto}</p></div>
+              <Button type="button" onClick={() => recomendacao.acao === "Abrir Frente de Caixa" ? navigate("/setor-vendas/frente-caixa") : setAbaAtiva("carteiras")}>{recomendacao.acao}</Button>
           </CardContent>
         </Card>
 
@@ -921,6 +1064,13 @@ export function CarteiraDigitalEventoPage() {
 
         {abaAtiva === "carteiras" ? (
           <div className="space-y-4">
+            <Card className="border-[color:color-mix(in_srgb,var(--g3-active)_30%,white)]">
+              <CardHeader><CardTitle>Confirmar saldo do cartão</CardTitle><p className="text-sm text-[var(--g3-muted)]">Informe o código impresso no cartão/comanda para consultar o saldo atualizado deste evento.</p></CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex flex-col gap-2 sm:flex-row"><Input value={consultaCartaoCodigo} onChange={(e) => setConsultaCartaoCodigo(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void consultarSaldoCartao(); }} placeholder="Código da carteira ou token do QR Code" aria-label="Código do cartão para consultar saldo" /><Button type="button" onClick={() => void consultarSaldoCartao()}>Consultar saldo</Button><Button type="button" variant="outline" onClick={() => { setConsultaCartaoCodigo(""); setConsultaCartaoResultado(null); }}>Limpar</Button></div>
+                {consultaCartaoResultado ? <div className="grid gap-3 rounded-xl border border-[var(--g3-active)] bg-[var(--g3-primary-soft)] p-4 sm:grid-cols-3"><div><p className="text-xs font-bold uppercase tracking-wide text-[var(--g3-muted)]">Participante</p><p className="font-black">{consultaCartaoResultado.nome}</p></div><div><p className="text-xs font-bold uppercase tracking-wide text-[var(--g3-muted)]">Status</p><p className="font-semibold">{consultaCartaoResultado.status}</p></div><div><p className="text-xs font-bold uppercase tracking-wide text-[var(--g3-muted)]">Saldo disponível</p><p className="text-2xl font-black text-[var(--g3-active)]">{formatarMoeda(consultaCartaoResultado.saldoAtual)}</p></div></div> : null}
+              </CardContent>
+            </Card>
             {participanteSelecionado ? (
               <Card>
                 <CardHeader><CardTitle>Identificação da carteira</CardTitle></CardHeader>
@@ -944,15 +1094,29 @@ export function CarteiraDigitalEventoPage() {
 
             <div className="grid gap-4 xl:grid-cols-[0.9fr_1fr_1fr]">
               <Card>
-                <CardHeader><CardTitle>Carteiras do evento</CardTitle></CardHeader>
+                <CardHeader><CardTitle>Carteiras do evento</CardTitle><p className="text-sm text-[var(--g3-muted)]">Localize uma carteira e selecione-a para consultar saldo, abastecer ou imprimir.</p></CardHeader>
                 <CardContent className="space-y-2">
-                  {participantes.map((item) => (
-                    <button key={item.id} type="button" onClick={() => selecionarParticipante(item)} className={`w-full rounded-xl border px-3 py-2 text-left ${participanteSelecionado?.id === item.id ? "border-[var(--g3-active)] bg-[var(--g3-primary-soft)]" : "border-[var(--g3-border)] hover:bg-[var(--g3-card-soft)]"}`}>
-                      <p className="font-semibold">{item.nome}</p>
-                      <p className="text-sm text-[var(--g3-muted)]">Carteira {item.numeroCarteira} · {formatarMoeda(item.saldoAtual)}</p>
-                      <p className="text-xs text-[var(--g3-muted)]">{formatarTelefone(item.telefone) || "Telefone não informado"}{item.cpf ? ` · CPF ${formatarCpf(item.cpf)}` : ""}</p>
-                    </button>
+                  <div className="grid gap-2 sm:grid-cols-[1fr_180px]">
+                    <Input value={buscaCarteiras} onChange={(e) => setBuscaCarteiras(e.target.value)} placeholder="Buscar por nome, código ou CPF" aria-label="Buscar carteiras" />
+                    <Select value={filtroCarteiras} onChange={(e) => setFiltroCarteiras(e.target.value)} aria-label="Filtrar carteiras">
+                      <option value="TODAS">Todas as carteiras</option><option value="ATIVAS">Ativas</option><option value="COM_SALDO">Com saldo</option><option value="SEM_SALDO">Sem saldo</option><option value="SEM_CARTAO">Aguardando impressão</option>
+                    </Select>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3">
+                    <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={participantesFiltrados.length > 0 && participantesFiltrados.every((item) => carteirasSelecionadasImpressao.includes(item.id))} onChange={(e) => setCarteirasSelecionadasImpressao(e.target.checked ? participantesFiltrados.map((item) => item.id) : [])} /> Selecionar carteiras filtradas</label>
+                    <Button type="button" variant="outline" disabled={!carteirasSelecionadasImpressao.length} onClick={() => void imprimirCartoesSelecionados()}>Imprimir cartões selecionados ({carteirasSelecionadasImpressao.length})</Button>
+                  </div>
+                  {participantesFiltrados.map((item) => (
+                    <div key={item.id} className="flex items-start gap-2">
+                      <input className="mt-3" type="checkbox" aria-label={`Selecionar carteira de ${item.nome}`} checked={carteirasSelecionadasImpressao.includes(item.id)} onChange={(e) => setCarteirasSelecionadasImpressao((atual) => e.target.checked ? [...new Set([...atual, item.id])] : atual.filter((id) => id !== item.id))} />
+                      <button type="button" onClick={() => selecionarParticipante(item)} className={`w-full rounded-xl border px-3 py-2 text-left ${participanteSelecionado?.id === item.id ? "border-[var(--g3-active)] bg-[var(--g3-primary-soft)]" : "border-[var(--g3-border)] hover:bg-[var(--g3-card-soft)]"}`}>
+                        <p className="font-semibold">{item.nome}</p>
+                        <p className="text-sm text-[var(--g3-muted)]">Carteira {item.numeroCarteira} · {formatarMoeda(item.saldoAtual)}</p>
+                        <p className="text-xs text-[var(--g3-muted)]">{formatarTelefone(item.telefone) || "Telefone não informado"}{item.cpf ? ` · CPF ${formatarCpf(item.cpf)}` : ""}</p>
+                      </button>
+                    </div>
                   ))}
+                  {!participantesFiltrados.length ? <p className="rounded-xl border border-dashed border-[var(--g3-border)] p-4 text-sm text-[var(--g3-muted)]">Nenhuma carteira encontrada com esses filtros.</p> : null}
                   <div className="grid gap-3 pt-2">
                     <div className="space-y-1">
                       <Label>Nome</Label>
@@ -984,7 +1148,7 @@ export function CarteiraDigitalEventoPage() {
                         {barcodeSvg ? <div className="mt-4 w-full overflow-hidden rounded-lg bg-white p-3 [&_svg]:h-auto [&_svg]:max-w-full [&_svg]:w-full" dangerouslySetInnerHTML={{ __html: barcodeSvg }} /> : null}
                         <p className="mt-2 font-semibold">{participanteSelecionado.nome}</p>
                         <p className="text-sm text-[var(--g3-muted)]">Carteira {participanteSelecionado.numeroCarteira}</p>
-                        <Button type="button" variant="outline" className="mt-3 w-full" onClick={imprimirCartaoQr}>
+                        <Button type="button" variant="outline" className="mt-3 w-full" onClick={() => void imprimirCartaoQr()}>
                           Imprimir cartão/comanda
                         </Button>
                       </div>
@@ -1007,13 +1171,18 @@ export function CarteiraDigitalEventoPage() {
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <Label>Valor da recarga</Label>
+                        <Label>Abastecer carteira</Label>
+                        <p className="text-xs text-[var(--g3-muted)]">Saldo atual: {formatarMoeda(participanteSelecionado.saldoAtual)}. Escolha um atalho ou informe outro valor.</p>
+                        <div className="grid grid-cols-4 gap-2">
+                          {[10, 20, 50, 100].map((valor) => <Button key={valor} type="button" variant="outline" onClick={() => setRecargaValor(formatarMoedaInput(String(valor)))}>R$ {valor}</Button>)}
+                        </div>
                         <Input className={classesCampoInvalido(errosOperacao.recargaValor)} inputMode="decimal" value={recargaValor} onChange={(e) => setRecargaValor(formatarMoedaInput(e.target.value))} onBlur={validarRecargaForm} placeholder="0,00" />
                         <CampoErro texto={errosOperacao.recargaValor} />
                         <Select value={recargaForma} onChange={(e) => setRecargaForma(e.target.value)}>
                           {formasRecarga.map((item) => <option key={item}>{item}</option>)}
                         </Select>
-                        <Button type="button" onClick={() => void executarRecarga()}>Registrar recarga</Button>
+                        {normalizarMoeda(recargaValor) > 0 ? <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-primary-soft)] p-3 text-sm"><p>Participante: <strong>{participanteSelecionado.nome}</strong></p><p>Valor adicionado: <strong>{formatarMoeda(normalizarMoeda(recargaValor))}</strong></p><p>Novo saldo: <strong>{formatarMoeda(participanteSelecionado.saldoAtual + normalizarMoeda(recargaValor))}</strong></p></div> : null}
+                        <Button type="button" onClick={() => void executarRecarga()}>Confirmar abastecimento</Button>
                       </div>
                     </>
                   ) : (
@@ -1065,6 +1234,13 @@ export function CarteiraDigitalEventoPage() {
         ) : null}
 
         {abaAtiva === "operacao" ? (
+          <div className="space-y-4">
+            <Card className="border-[color:color-mix(in_srgb,var(--g3-active)_30%,white)]">
+              <CardHeader><CardTitle>Como realizar uma compra?</CardTitle><p className="text-sm text-[var(--g3-muted)]">Siga esta sequência no atendimento ao participante.</p></CardHeader>
+              <CardContent className="grid gap-2 text-sm md:grid-cols-4">
+                {["Selecione a barraca", "Identifique pelo QR Code ou código", "Adicione os produtos", "Confirme o débito"].map((etapa, index) => <div key={etapa} className="rounded-xl border border-[var(--g3-border)] p-3"><span className="font-black text-[var(--g3-active)]">{index + 1}.</span> <span className="font-semibold">{etapa}</span></div>)}
+              </CardContent>
+            </Card>
           <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
             <Card>
               <CardHeader><CardTitle>Consulta da carteira</CardTitle></CardHeader>
@@ -1082,18 +1258,20 @@ export function CarteiraDigitalEventoPage() {
                   <option value="">Barraca / ponto de venda</option>
                   {barracasEvento.map((item) => <option key={item.id} value={item.id}>{item.nomeBarraca}</option>)}
                 </Select>
-                <Input value={tokenOperacao} onChange={(e) => setTokenOperacao(e.target.value)} placeholder="Token do QR Code ou número da carteira" />
+                <Input value={tokenOperacao} onChange={(e) => setTokenOperacao(e.target.value)} placeholder="Token do QR Code ou número da carteira" aria-label="Código ou token da carteira" />
                 <div className="flex gap-2">
+                  <Button type="button" variant="outline" onClick={() => setLeitorQrAtivo((atual) => !atual)}>{leitorQrAtivo ? "Fechar câmera" : "Ler QR Code"}</Button>
                   <Button type="button" onClick={() => void consultarCarteiraOperacao()}>Consultar</Button>
                   <Button type="button" variant="outline" onClick={() => { setCarteiraOperacao(null); setTokenOperacao(""); setItensVenda([]); setUltimaVenda(null); }}>Limpar</Button>
                 </div>
+                {leitorQrAtivo ? <div className="overflow-hidden rounded-xl border border-[var(--g3-border)] bg-black"><video ref={videoQrRef} className="aspect-video w-full object-cover" playsInline muted aria-label="Câmera para leitura do QR Code" /><p className="bg-[var(--g3-primary)] px-3 py-2 text-center text-xs font-semibold text-white">Aponte a câmera para o QR Code da carteira.</p></div> : null}
                 <div className="rounded-xl border border-dashed border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-4 py-3 text-sm text-[var(--g3-muted)]">
                   {barracaOperacaoId
                     ? "Barraca ativa selecionada. Ao trocar a barraca, a compra atual e limpa para evitar mistura de itens."
                     : "Selecione a barraca primeiro ou toque em um item vinculado a uma barraca para o sistema assumir essa barraca automaticamente."}
                 </div>
                 {carteiraOperacao ? <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-4"><p className="text-sm text-[var(--g3-muted)]">Participante</p><p className="text-xl font-black">{carteiraOperacao.nome}</p><p className="mt-2 text-3xl font-black text-[var(--g3-active)]">{formatarMoeda(carteiraOperacao.saldoAtual)}</p></div> : null}
-                <div className="rounded-xl border border-dashed border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-4 py-3 text-sm text-[var(--g3-muted)]">Operação preparada para celular e desktop. O token manual funciona imediatamente. A leitura por câmera pode ser conectada ao detector nativo do navegador em ambiente compatível.</div>
+                <div className="rounded-xl border border-dashed border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-4 py-3 text-sm text-[var(--g3-muted)]">Operação preparada para celular e desktop. O QR Code é validado pelo backend; se a câmera não for compatível, informe o código manualmente.</div>
               </CardContent>
             </Card>
 
@@ -1110,13 +1288,15 @@ export function CarteiraDigitalEventoPage() {
                   <div className="mt-3 flex items-center justify-between border-t border-[var(--g3-border)] pt-3"><span className="font-semibold">Total</span><span className="text-3xl font-black">{formatarMoeda(subtotalVenda)}</span></div>
                   <Button type="button" className="mt-3 w-full" onClick={() => void confirmarVenda()}>Confirmar débito</Button>
                 </div>
-                {ultimaVenda ? <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-primary-soft)] p-4"><p className="font-semibold">Venda concluída</p><p className="text-sm text-[var(--g3-muted)]">{ultimaVenda.participanteNome} · {ultimaVenda.barracaNome}</p><p className="mt-2 text-2xl font-black">{formatarMoeda(ultimaVenda.valorTotal)}</p><p className="text-sm font-semibold">Saldo atual: {formatarMoeda(ultimaVenda.saldoDepois)}</p></div> : null}
+                {ultimaVenda ? <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-primary-soft)] p-4"><p className="font-semibold">Venda concluída</p><p className="text-sm text-[var(--g3-muted)]">{ultimaVenda.participanteNome} · {ultimaVenda.barracaNome}</p><p className="mt-2 text-2xl font-black">{formatarMoeda(ultimaVenda.valorTotal)}</p><p className="text-sm font-semibold">Saldo atual: {formatarMoeda(ultimaVenda.saldoDepois)}</p>{eventoSelecionado?.permiteEstorno ? <button type="button" onClick={() => void estornarUltimaVenda()} className="mt-3 rounded-lg border border-[var(--g3-danger)] px-3 py-2 text-sm font-bold text-[var(--g3-danger)]">Estornar venda</button> : null}</div> : null}
               </CardContent>
             </Card>
+          </div>
           </div>
         ) : null}
 
         {abaAtiva === "fechamento" && fechamento ? <div className="grid gap-4 xl:grid-cols-2"><Card><CardHeader><CardTitle>Resumo do fechamento</CardTitle></CardHeader><CardContent className="space-y-2">{[["Total carregado", Number(fechamento.totalCarregadoEmCredito ?? 0)], ["Total consumido", Number(fechamento.totalConsumidoEmCredito ?? 0)], ["Saldo remanescente", Number(fechamento.saldoRemanescente ?? 0)], ["Divergências", Number(fechamento.divergencias ?? 0)]].map(([titulo, valor]) => <div key={String(titulo)} className="flex items-center justify-between rounded-xl border border-[var(--g3-border)] px-4 py-3"><span className="font-semibold">{titulo}</span><span className="font-black">{formatarMoeda(Number(valor))}</span></div>)}</CardContent></Card><Card><CardHeader><CardTitle>Operadores</CardTitle></CardHeader><CardContent className="space-y-2">{Array.isArray(fechamento.relatorioPorOperador) ? (fechamento.relatorioPorOperador as Array<any>).map((item) => <div key={item.operador} className="flex items-center justify-between rounded-xl border border-[var(--g3-border)] px-4 py-3"><span className="font-semibold">{item.operador}</span><span className="font-black">{formatarMoeda(Number(item.total ?? 0))}</span></div>) : null}</CardContent></Card></div> : null}
+        {abaAtiva === "auditoria" ? <Card><CardHeader><CardTitle>Histórico de auditoria</CardTitle><p className="text-sm text-[var(--g3-muted)]">Consulte quem realizou cada operação e os valores registrados no evento.</p></CardHeader><CardContent>{auditoria.length ? <div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead className="border-b border-[var(--g3-border)] text-xs uppercase tracking-wide text-[var(--g3-muted)]"><tr><th className="px-3 py-3">Data e hora</th><th className="px-3 py-3">Operação</th><th className="px-3 py-3">Descrição</th><th className="px-3 py-3">Operador</th><th className="px-3 py-3">Venda</th></tr></thead><tbody className="divide-y divide-[var(--g3-border)]">{auditoria.map((item) => <tr key={item.id}><td className="whitespace-nowrap px-3 py-3">{new Date(item.criadoEm).toLocaleString("pt-BR")}</td><td className="px-3 py-3 font-semibold">{item.tipoEvento}</td><td className="px-3 py-3">{item.descricao}</td><td className="px-3 py-3">{item.usuarioNome || "Sistema"}</td><td className="px-3 py-3">{item.vendaId ? `#${item.vendaId}` : "—"}</td></tr>)}</tbody></table></div> : <div className="rounded-xl border border-dashed border-[var(--g3-border)] px-4 py-8 text-center text-sm text-[var(--g3-muted)]">Ainda não há movimentações auditadas neste evento.</div>}</CardContent></Card> : null}
       </section>
       {popup ? <PopupMensagem popup={popup} onClose={() => setPopup(null)} /> : null}
       {carregando ? <div className="fixed bottom-4 right-4 rounded-full bg-[var(--g3-primary)] px-4 py-2 text-sm font-semibold text-white shadow-lg">Atualizando carteira digital...</div> : null}

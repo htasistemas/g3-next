@@ -48,7 +48,10 @@ carteiraEventoRoutes.post("/transferencias", ensurePermissions(permissoesTransfe
 carteiraEventoRoutes.post("/ajustes", ensurePermissions(permissoesAjuste), asyncHandler(controller.ajustar.bind(controller)));
 carteiraEventoRoutes.post("/operacao/consultar-token", ensurePermissions(permissoesOperacao), asyncHandler(controller.consultarToken.bind(controller)));
 carteiraEventoRoutes.post("/operacao/venda", ensurePermissions(permissoesOperacao), asyncHandler(controller.realizarVenda.bind(controller)));
+carteiraEventoRoutes.post("/operacao/venda/:id/estornar", ensurePermissions(permissoesAjuste), asyncHandler(controller.estornarVenda.bind(controller)));
 
 carteiraEventoRoutes.get("/dashboard", ensurePermissions(permissoesVisualizacao), asyncHandler(controller.obterDashboard.bind(controller)));
 carteiraEventoRoutes.get("/fechamento", ensurePermissions([...permissoesVisualizacao, ...permissoesFechamento]), asyncHandler(controller.obterFechamento.bind(controller)));
 carteiraEventoRoutes.get("/relatorios", ensurePermissions([...permissoesVisualizacao, ...permissoesRelatorio]), asyncHandler(controller.obterRelatorio.bind(controller)));
+carteiraEventoRoutes.get("/auditoria", ensurePermissions(permissoesRelatorio), asyncHandler(controller.obterAuditoria.bind(controller)));
+carteiraEventoRoutes.post("/impressao", ensurePermissions(permissoesVisualizacao), asyncHandler(controller.registrarImpressao.bind(controller)));

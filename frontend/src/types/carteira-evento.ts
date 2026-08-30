@@ -113,6 +113,12 @@ export type DashboardCarteiraEvento = {
   totalTransferencias: number;
   totalEstornos: number;
   quantidadeParticipantes: number;
+  quantidadeCarteiras: number;
+  carteirasAtivas: number;
+  carteirasBloqueadas: number;
+  carteirasSemSaldo: number;
+  carteirasAguardandoImpressao: number;
+  quantidadeVendas: number;
   ticketMedio: number;
   totalPorBarraca: Array<{ barraca: string; total: number; quantidadeVendas: number }>;
   rankingBarracas: Array<{ posicao: number; barraca: string; total: number; quantidadeVendas: number }>;

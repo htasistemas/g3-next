@@ -2,11 +2,14 @@ import { AppError } from "../../../shared/errors/app-error.js";
 import { z } from "zod";
 import {
   ajusteCarteiraInputSchema,
+  auditoriaCarteiraFiltersSchema,
+  impressaoCarteiraInputSchema,
   barracaEventoFiltersSchema,
   barracaEventoInputSchema,
   dashboardCarteiraFiltersSchema,
   eventoCarteiraFiltersSchema,
   eventoCarteiraInputSchema,
+  estornoVendaInputSchema,
   extratoCarteiraFiltersSchema,
   fechamentoCarteiraFiltersSchema,
   itemEventoFiltersSchema,
@@ -131,6 +134,11 @@ export class CarteiraEventoService {
     return this.repository.realizarVenda(input, ator);
   }
 
+  estornarVenda(rawInput: unknown, ator: CarteiraEventoAtor) {
+    const input = estornoVendaInputSchema.parse(rawInput);
+    return this.repository.estornarVenda(input, ator);
+  }
+
   listarExtrato(rawFilters: unknown, rawTenantId?: string) {
     const filters = extratoCarteiraFiltersSchema.parse(rawFilters ?? {});
     return this.repository.listarExtrato(filters, this.parseTenant(rawTenantId));
@@ -149,6 +157,16 @@ export class CarteiraEventoService {
   obterRelatorio(rawFilters: unknown, rawTenantId?: string) {
     const filters = relatorioCarteiraFiltersSchema.parse(rawFilters ?? {});
     return this.repository.obterRelatorio(filters, this.parseTenant(rawTenantId));
+  }
+
+  obterAuditoria(rawFilters: unknown, rawTenantId?: string) {
+    const filters = auditoriaCarteiraFiltersSchema.parse(rawFilters ?? {});
+    return this.repository.obterAuditoria(filters, this.parseTenant(rawTenantId));
+  }
+
+  registrarImpressao(rawInput: unknown, ator: CarteiraEventoAtor) {
+    const input = impressaoCarteiraInputSchema.parse(rawInput);
+    return this.repository.registrarImpressao(input.participante_id, ator);
   }
 
   private parseId(rawId: string, label: string) {

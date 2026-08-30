@@ -125,6 +125,11 @@ export const operacaoVendaInputSchema = z.object({
     .min(1)
 });
 
+export const estornoVendaInputSchema = z.object({
+  venda_id: z.coerce.number().int().positive(),
+  motivo: z.string().trim().min(3).max(500)
+});
+
 export const eventoCarteiraFiltersSchema = z.object({
   status: optionalTrimmedString,
   busca: optionalTrimmedString,
@@ -174,4 +179,13 @@ export const fechamentoCarteiraFiltersSchema = z.object({
 export const relatorioCarteiraFiltersSchema = z.object({
   evento_id: z.coerce.number().int().positive(),
   tipo: z.enum(tipoRelatorioCarteiraValues)
+});
+
+export const auditoriaCarteiraFiltersSchema = z.object({
+  evento_id: z.coerce.number().int().positive(),
+  limite: z.coerce.number().int().positive().max(500).optional()
+});
+
+export const impressaoCarteiraInputSchema = z.object({
+  participante_id: z.coerce.number().int().positive()
 });

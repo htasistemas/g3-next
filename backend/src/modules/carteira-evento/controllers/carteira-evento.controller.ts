@@ -102,6 +102,10 @@ export class CarteiraEventoController {
     return this.service.realizarVenda(request.body, mapAtor(request)).then((venda) => response.status(201).json(venda));
   }
 
+  estornarVenda(request: AuthenticatedRequest, response: Response) {
+    return this.service.estornarVenda({ ...request.body, venda_id: request.params.id }, mapAtor(request)).then((venda) => response.json(venda));
+  }
+
   listarExtrato(request: AuthenticatedRequest, response: Response) {
     return this.service.listarExtrato(request.query, request.authUser?.tenant_id).then((extrato) => response.json(extrato));
   }
@@ -116,5 +120,13 @@ export class CarteiraEventoController {
 
   obterRelatorio(request: AuthenticatedRequest, response: Response) {
     return this.service.obterRelatorio(request.query, request.authUser?.tenant_id).then((relatorio) => response.json(relatorio));
+  }
+
+  obterAuditoria(request: AuthenticatedRequest, response: Response) {
+    return this.service.obterAuditoria(request.query, request.authUser?.tenant_id).then((auditoria) => response.json(auditoria));
+  }
+
+  registrarImpressao(request: AuthenticatedRequest, response: Response) {
+    return this.service.registrarImpressao(request.body, mapAtor(request)).then((resultado) => response.status(201).json(resultado));
   }
 }

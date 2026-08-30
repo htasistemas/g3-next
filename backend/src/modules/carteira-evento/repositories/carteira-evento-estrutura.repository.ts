@@ -86,6 +86,9 @@ const sqlEstruturaCarteiraEvento: string[] = [
     saldo_antes NUMERIC(14,2) NOT NULL,
     saldo_depois NUMERIC(14,2) NOT NULL,
     observacao TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'CONCLUIDA',
+    estornada_em TIMESTAMP,
+    estorno_motivo TEXT,
     operador_usuario_id BIGINT REFERENCES usuarios(id) ON DELETE SET NULL,
     operador_nome VARCHAR(180),
     criado_em TIMESTAMP NOT NULL DEFAULT NOW()
@@ -123,7 +126,41 @@ const sqlEstruturaCarteiraEvento: string[] = [
     criado_em TIMESTAMP NOT NULL DEFAULT NOW()
   )
   `,
+  `
+  CREATE TABLE IF NOT EXISTS carteira_evento_auditoria (
+    id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    evento_id BIGINT REFERENCES carteira_evento(id) ON DELETE SET NULL,
+    participante_id BIGINT REFERENCES carteira_evento_participante(id) ON DELETE SET NULL,
+    venda_id BIGINT REFERENCES carteira_evento_venda(id) ON DELETE SET NULL,
+    tipo_evento VARCHAR(60) NOT NULL,
+    descricao TEXT NOT NULL,
+    dados JSONB NOT NULL DEFAULT '{}'::jsonb,
+    usuario_id BIGINT REFERENCES usuarios(id) ON DELETE SET NULL,
+    usuario_nome VARCHAR(180),
+    criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+  )
+  `,
+  `
+  CREATE TABLE IF NOT EXISTS carteira_evento_caixa_movimentacao (
+    id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    evento_id BIGINT NOT NULL REFERENCES carteira_evento(id) ON DELETE RESTRICT,
+    barraca_id BIGINT REFERENCES carteira_evento_barraca(id) ON DELETE SET NULL,
+    venda_id BIGINT REFERENCES carteira_evento_venda(id) ON DELETE SET NULL,
+    tipo VARCHAR(40) NOT NULL,
+    forma_pagamento VARCHAR(40),
+    valor NUMERIC(14,2) NOT NULL,
+    descricao VARCHAR(255) NOT NULL,
+    operador_usuario_id BIGINT REFERENCES usuarios(id) ON DELETE SET NULL,
+    operador_nome VARCHAR(180),
+    criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+  )
+  `,
   "ALTER TABLE IF EXISTS carteira_evento ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "ALTER TABLE IF EXISTS carteira_evento_venda ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'CONCLUIDA'",
+  "ALTER TABLE IF EXISTS carteira_evento_venda ADD COLUMN IF NOT EXISTS estornada_em TIMESTAMP",
+  "ALTER TABLE IF EXISTS carteira_evento_venda ADD COLUMN IF NOT EXISTS estorno_motivo TEXT",
   "CREATE INDEX IF NOT EXISTS carteira_evento_status_idx ON carteira_evento(status)",
   "CREATE INDEX IF NOT EXISTS carteira_evento_tenant_idx ON carteira_evento(tenant_id, data_inicio DESC, id DESC)",
   "CREATE INDEX IF NOT EXISTS carteira_evento_participante_evento_idx ON carteira_evento_participante(evento_id)",
@@ -132,6 +169,10 @@ const sqlEstruturaCarteiraEvento: string[] = [
   "CREATE INDEX IF NOT EXISTS carteira_evento_item_evento_idx ON carteira_evento_item(evento_id)",
   "CREATE INDEX IF NOT EXISTS carteira_evento_venda_evento_idx ON carteira_evento_venda(evento_id, criado_em DESC)",
   "CREATE INDEX IF NOT EXISTS carteira_evento_movimentacao_participante_idx ON carteira_evento_movimentacao(participante_id, criado_em DESC)",
+  "CREATE INDEX IF NOT EXISTS carteira_evento_auditoria_tenant_idx ON carteira_evento_auditoria(tenant_id, criado_em DESC, id DESC)",
+  "CREATE INDEX IF NOT EXISTS carteira_evento_auditoria_evento_idx ON carteira_evento_auditoria(evento_id, criado_em DESC, id DESC)",
+  "CREATE UNIQUE INDEX IF NOT EXISTS carteira_evento_caixa_venda_tipo_unq ON carteira_evento_caixa_movimentacao(venda_id, tipo) WHERE venda_id IS NOT NULL",
+  "CREATE INDEX IF NOT EXISTS carteira_evento_caixa_evento_idx ON carteira_evento_caixa_movimentacao(tenant_id, evento_id, criado_em DESC)",
   `
   INSERT INTO permissao (nome)
   VALUES

@@ -14,11 +14,11 @@ import {
   UserRound,
   Wallet
 } from "lucide-react";
-import { useItensAlmoxarifado } from "@/features/almoxarifado/use-almoxarifado";
 import { useUnidadeAssistencialAtual } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
 import { resolverUrlArquivo } from "@/lib/arquivos";
+import { carteiraEventoService } from "@/services/carteira-evento.service";
 import { vendasService } from "@/services/vendas.service";
-import type { ItemAlmoxarifado } from "@/types/almoxarifado";
+import type { EventoCarteira } from "@/types/carteira-evento";
 import type { Venda } from "@/types/vendas";
 
 type MetodoPagamento = "DINHEIRO" | "DEBITO" | "CREDITO" | "PIX";
@@ -30,6 +30,17 @@ type ItemVenda = {
   preco: number;
   quantidade: number;
   estoqueDisponivel: number;
+};
+
+type ProdutoPdv = {
+  id_item: string;
+  codigo: string;
+  codigo_barras?: string;
+  descricao: string;
+  estoque_atual: number;
+  valor_unitario: number;
+  situacao: string;
+  is_kit: boolean;
 };
 
 const metodosPagamento: Array<{
@@ -55,7 +66,7 @@ function formatarMetodo(metodo: string) {
   return "Pix";
 }
 
-function textoBuscaItem(item: ItemAlmoxarifado) {
+function textoBuscaItem(item: ProdutoPdv) {
   return `${item.codigo} ${item.codigo_barras ?? ""} ${item.descricao}`.toLowerCase();
 }
 
@@ -75,12 +86,15 @@ export function FrenteCaixaPage() {
   const [historico, setHistorico] = useState<Venda[]>([]);
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
   const [salvandoVenda, setSalvandoVenda] = useState(false);
+  const [eventosCarteira, setEventosCarteira] = useState<EventoCarteira[]>([]);
+  const [eventoSelecionadoId, setEventoSelecionadoId] = useState(0);
+  const [catalogo, setCatalogo] = useState<ProdutoPdv[]>([]);
+  const [carregandoProdutos, setCarregandoProdutos] = useState(false);
+  const [erroProdutos, setErroProdutos] = useState(false);
   const buscaRef = useRef<HTMLInputElement | null>(null);
   const qtdRef = useRef<HTMLInputElement | null>(null);
 
-  const itensQuery = useItensAlmoxarifado();
   const { data: unidadeAtualData } = useUnidadeAssistencialAtual();
-  const catalogo = itensQuery.data?.itens ?? [];
   const logomarcaInstituicao = unidadeAtualData?.unidade?.logomarca?.trim();
   const nomeInstituicao = unidadeAtualData?.unidade?.nome_fantasia?.trim() || "Instituicao";
 
@@ -92,6 +106,35 @@ export function FrenteCaixaPage() {
   useEffect(() => {
     void carregarHistorico();
   }, []);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const resposta = await carteiraEventoService.listarEventos();
+        setEventosCarteira(resposta.eventos);
+        const eventoId = resposta.eventos[0]?.id ?? 0;
+        setEventoSelecionadoId(eventoId);
+        if (eventoId) await carregarCatalogoEvento(eventoId);
+      } catch {
+        setErroProdutos(true);
+      }
+    })();
+  }, []);
+
+  async function carregarCatalogoEvento(eventoId: number) {
+    if (!eventoId) { setCatalogo([]); return; }
+    setCarregandoProdutos(true);
+    setErroProdutos(false);
+    try {
+      const resposta = await carteiraEventoService.listarItens({ evento_id: eventoId });
+      setCatalogo(resposta.itens.map((item) => ({ id_item: String(item.id), codigo: String(item.id), descricao: item.nomeItem, estoque_atual: item.estoque == null ? 999999 : Number(item.estoque), valor_unitario: Number(item.preco ?? 0), situacao: item.ativo ? "ATIVO" : "INATIVO", is_kit: false })));
+    } catch {
+      setCatalogo([]);
+      setErroProdutos(true);
+    } finally {
+      setCarregandoProdutos(false);
+    }
+  }
 
   async function carregarHistorico() {
     setCarregandoHistorico(true);
@@ -106,20 +149,17 @@ export function FrenteCaixaPage() {
   }
 
   const itensDisponiveis = useMemo(
-    () =>
-      catalogo.filter(
-        (item) => item.situacao?.toLowerCase() === "ativo" && Number(item.estoque_atual || 0) > 0 && !item.is_kit
-      ),
+    () => catalogo.filter((item) => ["ativo", "ativa", "disponivel", "disponível"].includes(item.situacao?.trim().toLocaleLowerCase("pt-BR")) && !item.is_kit),
     [catalogo]
   );
 
   const sugestoes = useMemo(() => {
     const termo = busca.trim().toLowerCase();
-    if (!termo) return [];
-    return itensDisponiveis.filter((item) => textoBuscaItem(item).includes(termo)).slice(0, 6);
+    if (!termo) return itensDisponiveis.slice(0, 50);
+    return itensDisponiveis.filter((item) => textoBuscaItem(item).includes(termo)).slice(0, 12);
   }, [busca, itensDisponiveis]);
 
-  const itemAtual = sugestoes[0] ?? null;
+  const itemAtual = busca.trim() ? sugestoes[0] ?? null : null;
   const quantidadeNumero = Number(quantidade.replace(",", "."));
   const quantidadeValida = Number.isFinite(quantidadeNumero) && quantidadeNumero > 0 ? quantidadeNumero : 1;
   const subtotal = itensVenda.reduce((acc, item) => acc + item.preco * item.quantidade, 0);
@@ -249,7 +289,7 @@ export function FrenteCaixaPage() {
       setStatus(`Venda concluida em ${formatarMetodo(metodo).toLowerCase()}`);
       setClienteNome("");
       setClienteDocumento("");
-      await itensQuery.refetch();
+      await carregarCatalogoEvento(eventoSelecionadoId);
       await carregarHistorico();
       buscaRef.current?.focus();
     } catch (error: any) {
@@ -260,8 +300,8 @@ export function FrenteCaixaPage() {
   }
 
   return (
-    <main className="h-screen overflow-hidden bg-[radial-gradient(circle_at_top,var(--g3-primary-soft)_0%,var(--g3-bg)_62%,var(--g3-card-soft)_100%)] text-[var(--g3-foreground)]">
-      <div className="mx-auto flex h-screen max-w-[1920px] flex-col gap-4 px-4 py-4 lg:px-5">
+    <main className="h-dvh overflow-x-hidden overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden bg-[radial-gradient(circle_at_top,var(--g3-primary-soft)_0%,var(--g3-bg)_62%,var(--g3-card-soft)_100%)] text-[var(--g3-foreground)]">
+      <div className="mx-auto flex min-h-full max-w-[1920px] flex-col gap-4 px-4 py-4 lg:px-5">
         <header className="grid shrink-0 gap-4 rounded-[28px] border border-[color:color-mix(in_srgb,var(--g3-primary)_40%,white)] bg-[linear-gradient(135deg,var(--g3-primary)_0%,var(--g3-primary-hover)_68%,var(--g3-sidebar-bg-alt)_100%)] px-5 py-4 text-white shadow-[0_28px_60px_rgba(0,0,0,0.16)] lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-center">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15"><Store className="h-6 w-6" /></div>
@@ -292,13 +332,14 @@ export function FrenteCaixaPage() {
         </header>
 
         <section className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[0.92fr_1.28fr]">
-          <div className="flex min-h-0 flex-col gap-4 overflow-hidden">
+          <div className="flex min-h-0 flex-col gap-4 overflow-visible xl:overflow-hidden">
             <div className="shrink-0 rounded-[28px] border border-[var(--g3-border)] bg-[var(--g3-card)] p-5 shadow-sm">
               <label className="mb-2 block text-xs font-bold uppercase tracking-[0.16em] text-[var(--g3-muted)]">Codigo de barras ou nome <span className="ml-2 rounded-md border border-[var(--g3-border)] bg-[var(--g3-primary-soft)] px-2 py-0.5 text-[10px] text-[var(--g3-active)]">F2</span></label>
               <div className="relative">
                 <ScanBarcode className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--g3-muted)]" />
                 <input ref={buscaRef} value={busca} onChange={(event) => setBusca(event.target.value)} placeholder="Ler codigo ou pesquisar produto" className="h-16 w-full rounded-2xl border-2 border-[var(--g3-border)] bg-[var(--g3-card-soft)] pl-12 pr-4 text-xl font-bold text-[var(--g3-foreground)] outline-none transition focus:border-[var(--g3-primary)] focus:bg-[var(--g3-card)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--g3-primary)_18%,transparent)]" />
               </div>
+              <div className="mt-3 rounded-2xl border border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-4 py-3"><label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--g3-muted)]">Evento da venda</label><select value={eventoSelecionadoId || ""} onChange={(event) => { const id = Number(event.target.value); setEventoSelecionadoId(id); setItensVenda([]); void carregarCatalogoEvento(id); }} className="w-full rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-2 font-semibold text-[var(--g3-foreground)]"><option value="">Selecione o evento</option>{eventosCarteira.map((evento) => <option key={evento.id} value={evento.id}>{evento.nomeEvento}</option>)}</select><p className="mt-2 text-xs text-[var(--g3-muted)]">A lista abaixo vem dos produtos cadastrados neste evento, na Carteira Digital.</p></div>
               <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_160px]">
                 <div className="rounded-2xl border border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-4 py-3"><p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--g3-muted)]">Valor unitario</p><p className="mt-1 text-2xl font-black">{itemAtual ? formatarMoeda(Number(itemAtual.valor_unitario || 0)) : "R$ 0,00"}</p></div>
                 <div className="rounded-2xl border border-[var(--g3-border)] bg-[var(--g3-card)] px-4 py-3"><label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--g3-muted)]">Quantidade <span className="ml-2 rounded-md border border-[var(--g3-border)] bg-[var(--g3-primary-soft)] px-2 py-0.5 text-[10px] text-[var(--g3-active)]">F3</span></label><input ref={qtdRef} value={quantidade} onChange={(event) => setQuantidade(event.target.value)} className="w-full rounded-xl border-2 border-[var(--g3-border)] px-3 py-2 text-center text-2xl font-black outline-none focus:border-[var(--g3-primary)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--g3-primary)_18%,transparent)]" /></div>
@@ -321,22 +362,22 @@ export function FrenteCaixaPage() {
                   <button type="button" onClick={() => itensVenda.length && setCancelamentoAberto(true)} className="col-span-2 rounded-xl border border-[color:color-mix(in_srgb,var(--g3-danger)_28%,white)] bg-[color:color-mix(in_srgb,var(--g3-danger)_10%,white)] px-2.5 py-2 text-left"><p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[var(--g3-danger)]">F11</p><p className="mt-0.5 text-[13px] font-semibold leading-tight">Cancelar item</p></button>
                 </div>
               </div>
-              <div className="flex min-h-0 flex-col overflow-hidden rounded-[28px] border border-[var(--g3-border)] bg-[var(--g3-card)] p-5 shadow-sm">
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--g3-muted)]">Sugestoes rapidas</p>
+              <div className="flex min-h-0 flex-col overflow-visible rounded-[28px] border border-[var(--g3-border)] bg-[var(--g3-card)] p-5 shadow-sm xl:overflow-hidden">
+                <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--g3-muted)]">Produtos do evento ({itensDisponiveis.length})</p><button type="button" onClick={() => void carregarCatalogoEvento(eventoSelecionadoId)} className="rounded-lg border border-[var(--g3-border)] px-2.5 py-1.5 text-xs font-bold text-[var(--g3-active)]">Atualizar produtos</button></div>
                 <div className="mt-4 flex-1 space-y-2 overflow-auto pr-1">
-                  {itensQuery.isLoading ? <div className="rounded-2xl border border-dashed border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-4 py-6 text-center text-sm text-[var(--g3-muted)]">Carregando produtos do almoxarifado...</div> : sugestoes.length ? sugestoes.map((item) => (
-                    <button key={item.id_item ?? item.codigo} type="button" onClick={() => adicionarItem(item)} className="flex w-full items-center justify-between rounded-2xl border border-[var(--g3-border)] px-4 py-3 text-left hover:border-[var(--g3-primary)]/35 hover:bg-[var(--g3-card-soft)]">
-                      <span><span className="block font-semibold">{item.descricao}</span><span className="text-sm text-[var(--g3-muted)]">Codigo {item.codigo} - estoque {item.estoque_atual}</span></span>
+                  {carregandoProdutos ? <div className="rounded-2xl border border-dashed border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-4 py-6 text-center text-sm text-[var(--g3-muted)]">Carregando produtos do evento...</div> : erroProdutos ? <div className="rounded-2xl border border-dashed border-[var(--g3-danger)] bg-[color:color-mix(in_srgb,var(--g3-danger)_8%,white)] px-4 py-6 text-center text-sm text-[var(--g3-danger)]">Não foi possível carregar os produtos deste evento. Atualize a tela e tente novamente.</div> : sugestoes.length ? sugestoes.map((item) => (
+                    <button key={item.id_item ?? item.codigo} type="button" disabled={Number(item.estoque_atual || 0) <= 0} onClick={() => adicionarItem(item)} className="flex w-full items-center justify-between rounded-2xl border border-[var(--g3-border)] px-4 py-3 text-left hover:border-[var(--g3-primary)]/35 hover:bg-[var(--g3-card-soft)] disabled:cursor-not-allowed disabled:opacity-50">
+                      <span><span className="block font-semibold">{item.descricao}</span><span className="text-sm text-[var(--g3-muted)]">Código {item.codigo} · estoque {item.estoque_atual}</span></span>
                       <span className="font-black text-[var(--g3-active)]">{formatarMoeda(Number(item.valor_unitario || 0))}</span>
                     </button>
-                  )) : <div className="rounded-2xl border border-dashed border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-4 py-6 text-center text-sm text-[var(--g3-muted)]">Pesquise um produto real do almoxarifado para montar a venda.</div>}
+                  )) : <div className="rounded-2xl border border-dashed border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-4 py-6 text-center text-sm text-[var(--g3-muted)]">Nenhum produto ativo foi encontrado nos produtos deste evento.</div>}
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="grid min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
-            <div className="overflow-hidden rounded-[28px] border border-[var(--g3-border)] bg-[var(--g3-card)] shadow-sm">
+          <div className="grid min-h-0 gap-4 overflow-visible xl:grid-cols-[minmax(0,1fr)_300px] xl:overflow-hidden">
+            <div className="overflow-visible rounded-[28px] border border-[var(--g3-border)] bg-[var(--g3-card)] shadow-sm xl:overflow-hidden">
               <div className="flex items-center justify-between border-b border-[var(--g3-border)] bg-[var(--g3-primary-soft)] px-5 py-4"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--g3-active)]">Lista de itens</p><h3 className="mt-1 text-lg font-black">Venda atual</h3></div><div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-2 text-sm font-bold">{totalItens} item(ns)</div></div>
               <div className="h-full overflow-auto px-2 pb-2 pt-1">{itensVenda.length ? <table className="min-w-full"><thead className="sticky top-0 bg-[var(--g3-card)] text-left text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--g3-muted)]"><tr><th className="px-3 py-3">#</th><th className="px-3 py-3">Produto</th><th className="px-3 py-3 text-right">Qtd</th><th className="px-3 py-3 text-right">Total</th></tr></thead><tbody className="divide-y divide-[var(--g3-border)]">{itensVenda.map((item, index) => <tr key={item.key}><td className="px-3 py-3 font-bold text-[var(--g3-muted)]">{index + 1}</td><td className="px-3 py-3"><p className="font-semibold">{item.nome}</p><p className="text-sm text-[var(--g3-muted)]">Codigo {item.codigo} - estoque {item.estoqueDisponivel}</p></td><td className="px-3 py-3 text-right font-semibold">{item.quantidade}</td><td className="px-3 py-3 text-right font-black">{formatarMoeda(item.preco * item.quantidade)}</td></tr>)}</tbody></table> : <div className="flex h-full min-h-[460px] flex-col items-center justify-center text-center text-[var(--g3-muted)]"><ShoppingBasket className="h-16 w-16 opacity-30" /><p className="mt-4 text-xl font-black text-[var(--g3-foreground)]">Cupom vazio</p><p className="mt-1 text-sm">Aguardando leitura ou selecao de produto.</p></div>}</div>
             </div>

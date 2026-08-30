@@ -5,10 +5,12 @@ import { AppError } from "../../../shared/errors/app-error.js";
 import { normalizeDigits, toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
 import type {
   AjusteCarteiraInput,
+  AuditoriaCarteiraFilters,
   BarracaEventoFilters,
   BarracaEventoInput,
   CarteiraEventoAtor,
   DashboardCarteiraFilters,
+  EstornoVendaInput,
   EventoCarteiraFilters,
   EventoCarteiraInput,
   ExtratoCarteiraFilters,
@@ -233,6 +235,7 @@ export class CarteiraEventoRepository {
         p.id,
         p.evento_id,
         e.nome_evento,
+        e.validade_credito,
         p.nome,
         p.telefone,
         p.cpf,
@@ -263,6 +266,7 @@ export class CarteiraEventoRepository {
         p.id,
         p.evento_id,
         e.nome_evento,
+        e.validade_credito,
         p.nome,
         p.telefone,
         p.cpf,
@@ -821,6 +825,7 @@ export class CarteiraEventoRepository {
         p.id,
         p.evento_id,
         e.nome_evento,
+        e.validade_credito,
         p.nome,
         p.telefone,
         p.cpf,
@@ -847,6 +852,9 @@ export class CarteiraEventoRepository {
     if (!row) {
       throw new AppError("Carteira nao encontrada para o identificador informado.", 404);
     }
+    if (row.validade_credito && new Date(row.validade_credito).getTime() < Date.now()) {
+      throw new AppError("A validade dos creditos desta carteira expirou.", 409);
+    }
     return mapParticipanteCarteira(row);
   }
 
@@ -872,7 +880,10 @@ export class CarteiraEventoRepository {
         FROM carteira_evento_venda v
         INNER JOIN carteira_evento_participante p ON p.id = v.participante_id
         INNER JOIN carteira_evento_barraca b ON b.id = v.barraca_id
+        INNER JOIN carteira_evento e ON e.id = v.evento_id
         WHERE v.chave_operacao = ${input.chave_operacao}
+          AND v.evento_id = ${BigInt(input.evento_id)}
+          AND e.tenant_id::text = ${tenantId}
         LIMIT 1
       `);
       if (vendaExistente[0]) {
@@ -904,11 +915,23 @@ export class CarteiraEventoRepository {
         throw new AppError("A carteira informada nao esta ativa para uso.", 409);
       }
 
+      const validade = await tx.$queryRaw<Array<{ validade_credito: Date | null }>>(Prisma.sql`
+        SELECT validade_credito
+        FROM carteira_evento
+        WHERE id = ${evento.id}
+        LIMIT 1
+      `);
+      if (validade[0]?.validade_credito && new Date(validade[0].validade_credito).getTime() < Date.now()) {
+        throw new AppError("A validade dos creditos desta carteira expirou.", 409);
+      }
+
       const idsItens = input.itens.map((item) => BigInt(item.item_id));
       const itensDb = await tx.$queryRaw<ItemOperacaoRow[]>(Prisma.sql`
         SELECT id, evento_id, barraca_id, nome_item, categoria, preco, estoque, ativo
         FROM carteira_evento_item
         WHERE id IN (${Prisma.join(idsItens)})
+        ORDER BY id ASC
+        FOR UPDATE
       `);
       if (itensDb.length !== input.itens.length) {
         throw new AppError("Um ou mais itens da venda nao foram encontrados.", 404);
@@ -1021,6 +1044,15 @@ export class CarteiraEventoRepository {
         motivo: trimOrUndefined(input.observacao),
         operador: ator
       });
+      await this.registrarCaixaEventoTx(tx, tenantId, {
+        eventoId: evento.id,
+        barracaId: barraca.id,
+        vendaId,
+        tipo: "VENDA_CARTEIRA",
+        valor: total,
+        descricao: `Consumo da carteira na barraca ${barraca.nome_barraca}`,
+        operador: ator
+      });
 
       const venda = (
         await tx.$queryRaw<VendaCarteiraRow[]>(Prisma.sql`
@@ -1047,6 +1079,100 @@ export class CarteiraEventoRepository {
       )[0];
       const itens = await this.listarItensVendaTx(tx, vendaId);
       return mapVendaCarteira(venda, itens);
+    });
+  }
+
+  async estornarVenda(input: EstornoVendaInput, ator: CarteiraEventoAtor) {
+    await ensureCarteiraEventoEstrutura(prisma);
+    return prisma.$transaction(async (tx) => {
+      const tenantId = this.requireTenant(ator.tenantId);
+      const vendas = await tx.$queryRaw<Array<{
+        id: bigint;
+        evento_id: bigint;
+        barraca_id: bigint;
+        participante_id: bigint;
+        valor_total: number;
+        status: string | null;
+        participante_nome: string;
+        barraca_nome: string;
+      }>>(Prisma.sql`
+        SELECT v.id, v.evento_id, v.barraca_id, v.participante_id, v.valor_total,
+               v.status, p.nome AS participante_nome, b.nome_barraca AS barraca_nome
+        FROM carteira_evento_venda v
+        INNER JOIN carteira_evento e ON e.id = v.evento_id
+        INNER JOIN carteira_evento_participante p ON p.id = v.participante_id
+        INNER JOIN carteira_evento_barraca b ON b.id = v.barraca_id
+        WHERE v.id = ${BigInt(input.venda_id)}
+          AND e.tenant_id::text = ${tenantId}
+        FOR UPDATE
+      `);
+      const venda = vendas[0];
+      if (!venda) throw new AppError("Venda nao encontrada.", 404);
+      if (venda.status === "ESTORNADA") throw new AppError("Esta venda ja foi estornada.", 409);
+
+      const evento = await this.buscarEventoConfigPorIdOuFalhar(venda.evento_id, tx, tenantId);
+      if (!evento.permite_estorno) throw new AppError("Este evento nao permite estorno.", 409);
+
+      const participante = await this.buscarParticipanteSaldoPorIdOuFalhar(venda.participante_id, tx, tenantId, true);
+      const saldoAnterior = Number(participante.saldo_atual ?? 0);
+      const saldoPosterior = saldoAnterior + Number(venda.valor_total);
+      const itens = await this.listarItensVendaTx(tx, venda.id);
+
+      for (const item of itens) {
+        await tx.$executeRaw(Prisma.sql`
+          UPDATE carteira_evento_item
+          SET estoque = estoque + ${item.quantidade}, atualizado_em = NOW()
+          WHERE id = ${item.item_id}
+            AND estoque IS NOT NULL
+        `);
+      }
+
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE carteira_evento_participante
+        SET saldo_atual = ${saldoPosterior}, atualizado_em = NOW()
+        WHERE id = ${participante.id}
+      `);
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE carteira_evento_venda
+        SET status = 'ESTORNADA', estornada_em = NOW(), estorno_motivo = ${input.motivo.trim()}
+        WHERE id = ${venda.id}
+      `);
+      await this.registrarMovimentacaoTx(tx, {
+        evento_id: venda.evento_id,
+        participante_id: venda.participante_id,
+        barraca_id: venda.barraca_id,
+        venda_id: venda.id,
+        tipo_movimentacao: "ESTORNO",
+        valor: Number(venda.valor_total),
+        saldo_anterior: saldoAnterior,
+        saldo_posterior: saldoPosterior,
+        descricao: `Estorno da venda na barraca ${venda.barraca_nome}`,
+        motivo: input.motivo.trim(),
+        referencia_externa: `ESTORNO-VENDA-${venda.id}`,
+        operador: ator
+      });
+      await this.registrarCaixaEventoTx(tx, tenantId, {
+        eventoId: venda.evento_id,
+        barracaId: venda.barraca_id,
+        vendaId: venda.id,
+        tipo: "ESTORNO_VENDA_CARTEIRA",
+        valor: Number(venda.valor_total),
+        descricao: `Estorno da venda na barraca ${venda.barraca_nome}`,
+        operador: ator
+      });
+
+      return {
+        id: Number(venda.id),
+        eventoId: Number(venda.evento_id),
+        barracaId: Number(venda.barraca_id),
+        participanteId: Number(venda.participante_id),
+        valorTotal: Number(venda.valor_total),
+        saldoDepois: saldoPosterior,
+        status: "ESTORNADA",
+        participanteNome: venda.participante_nome,
+        barracaNome: venda.barraca_nome,
+        motivo: input.motivo.trim()
+      };
     });
   }
 
@@ -1108,7 +1234,9 @@ export class CarteiraEventoRepository {
     >(Prisma.sql`
       SELECT
         SUM(CASE WHEN tipo_movimentacao = 'RECARGA' THEN valor ELSE 0 END) AS total_carregado,
-        SUM(CASE WHEN tipo_movimentacao = 'VENDA' THEN valor ELSE 0 END) AS total_consumido,
+        SUM(CASE WHEN tipo_movimentacao = 'VENDA' AND (venda_id IS NULL OR EXISTS (
+          SELECT 1 FROM carteira_evento_venda v2 WHERE v2.id = carteira_evento_movimentacao.venda_id AND v2.status <> 'ESTORNADA'
+        )) THEN valor ELSE 0 END) AS total_consumido,
         SUM(CASE WHEN tipo_movimentacao IN ('TRANSFERENCIA_ENVIADA', 'TRANSFERENCIA_RECEBIDA') THEN valor ELSE 0 END) / 2 AS total_transferencias,
         SUM(CASE WHEN tipo_movimentacao = 'ESTORNO' THEN valor ELSE 0 END) AS total_estornos
       FROM carteira_evento_movimentacao
@@ -1127,20 +1255,36 @@ export class CarteiraEventoRepository {
       SELECT COUNT(*)::bigint AS total
       FROM carteira_evento_participante
       WHERE evento_id = ${eventoId}
-        AND EXISTS (SELECT 1 FROM carteira_evento e WHERE e.id = carteira_evento_participante.evento_id AND e.tenant_id::text = ${tenantId})
+      AND EXISTS (SELECT 1 FROM carteira_evento e WHERE e.id = carteira_evento_participante.evento_id AND e.tenant_id::text = ${tenantId})
+    `);
+
+    const statusCarteiras = await prisma.$queryRaw<Array<{ ativas: bigint; bloqueadas: bigint; sem_saldo: bigint; aguardando_impressao: bigint }>>(Prisma.sql`
+      SELECT
+        COUNT(*) FILTER (WHERE p.status = 'ATIVO')::bigint AS ativas,
+        COUNT(*) FILTER (WHERE p.status = 'BLOQUEADO')::bigint AS bloqueadas,
+        COUNT(*) FILTER (WHERE COALESCE(p.saldo_atual, 0) = 0)::bigint AS sem_saldo,
+        COUNT(*) FILTER (WHERE NOT EXISTS (
+          SELECT 1 FROM carteira_evento_auditoria a
+          WHERE a.participante_id = p.id
+            AND a.tipo_evento IN ('IMPRESSAO_CARTAO', 'REIMPRESSAO_CARTAO')
+        ))::bigint AS aguardando_impressao
+      FROM carteira_evento_participante p
+      WHERE p.evento_id = ${eventoId}
+        AND EXISTS (SELECT 1 FROM carteira_evento e WHERE e.id = p.evento_id AND e.tenant_id::text = ${tenantId})
     `);
 
     const totalVendas = await prisma.$queryRaw<Array<{ total: bigint; valor: number | null }>>(Prisma.sql`
       SELECT COUNT(*)::bigint AS total, COALESCE(SUM(valor_total), 0) AS valor
       FROM carteira_evento_venda
       WHERE evento_id = ${eventoId}
+        AND status <> 'ESTORNADA'
         AND EXISTS (SELECT 1 FROM carteira_evento e WHERE e.id = carteira_evento_venda.evento_id AND e.tenant_id::text = ${tenantId})
     `);
 
     const rankingBarracas = await prisma.$queryRaw<Array<{ barraca: string; total: number; quantidade: bigint }>>(Prisma.sql`
       SELECT b.nome_barraca AS barraca, COALESCE(SUM(v.valor_total), 0) AS total, COUNT(v.id)::bigint AS quantidade
       FROM carteira_evento_barraca b
-      LEFT JOIN carteira_evento_venda v ON v.barraca_id = b.id
+      LEFT JOIN carteira_evento_venda v ON v.barraca_id = b.id AND v.status <> 'ESTORNADA'
       WHERE b.evento_id = ${eventoId}
         AND EXISTS (SELECT 1 FROM carteira_evento e WHERE e.id = b.evento_id AND e.tenant_id::text = ${tenantId})
       GROUP BY b.id, b.nome_barraca
@@ -1152,6 +1296,7 @@ export class CarteiraEventoRepository {
       FROM carteira_evento_venda_item vi
       INNER JOIN carteira_evento_venda v ON v.id = vi.venda_id
       WHERE v.evento_id = ${eventoId}
+        AND v.status <> 'ESTORNADA'
         AND EXISTS (SELECT 1 FROM carteira_evento e WHERE e.id = v.evento_id AND e.tenant_id::text = ${tenantId})
       GROUP BY vi.nome_item
       ORDER BY quantidade DESC, total DESC
@@ -1179,6 +1324,12 @@ export class CarteiraEventoRepository {
       totalTransferencias: Number(totais[0]?.total_transferencias ?? 0),
       totalEstornos: Number(totais[0]?.total_estornos ?? 0),
       quantidadeParticipantes: Number(participantes[0]?.total ?? BigInt(0)),
+      quantidadeCarteiras: Number(participantes[0]?.total ?? BigInt(0)),
+      carteirasAtivas: Number(statusCarteiras[0]?.ativas ?? BigInt(0)),
+      carteirasBloqueadas: Number(statusCarteiras[0]?.bloqueadas ?? BigInt(0)),
+      carteirasSemSaldo: Number(statusCarteiras[0]?.sem_saldo ?? BigInt(0)),
+      carteirasAguardandoImpressao: Number(statusCarteiras[0]?.aguardando_impressao ?? BigInt(0)),
+      quantidadeVendas: quantidadeVendas,
       ticketMedio: quantidadeVendas ? totalVendido / quantidadeVendas : 0,
       totalPorBarraca: rankingBarracas.map((item) => ({
         barraca: item.barraca,
@@ -1214,6 +1365,7 @@ export class CarteiraEventoRepository {
       FROM carteira_evento_venda_item vi
       INNER JOIN carteira_evento_venda v ON v.id = vi.venda_id
       WHERE v.evento_id = ${eventoId}
+        AND v.status <> 'ESTORNADA'
         AND EXISTS (SELECT 1 FROM carteira_evento e WHERE e.id = v.evento_id AND e.tenant_id::text = ${tenantId})
       GROUP BY vi.nome_item
       ORDER BY total DESC, quantidade DESC, vi.nome_item ASC
@@ -1223,6 +1375,7 @@ export class CarteiraEventoRepository {
       SELECT COALESCE(v.operador_nome, 'Nao informado') AS operador_nome, COALESCE(SUM(v.valor_total), 0) AS total, COUNT(v.id)::bigint AS quantidade
       FROM carteira_evento_venda v
       WHERE v.evento_id = ${eventoId}
+        AND v.status <> 'ESTORNADA'
         AND EXISTS (SELECT 1 FROM carteira_evento e WHERE e.id = v.evento_id AND e.tenant_id::text = ${tenantId})
       GROUP BY COALESCE(v.operador_nome, 'Nao informado')
       ORDER BY total DESC
@@ -1249,6 +1402,79 @@ export class CarteiraEventoRepository {
         quantidadeVendas: Number(item.quantidade ?? BigInt(0))
       }))
     };
+  }
+
+  async obterAuditoria(filters: AuditoriaCarteiraFilters, tenantId: string) {
+    await ensureCarteiraEventoEstrutura(prisma);
+    const eventoId = BigInt(filters.evento_id);
+    await this.buscarEventoPorIdOuFalhar(eventoId, tenantId);
+    const limite = Number.isInteger(filters.limite) ? Number(filters.limite) : 200;
+    const rows = await prisma.$queryRaw<Array<{
+      id: bigint;
+      evento_id: bigint | null;
+      participante_id: bigint | null;
+      venda_id: bigint | null;
+      tipo_evento: string;
+      descricao: string;
+      dados: unknown;
+      usuario_id: bigint | null;
+      usuario_nome: string | null;
+      criado_em: Date;
+    }>>(Prisma.sql`
+      SELECT id, evento_id, participante_id, venda_id, tipo_evento, descricao,
+             dados, usuario_id, usuario_nome, criado_em
+      FROM carteira_evento_auditoria
+      WHERE tenant_id::text = ${tenantId}
+        AND evento_id = ${eventoId}
+      ORDER BY criado_em DESC, id DESC
+      LIMIT ${limite}
+    `);
+    return {
+      eventoId: Number(eventoId),
+      registros: rows.map((row) => ({
+        id: Number(row.id),
+        eventoId: row.evento_id == null ? null : Number(row.evento_id),
+        participanteId: row.participante_id == null ? null : Number(row.participante_id),
+        vendaId: row.venda_id == null ? null : Number(row.venda_id),
+        tipoEvento: row.tipo_evento,
+        descricao: row.descricao,
+        dados: row.dados,
+        usuarioId: row.usuario_id == null ? null : Number(row.usuario_id),
+        usuarioNome: row.usuario_nome,
+        criadoEm: row.criado_em.toISOString()
+      }))
+    };
+  }
+
+  async registrarImpressao(participanteId: number, ator: CarteiraEventoAtor) {
+    await ensureCarteiraEventoEstrutura(prisma);
+    const tenantId = this.requireTenant(ator.tenantId);
+    const participante = await this.buscarParticipantePorIdOuFalhar(BigInt(participanteId), tenantId);
+    const anteriores = await prisma.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`
+      SELECT COUNT(*)::bigint AS total
+      FROM carteira_evento_auditoria
+      WHERE tenant_id::text = ${tenantId}
+        AND participante_id = ${BigInt(participanteId)}
+        AND tipo_evento IN ('IMPRESSAO_CARTAO', 'REIMPRESSAO_CARTAO')
+    `);
+    const tipo = Number(anteriores[0]?.total ?? BigInt(0)) > 0 ? "REIMPRESSAO_CARTAO" : "IMPRESSAO_CARTAO";
+    await prisma.$executeRaw(Prisma.sql`
+      INSERT INTO carteira_evento_auditoria (
+        tenant_id, evento_id, participante_id, tipo_evento, descricao, dados,
+        usuario_id, usuario_nome, criado_em
+      ) VALUES (
+        ${tenantId}::uuid,
+        ${BigInt(participante.eventoId)},
+        ${BigInt(participanteId)},
+        ${tipo},
+        ${tipo === "IMPRESSAO_CARTAO" ? "Primeira impressao do cartao/comanda" : "Reimpressao do cartao/comanda"},
+        ${JSON.stringify({ formato: "CR80", larguraMm: 85.6, alturaMm: 53.98 })}::jsonb,
+        ${ator.id ?? null},
+        ${ator.nome ?? ator.nome_usuario},
+        NOW()
+      )
+    `);
+    return { tipo, participanteId, eventoId: participante.eventoId };
   }
 
   async obterRelatorio(filters: RelatorioCarteiraFilters, tenantId: string) {
@@ -1315,6 +1541,7 @@ export class CarteiraEventoRepository {
       SELECT TO_CHAR(v.criado_em, 'HH24:00') AS hora, COALESCE(SUM(v.valor_total), 0) AS total, COUNT(v.id)::bigint AS quantidade
       FROM carteira_evento_venda v
       WHERE v.evento_id = ${eventoId}
+        AND v.status <> 'ESTORNADA'
         AND EXISTS (SELECT 1 FROM carteira_evento e WHERE e.id = v.evento_id AND e.tenant_id::text = ${tenantId})
       GROUP BY TO_CHAR(v.criado_em, 'HH24:00')
       ORDER BY hora ASC
@@ -1554,6 +1781,47 @@ export class CarteiraEventoRepository {
     return normalized;
   }
 
+  private async registrarCaixaEventoTx(
+    tx: Tx,
+    tenantId: string,
+    input: {
+      eventoId: bigint;
+      barracaId?: bigint;
+      vendaId?: bigint;
+      tipo: string;
+      valor: number;
+      descricao: string;
+      operador: CarteiraEventoAtor;
+    }
+  ) {
+    await tx.$executeRaw(Prisma.sql`
+      INSERT INTO carteira_evento_caixa_movimentacao (
+        tenant_id,
+        evento_id,
+        barraca_id,
+        venda_id,
+        tipo,
+        valor,
+        descricao,
+        operador_usuario_id,
+        operador_nome,
+        criado_em
+      ) VALUES (
+        ${tenantId}::uuid,
+        ${input.eventoId},
+        ${input.barracaId ?? null},
+        ${input.vendaId ?? null},
+        ${input.tipo},
+        ${input.valor},
+        ${input.descricao},
+        ${input.operador.id ?? null},
+        ${input.operador.nome ?? input.operador.nome_usuario},
+        NOW()
+      )
+      ON CONFLICT (venda_id, tipo) WHERE venda_id IS NOT NULL DO NOTHING
+    `);
+  }
+
   private async registrarMovimentacaoTx(
     tx: Tx,
     input: {
@@ -1610,6 +1878,47 @@ export class CarteiraEventoRepository {
         NOW()
       )
     `);
+
+    const evento = await tx.$queryRaw<Array<{ tenant_id: string | null }>>(Prisma.sql`
+      SELECT tenant_id::text
+      FROM carteira_evento
+      WHERE id = ${input.evento_id}
+      LIMIT 1
+    `);
+    if (evento[0]?.tenant_id) {
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO carteira_evento_auditoria (
+          tenant_id,
+          evento_id,
+          participante_id,
+          venda_id,
+          tipo_evento,
+          descricao,
+          dados,
+          usuario_id,
+          usuario_nome,
+          criado_em
+        ) VALUES (
+          ${evento[0].tenant_id}::uuid,
+          ${input.evento_id},
+          ${input.participante_id},
+          ${input.venda_id ?? null},
+          ${input.tipo_movimentacao},
+          ${trimOrUndefined(input.descricao) ?? "Movimentacao da carteira"},
+          ${JSON.stringify({
+            valor: input.valor,
+            saldoAnterior: input.saldo_anterior,
+            saldoPosterior: input.saldo_posterior,
+            formaPagamento: input.forma_pagamento ?? null,
+            motivo: input.motivo ?? null,
+            referenciaExterna: input.referencia_externa ?? null
+          })}::jsonb,
+          ${input.operador.id ?? null},
+          ${input.operador.nome ?? input.operador.nome_usuario},
+          NOW()
+        )
+      `);
+    }
   }
 
   private async listarItensVendaTx(tx: Tx, vendaId: bigint) {

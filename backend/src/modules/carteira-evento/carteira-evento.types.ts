@@ -153,6 +153,11 @@ export type OperacaoVendaInput = {
   observacao?: string;
 };
 
+export type EstornoVendaInput = {
+  venda_id: number;
+  motivo: string;
+};
+
 export type ParticipanteCarteiraFilters = {
   evento_id?: number;
   busca?: string;
@@ -194,6 +199,11 @@ export type FechamentoCarteiraFilters = {
 export type RelatorioCarteiraFilters = {
   evento_id: number;
   tipo: TipoRelatorioCarteira;
+};
+
+export type AuditoriaCarteiraFilters = {
+  evento_id: number;
+  limite?: number;
 };
 
 export type CarteiraEventoAtor = {

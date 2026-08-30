@@ -14,6 +14,30 @@ async function ensureVendaEstrutura() {
       await prisma.$executeRawUnsafe("ALTER TABLE IF EXISTS venda_setor_item ADD COLUMN IF NOT EXISTS tenant_id UUID");
       await prisma.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS venda_setor_tenant_idx ON venda_setor(tenant_id, criado_em DESC)");
       await prisma.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS venda_setor_item_tenant_idx ON venda_setor_item(tenant_id, venda_id)");
+      await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS venda_setor_pagamento (
+        id BIGSERIAL PRIMARY KEY,
+        tenant_id UUID NOT NULL,
+        venda_id BIGINT NOT NULL REFERENCES venda_setor(id) ON DELETE RESTRICT,
+        forma_pagamento VARCHAR(40) NOT NULL,
+        valor NUMERIC(14,2) NOT NULL,
+        status VARCHAR(30) NOT NULL DEFAULT 'CONFIRMADO',
+        criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+        UNIQUE (tenant_id, venda_id, forma_pagamento)
+      )`);
+      await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS venda_setor_caixa_movimentacao (
+        id BIGSERIAL PRIMARY KEY,
+        tenant_id UUID NOT NULL,
+        venda_id BIGINT NOT NULL REFERENCES venda_setor(id) ON DELETE RESTRICT,
+        pagamento_id BIGINT REFERENCES venda_setor_pagamento(id) ON DELETE RESTRICT,
+        tipo VARCHAR(30) NOT NULL DEFAULT 'ENTRADA',
+        forma_pagamento VARCHAR(40) NOT NULL,
+        valor NUMERIC(14,2) NOT NULL,
+        descricao VARCHAR(255) NOT NULL,
+        criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+        UNIQUE (tenant_id, venda_id, tipo, forma_pagamento)
+      )`);
+      await prisma.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS venda_setor_pagamento_tenant_idx ON venda_setor_pagamento(tenant_id, venda_id)");
+      await prisma.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS venda_setor_caixa_tenant_idx ON venda_setor_caixa_movimentacao(tenant_id, criado_em DESC)");
 
       await prisma.$executeRawUnsafe(`
         UPDATE venda_setor
@@ -256,6 +280,18 @@ export class VendaRepository {
       if (!vendaId) {
         throw new AppError("Nao foi possivel concluir a venda.", 500);
       }
+
+      const pagamentoInserido = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+        INSERT INTO venda_setor_pagamento (tenant_id, venda_id, forma_pagamento, valor, status)
+        VALUES (${tenantId}::uuid, ${vendaId}, ${input.forma_pagamento}, ${valorTotal}, 'CONFIRMADO')
+        ON CONFLICT (tenant_id, venda_id, forma_pagamento) DO UPDATE SET valor = EXCLUDED.valor
+        RETURNING id
+      `);
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO venda_setor_caixa_movimentacao (tenant_id, venda_id, pagamento_id, tipo, forma_pagamento, valor, descricao)
+        VALUES (${tenantId}::uuid, ${vendaId}, ${pagamentoInserido[0]?.id ?? null}, 'ENTRADA', ${input.forma_pagamento}, ${valorTotal}, ${`Recebimento da venda #${vendaId}`})
+        ON CONFLICT (tenant_id, venda_id, tipo, forma_pagamento) DO NOTHING
+      `);
 
       for (const item of itensNormalizados) {
         await tx.$executeRaw(Prisma.sql`

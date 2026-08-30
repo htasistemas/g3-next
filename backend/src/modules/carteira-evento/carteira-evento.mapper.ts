@@ -21,6 +21,7 @@ export type ParticipanteCarteiraRow = {
   id: bigint;
   evento_id: bigint;
   nome_evento: string | null;
+  validade_credito?: Date | null;
   nome: string;
   telefone: string | null;
   cpf: string | null;

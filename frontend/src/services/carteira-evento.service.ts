@@ -70,6 +70,9 @@ export const carteiraEventoService = {
   realizarVenda(payload: Record<string, unknown>) {
     return httpClient.post<VendaCarteira>("/api/carteira-evento/operacao/venda", payload).then((r) => r.data);
   },
+  estornarVenda(id: number, motivo: string) {
+    return httpClient.post<VendaCarteira>(`/api/carteira-evento/operacao/venda/${id}/estornar`, { motivo }).then((r) => r.data);
+  },
   extrato(participanteId: number) {
     return httpClient
       .get<{ participante: ParticipanteCarteira; saldoAtual: number; movimentacoes: MovimentacaoCarteira[] }>("/api/carteira-evento/extrato", {
@@ -85,5 +88,11 @@ export const carteiraEventoService = {
   },
   relatorio(eventoId: number, tipo: string) {
     return httpClient.get<{ tipo: string; dados: unknown }>("/api/carteira-evento/relatorios", { params: { evento_id: eventoId, tipo } }).then((r) => r.data);
+  },
+  auditoria(eventoId: number, limite = 200) {
+    return httpClient.get<{ eventoId: number; registros: unknown[] }>("/api/carteira-evento/auditoria", { params: { evento_id: eventoId, limite } }).then((r) => r.data);
+  },
+  registrarImpressao(participanteId: number) {
+    return httpClient.post<{ tipo: string; participanteId: number }>("/api/carteira-evento/impressao", { participante_id: participanteId }).then((r) => r.data);
   }
 };
