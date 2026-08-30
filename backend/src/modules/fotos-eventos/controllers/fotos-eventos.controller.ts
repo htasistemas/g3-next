@@ -49,6 +49,15 @@ export class FotosEventosController {
     return response.status(204).send();
   }
 
+  async removerEmLote(request: AuthenticatedRequest, response: Response) {
+    const resultado = await service.removerEmLote(
+      request.body?.ids,
+      request.authUser?.id,
+      request.authUser?.tenant_id
+    );
+    return response.json(resultado);
+  }
+
   async adicionarFoto(request: AuthenticatedRequest, response: Response) {
     const foto = await service.adicionarFoto(
       request.params.id,

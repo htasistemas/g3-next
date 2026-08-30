@@ -37,6 +37,7 @@ import {
   useFotoEvento,
   useFotosEventos,
   useRemoverFotoEvento,
+  useRemoverFotosEventosEmLote,
   useRemoverFotoItemEvento,
   useReordenarFotosEvento,
   useSalvarFotoEvento
@@ -363,6 +364,8 @@ export function FotosEventosPage() {
   const [snapshot, setSnapshot] = useState<FormState>(defaultForm);
   const [popupMensagem, setPopupMensagem] = useState<PopupMensagemState | null>(null);
   const [confirmarExcluir, setConfirmarExcluir] = useState(false);
+  const [albunsSelecionados, setAlbunsSelecionados] = useState<number[]>([]);
+  const [mostrarConfirmacaoExclusaoEmLote, setMostrarConfirmacaoExclusaoEmLote] = useState(false);
   const [confirmarExcluirFotoId, setConfirmarExcluirFotoId] = useState<number | null>(null);
   const [uploadsPendentes, setUploadsPendentes] = useState<UploadPendente[]>([]);
   const [importandoPastas, setImportandoPastas] = useState(false);
@@ -389,6 +392,7 @@ export function FotosEventosPage() {
   const detalheQuery = useFotoEvento(form.id);
   const salvarMutation = useSalvarFotoEvento();
   const removerMutation = useRemoverFotoEvento();
+  const removerEmLoteMutation = useRemoverFotosEventosEmLote();
   const adicionarFotosLoteMutation = useAdicionarFotosEventoLote();
   const definirCapaMutation = useDefinirCapaEvento();
   const removerFotoMutation = useRemoverFotoItemEvento();
@@ -402,6 +406,7 @@ export function FotosEventosPage() {
   const carregandoAcoes =
     salvarMutation.isPending ||
     removerMutation.isPending ||
+    removerEmLoteMutation.isPending ||
     adicionarFotosLoteMutation.isPending ||
     definirCapaMutation.isPending ||
     removerFotoMutation.isPending ||
@@ -851,6 +856,40 @@ export function FotosEventosPage() {
     }
   }
 
+  function alternarAlbumSelecionado(id: number) {
+    setAlbunsSelecionados((atuais) =>
+      atuais.includes(id) ? atuais.filter((item) => item !== id) : [...atuais, id]
+    );
+  }
+
+  function alternarTodosAlbuns() {
+    setAlbunsSelecionados((atuais) =>
+      atuais.length === eventos.length ? [] : eventos.map((item) => item.id)
+    );
+  }
+
+  async function confirmarExclusaoEmLote() {
+    if (!albunsSelecionados.length) return;
+    try {
+      const resultado = await removerEmLoteMutation.mutateAsync(albunsSelecionados);
+      setAlbunsSelecionados([]);
+      setMostrarConfirmacaoExclusaoEmLote(false);
+      if (form.id && albunsSelecionados.includes(form.id)) novo();
+      setAbaAtiva("lista");
+      setPopupMensagem({
+        tipo: "sucesso",
+        titulo: "Álbuns excluídos",
+        texto: `${resultado.quantidade} álbum(ns) foram excluídos com sucesso.`
+      });
+    } catch (error: any) {
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Não foi possível excluir",
+        texto: error?.response?.data?.message ?? "Não foi possível excluir os álbuns selecionados."
+      });
+    }
+  }
+
   async function definirCapa(fotoId: number) {
     if (!form.id) return;
 
@@ -916,7 +955,14 @@ export function FotosEventosPage() {
   const acoes: AdminAction[] =
     abaAtiva === "lista"
       ? [
-          { label: "Buscar eventos", icon: Search, onClick: buscar, variant: "outline" },
+            { label: "Buscar eventos", icon: Search, onClick: buscar, variant: "outline" },
+            {
+              label: albunsSelecionados.length ? `Excluir selecionados (${albunsSelecionados.length})` : "Excluir selecionados",
+              icon: Trash2,
+              onClick: () => setMostrarConfirmacaoExclusaoEmLote(true),
+              variant: "danger",
+              disabled: carregandoAcoes || !albunsSelecionados.length
+            },
           { label: "Abrir mural", icon: Images, onClick: abrirCards, variant: "ghost" },
           { label: "Novo evento", icon: Plus, onClick: novo, variant: "default", disabled: carregandoAcoes },
           { label: "Imprimir", icon: Upload, onClick: imprimir, variant: "ghost", disabled: carregandoAcoes },
@@ -1043,6 +1089,14 @@ export function FotosEventosPage() {
               <table className="min-w-full text-sm">
                 <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
                   <tr>
+                    <th className="w-12 px-3 py-2 text-center">
+                      <input
+                        type="checkbox"
+                        aria-label="Selecionar todos os álbuns exibidos"
+                        checked={eventos.length > 0 && albunsSelecionados.length === eventos.length}
+                        onChange={alternarTodosAlbuns}
+                      />
+                    </th>
                     <th className="px-3 py-2 text-left">Evento</th>
                     <th className="px-3 py-2 text-left">Data</th>
                     <th className="px-3 py-2 text-left">Local</th>
@@ -1054,7 +1108,7 @@ export function FotosEventosPage() {
                 <tbody>
                   {isLoading ? (
                     <tr>
-                      <td colSpan={6} className="px-3 py-5 text-center">
+                      <td colSpan={7} className="px-3 py-5 text-center">
                         Carregando eventos...
                       </td>
                     </tr>
@@ -1067,6 +1121,14 @@ export function FotosEventosPage() {
                         }`}
                         onClick={() => selecionar(item.id)}
                       >
+                        <td className="px-3 py-3 text-center" onClick={(event) => event.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            aria-label={`Selecionar álbum ${item.titulo}`}
+                            checked={albunsSelecionados.includes(item.id)}
+                            onChange={() => alternarAlbumSelecionado(item.id)}
+                          />
+                        </td>
                         <td className="px-3 py-3">
                           <div className="min-w-[220px]">
                             <p className="font-medium text-[var(--g3-foreground)]">{item.titulo}</p>
@@ -1086,7 +1148,7 @@ export function FotosEventosPage() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={6} className="px-3 py-5 text-center text-[var(--g3-muted)]">
+                      <td colSpan={7} className="px-3 py-5 text-center text-[var(--g3-muted)]">
                         Nenhum evento encontrado para os filtros informados.
                       </td>
                     </tr>
@@ -1736,6 +1798,16 @@ export function FotosEventosPage() {
         onCancel={() => setConfirmarExcluir(false)}
         onConfirm={() => void confirmarExclusao()}
         confirmarTexto="Excluir"
+      />
+
+      <PopupConfirmacao
+        aberto={mostrarConfirmacaoExclusaoEmLote}
+        titulo="Excluir álbuns selecionados?"
+        texto={`Você selecionou ${albunsSelecionados.length} álbum(ns). Deseja realmente excluir? Esta ação será irreversível e removerá os álbuns e suas fotos.`}
+        processando={removerEmLoteMutation.isPending}
+        onCancel={() => setMostrarConfirmacaoExclusaoEmLote(false)}
+        onConfirm={() => void confirmarExclusaoEmLote()}
+        confirmarTexto="Sim, excluir"
       />
 
       <PopupConfirmacao

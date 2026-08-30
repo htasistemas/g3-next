@@ -75,6 +75,13 @@ fotosEventosRoutes.delete(
   ensurePermissions(permissaoExclusao),
   asyncHandler(controller.removerFoto.bind(controller))
 );
+
+fotosEventosRoutes.post(
+  "/excluir-em-lote",
+  ensureAuthenticated,
+  ensurePermissions(permissaoExclusao),
+  asyncHandler(controller.removerEmLote.bind(controller))
+);
 fotosEventosRoutes.get(
   "/:id/fotos/:fotoId/arquivo",
   ensureAuthenticated,

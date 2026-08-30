@@ -461,6 +461,33 @@ export class FotosEventosRepository {
     `);
   }
 
+  async removerEmLote(ids: bigint[], tenantId: string) {
+    await this.ensureEstrutura();
+    if (!ids.length) return [];
+
+    const registros = await Promise.all(ids.map((id) => this.buscarPorIdOuFalhar(id, tenantId)));
+    await prisma.$transaction(async (tx) => {
+      const listaIds = Prisma.join(ids);
+      await tx.$executeRaw(Prisma.sql`
+        DELETE FROM fotos_eventos_tags
+        WHERE evento_id IN (${listaIds})
+          AND tenant_id::text = ${tenantId}
+      `);
+      await tx.$executeRaw(Prisma.sql`
+        DELETE FROM fotos_eventos_itens
+        WHERE evento_id IN (${listaIds})
+          AND tenant_id::text = ${tenantId}
+      `);
+      await tx.$executeRaw(Prisma.sql`
+        DELETE FROM fotos_eventos
+        WHERE id IN (${listaIds})
+          AND tenant_id::text = ${tenantId}
+      `);
+    });
+
+    return registros;
+  }
+
   async listarFotosEvento(eventoId: bigint, tenantId: string) {
     await this.ensureEstrutura();
     return prisma.$queryRaw<FotoEventoItemRow[]>(Prisma.sql`

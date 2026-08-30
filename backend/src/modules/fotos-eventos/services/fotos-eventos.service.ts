@@ -118,6 +118,23 @@ export class FotosEventosService {
     );
   }
 
+  async removerEmLote(rawIds: unknown, rawUsuarioId?: string, rawTenantId?: string) {
+    if (!Array.isArray(rawIds) || !rawIds.length) {
+      throw new AppError("Informe ao menos um álbum para excluir.", 400);
+    }
+
+    const ids = rawIds.map((valor) => this.parseId(String(valor)));
+    const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const tenantId = this.parseTenant(rawTenantId);
+    const registros = await this.repository.removerEmLote(ids, tenantId);
+    await this.removerCaminhos(
+      registros.flatMap((registro) => registro.fotos.map((item) => item.arquivo))
+        .filter((item) => this.isManagedStoragePath(item)),
+      usuarioId
+    );
+    return { quantidade: registros.length };
+  }
+
   async adicionarFoto(
     rawEventoId: string,
     rawInput: unknown,

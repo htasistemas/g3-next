@@ -55,6 +55,14 @@ export const fotosEventosService = {
     await httpClient.delete(`/api/fotos-eventos/${id}`);
   },
 
+  async excluirEmLote(ids: number[]) {
+    const { data } = await httpClient.post<{ quantidade: number }>(
+      "/api/fotos-eventos/excluir-em-lote",
+      { ids }
+    );
+    return data;
+  },
+
   async adicionarFoto(
     id: number,
     payload: FotoEventoFotosLotePayload["fotos"][number]

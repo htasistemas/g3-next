@@ -56,6 +56,16 @@ export function useRemoverFotoEvento() {
   });
 }
 
+export function useRemoverFotosEventosEmLote() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: number[]) => fotosEventosService.excluirEmLote(ids),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["fotos-eventos"] });
+    }
+  });
+}
+
 export function useAdicionarFotoEvento() {
   const queryClient = useQueryClient();
   return useMutation({
