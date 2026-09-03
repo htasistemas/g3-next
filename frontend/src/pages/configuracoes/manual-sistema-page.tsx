@@ -1323,7 +1323,8 @@ const secoesManual: ManualSecao[] = [
           "Na aba Visão geral, use Próxima etapa para abrir inscrições quando a eleição estiver em configuração. A abertura muda o status e libera o período de candidatura.",
           "O colaborador pode acessar o Portal da eleição, autenticar-se com CPF e data de nascimento, conferir seus dados, preencher apresentação e proposta, declarar ciência das regras e enviar a candidatura.",
           "A candidatura enviada recebe protocolo e número gerado automaticamente. O número não é reutilizado dentro da mesma eleição, mesmo se a candidatura for reprovada ou desistir.",
-          "Na aba Candidatos, a comissão consulta nome público, foto quando permitida, número, cargo, setor, unidade, apresentação, proposta, data, protocolo e situação.",
+           "Na aba Candidatos, a comissão consulta nome público, foto quando permitida, número, cargo, setor, unidade, apresentação, proposta, data, protocolo e situação.",
+           "Para usar um cadastro já existente, pesquise o nome na área Adicionar candidato pelo cadastro de beneficiários, selecione a pessoa e informe matrícula e data de admissão. O G3N cria o vínculo trabalhista oficial e envia a candidatura para análise, sem duplicar o cadastro de origem.",
           "Para cada candidatura em análise, escolha Aprovar, Reprovar ou Solicitar correção. Use uma justificativa clara e suficiente para que o candidato saiba o que precisa corrigir.",
           "Acompanhe os contadores de inscritos, em análise, aprovados, reprovados e desistentes. Só publique quando a comissão tiver finalizado a análise e os dados divulgáveis estiverem revisados.",
           "Depois da publicação, o sistema libera no portal público somente candidatos aprovados e bloqueia alterações administrativas incompatíveis com a eleição pronta."
