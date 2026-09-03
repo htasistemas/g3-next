@@ -186,7 +186,13 @@ if ! run_backend_task npx prisma migrate deploy; then
     20260814_harden_gestao_parcerias \
     20260815_vinculo_termo_fomento_parceria \
     20260820_create_portal_inscricoes \
-    20260820_portal_publicacao_catalogo; do
+    20260820_portal_publicacao_catalogo \
+    20260902_create_rh_colaboradores_cipa_core \
+    20260902_create_cipa_portal_sessions \
+    20260903_cipa_apuracao_live \
+    20260904_cipa_public_identifier_global \
+    20260905_cipa_participation_extension \
+    20260906_cipa_desempate_auditado; do
     run_backend_task npx prisma db execute --schema prisma/schema.prisma --file "prisma/migrations/$migration/migration.sql"
   done
 fi
