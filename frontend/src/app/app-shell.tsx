@@ -568,6 +568,13 @@ const menuSectionsBase: MenuSection[] = [
         to: "/setor-rh/contratacao",
         label: "Contratação",
         icon: ShieldUser
+      },
+      {
+        id: "setor-rh-cipa",
+        to: "/setor-rh/cipa",
+        label: "Eleição CIPA",
+        icon: CheckSquare2,
+        requiredPermissions: ["ADMINISTRADOR", "CIPA_VISUALIZAR"]
       }
     ]
   },

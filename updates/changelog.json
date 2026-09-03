@@ -1,6 +1,14 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.871",
+                        "releaseDate": "2026-09-03",
+                        "title": "Gestão de eleições da CIPA",
+                        "description": "Implantação do módulo de gestão eleitoral da CIPA com fluxo administrativo, urna mobile, sigilo do voto e auditoria.",
+                        "changes": ["Incluídas eleições, cronograma, eleitores, candidaturas, votação, apuração, documentos e trilha de auditoria.", "Adicionadas proteção contra votação duplicada, segregação do voto, isolamento por tenant e acompanhamento da participação.", "Adequada a tela administrativa ao padrão de abas do G3N e incluído o portal público da eleição."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.870",
                         "releaseDate": "2026-08-23",
                         "title": "Correção do container nas migrações do deploy",

@@ -1,0 +1,57 @@
+import { Router } from "express";
+import { asyncHandler } from "../../../shared/http/async-handler.js";
+import { ensureAuthenticated, ensurePermissions } from "../../auth/middlewares/auth.middleware.js";
+import { rateLimit } from "../../../shared/http/rate-limit.js";
+import { CipaController, cipaImportUpload } from "../controllers/cipa.controller.js";
+
+const controller = new CipaController();
+export const cipaRoutes = Router();
+const visualizar = ["ADMINISTRADOR", "CIPA_VISUALIZAR"];
+const portalRateLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, keyPrefix: "cipa-portal-auth", key: (request) => `${request.ip}:${request.params.identificador ?? ""}` });
+
+cipaRoutes.get("/colaboradores", ensureAuthenticated, ensurePermissions(visualizar), asyncHandler(controller.listarColaboradores.bind(controller)));
+cipaRoutes.get("/colaboradores/:id", ensureAuthenticated, ensurePermissions(visualizar), asyncHandler(controller.buscarColaborador.bind(controller)));
+cipaRoutes.post("/colaboradores", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "CIPA_GERENCIAR_ELEITORES"]), asyncHandler(controller.criarColaborador.bind(controller)));
+cipaRoutes.get("/eleicoes", ensureAuthenticated, ensurePermissions(visualizar), asyncHandler(controller.listarEleicoes.bind(controller)));
+cipaRoutes.get("/eleicoes/:id", ensureAuthenticated, ensurePermissions(visualizar), asyncHandler(controller.buscarEleicao.bind(controller)));
+cipaRoutes.post("/eleicoes", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "CIPA_CRIAR_ELEICAO"]), asyncHandler(controller.criarEleicao.bind(controller)));
+cipaRoutes.patch("/eleicoes/:id", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "CIPA_EDITAR_ELEICAO"]), asyncHandler(controller.editarEleicao.bind(controller)));
+cipaRoutes.get("/eleicoes/:id/eleitores", ensureAuthenticated, ensurePermissions(visualizar), asyncHandler(controller.listarEleitores.bind(controller)));
+cipaRoutes.post("/eleicoes/:id/eleitores", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "CIPA_GERENCIAR_ELEITORES"]), asyncHandler(controller.adicionarEleitor.bind(controller)));
+cipaRoutes.delete("/eleicoes/:id/eleitores/:eleitorId", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "CIPA_GERENCIAR_ELEITORES"]), asyncHandler(controller.removerEleitor.bind(controller)));
+cipaRoutes.get("/portal/:identificador", asyncHandler(controller.portalPublico.bind(controller)));
+cipaRoutes.post("/eleicoes/:id/eleitores/importar", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "CIPA_GERENCIAR_ELEITORES"]), cipaImportUpload.single("arquivo"), asyncHandler(controller.importarEleitores.bind(controller)));
+cipaRoutes.get("/eleicoes/:id/candidaturas", ensureAuthenticated, ensurePermissions(visualizar), asyncHandler(controller.listarCandidaturas.bind(controller)));
+cipaRoutes.post("/eleicoes/:id/candidaturas", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "CIPA_GERENCIAR_CANDIDATOS"]), asyncHandler(controller.criarCandidatura.bind(controller)));
+cipaRoutes.patch("/eleicoes/:id/candidaturas/:candidaturaId/status", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "CIPA_GERENCIAR_CANDIDATOS"]), asyncHandler(controller.alterarStatusCandidatura.bind(controller)));
+cipaRoutes.post("/eleicoes/:id/abrir-inscricoes", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "CIPA_EDITAR_ELEICAO"]), asyncHandler(controller.abrirInscricoes.bind(controller)));
+cipaRoutes.post("/eleicoes/:id/encerrar-inscricoes", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "CIPA_EDITAR_ELEICAO"]), asyncHandler(controller.encerrarInscricoes.bind(controller)));
+cipaRoutes.post("/eleicoes/:id/cancelar", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "CIPA_EDITAR_ELEICAO"]), asyncHandler(controller.cancelarEleicao.bind(controller)));
+cipaRoutes.get("/eleicoes/:id/dashboard", ensureAuthenticated, ensurePermissions(visualizar), asyncHandler(controller.obterDashboard.bind(controller)));
+cipaRoutes.get("/eleicoes/:id/dashboard/ao-vivo", ensureAuthenticated, ensurePermissions(visualizar), asyncHandler(controller.acompanhar.bind(controller)));
+cipaRoutes.get("/eleicoes/:id/comissao", ensureAuthenticated, ensurePermissions(visualizar), asyncHandler(controller.listarComissao.bind(controller)));
+cipaRoutes.get("/eleicoes/:id/auditoria", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "CIPA_AUDITORIA"]), asyncHandler(controller.listarAuditoria.bind(controller)));
+cipaRoutes.post("/eleicoes/:id/comissao", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "CIPA_EDITAR_ELEICAO"]), asyncHandler(controller.adicionarComissao.bind(controller)));
+cipaRoutes.delete("/eleicoes/:id/comissao/:membroId", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "CIPA_EDITAR_ELEICAO"]), asyncHandler(controller.removerComissao.bind(controller)));
+cipaRoutes.post("/eleicoes/:id/publicar", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "CIPA_EDITAR_ELEICAO"]), asyncHandler(controller.publicarEleicao.bind(controller)));
+cipaRoutes.post("/eleicoes/:id/zeresima", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "CIPA_ABRIR_VOTACAO"]), asyncHandler(controller.gerarZeresima.bind(controller)));
+cipaRoutes.post("/eleicoes/:id/abrir-votacao", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "CIPA_ABRIR_VOTACAO"]), asyncHandler(controller.abrirVotacao.bind(controller)));
+cipaRoutes.post("/eleicoes/:id/encerrar-votacao", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "CIPA_ENCERRAR_VOTACAO"]), asyncHandler(controller.encerrarVotacao.bind(controller)));
+cipaRoutes.post("/eleicoes/:id/estender-votacao", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "CIPA_ENCERRAR_VOTACAO"]), asyncHandler(controller.estenderVotacao.bind(controller)));
+cipaRoutes.post("/eleicoes/:id/apurar", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "CIPA_APURAR"]), asyncHandler(controller.apurar.bind(controller)));
+cipaRoutes.get("/eleicoes/:id/apuracao", ensureAuthenticated, ensurePermissions(visualizar), asyncHandler(controller.buscarApuracao.bind(controller)));
+cipaRoutes.post("/eleicoes/:id/publicar-resultado", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "CIPA_PUBLICAR_RESULTADO"]), asyncHandler(controller.publicarResultado.bind(controller)));
+cipaRoutes.post("/eleicoes/:id/desempates", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "CIPA_APURAR"]), asyncHandler(controller.registrarDesempate.bind(controller)));
+cipaRoutes.post("/eleicoes/:id/documentos", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "CIPA_DOCUMENTOS"]), asyncHandler(controller.gerarDocumento.bind(controller)));
+cipaRoutes.get("/eleicoes/:id/documentos", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "CIPA_DOCUMENTOS"]), asyncHandler(controller.listarDocumentos.bind(controller)));
+cipaRoutes.get("/eleicoes/:id/documentos/:documentoId/conteudo", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "CIPA_DOCUMENTOS"]), asyncHandler(controller.obterConteudoDocumento.bind(controller)));
+cipaRoutes.get("/eleicoes/:id/relatorios", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "CIPA_DOCUMENTOS"]), asyncHandler(controller.gerarRelatorio.bind(controller)));
+
+// Portal separado do painel administrativo. O token é opaco, curto e nunca é salvo em texto no banco.
+cipaRoutes.post("/portal/:identificador/autenticar-eleitor", portalRateLimit, asyncHandler(controller.autenticarEleitor.bind(controller)));
+cipaRoutes.post("/portal/:identificador/autenticar-candidato", portalRateLimit, asyncHandler(controller.autenticarCandidato.bind(controller)));
+cipaRoutes.get("/portal/:identificador/urna", asyncHandler(controller.obterUrna.bind(controller)));
+cipaRoutes.get("/portal/:identificador/candidatos/:candidaturaId/foto", asyncHandler(controller.obterFotoCandidaturaPortal.bind(controller)));
+cipaRoutes.post("/portal/:identificador/voto", asyncHandler(controller.registrarVoto.bind(controller)));
+cipaRoutes.post("/portal/:identificador/candidatura", asyncHandler(controller.criarCandidaturaPortal.bind(controller)));
+cipaRoutes.post("/portal/:identificador/candidatura/foto", cipaImportUpload.single("arquivo"), asyncHandler(controller.enviarFotoCandidaturaPortal.bind(controller)));

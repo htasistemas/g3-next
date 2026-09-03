@@ -1263,6 +1263,28 @@ const secoesManual: ManualSecao[] = [
           "Se a câmera do dispositivo não estiver disponível, o cadastro facial e a confirmação do ponto não poderão ser concluídos nesse equipamento.",
           "No ajuste administrativo, quando o modo Somente senha estiver selecionado, o sistema não deve exigir captura facial para concluir o salvamento."
         ]
+      },
+      {
+        nome: "Eleição CIPA",
+        objetivo: "Organizar o processo eleitoral da CIPA com cronograma, eleitores, candidaturas, votação secreta, apuração e documentos.",
+        comoUsar: [
+          "No menu Recursos humanos, abra CIPA e depois Eleição CIPA para criar uma eleição e preencher o cronograma; o período de inscrições deve respeitar a regra mínima configurada.",
+          "Cadastre ou importe os colaboradores aptos por CSV, XLS ou XLSX, revise as inconsistências e confirme a lista de eleitores antes da votação.",
+          "Abra as inscrições, acompanhe as candidaturas pelo portal, analise os candidatos e defina a comissão eleitoral antes de publicar a eleição.",
+          "Gere a zerésima antes de abrir a urna. Depois divulgue o link ou QR Code e acompanhe a participação no dashboard ao vivo.",
+          "Após o encerramento, execute a apuração, revise titulares e suplentes, publique o resultado e gere os documentos oficiais do processo."
+          ,"Depois de confirmar o voto, use Imprimir ou salvar em PDF para guardar o comprovante de participação; ele não informa o candidato escolhido.",
+          "Na central Documentos e relatórios da eleição, use os botões de Relatórios para baixar listas de eleitores, candidatos, participação, apuração, resultado e auditoria em CSV compatível com Excel."
+        ],
+        atencoes: [
+          "A urna valida CPF, data de nascimento, aptidão, eleição, janela de votação e sessão no backend; o navegador não é fonte de autoridade.",
+          "O voto é armazenado separado do registro de participação. O administrador consegue confirmar que o eleitor participou, mas não consulta diretamente em quem ele votou.",
+          "A unicidade do banco, a transação e o bloqueio da sessão impedem uma segunda participação, inclusive em requisições simultâneas.",
+          "O QR Code abre apenas o portal público da eleição. O comprovante confirma a participação e não revela a opção escolhida.",
+          "O módulo apoia o atendimento aos requisitos aplicáveis da NR-5; a condução formal, a comissão eleitoral e a guarda documental continuam sob responsabilidade da organização.",
+          "A tela respeita o tenant autenticado. Não informe tenant manualmente nem compartilhe CPF completo em relatórios ou dashboards.",
+          "Os relatórios exigem a permissão CIPA_DOCUMENTOS e exportam o CPF mascarado; revise os destinatários antes de compartilhar arquivos."
+        ]
       }
     ]
   },

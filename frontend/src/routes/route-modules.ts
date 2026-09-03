@@ -94,6 +94,7 @@ const routeModules: RouteModuleDefinition[] = [
   },
   { path: "/setor-rh/registro-ponto", loader: () => import("@/pages/registro-ponto/registro-ponto-page") },
   { path: "/setor-rh/contratacao", loader: () => import("@/pages/setor-rh/contratacao-page") },
+  { path: "/setor-rh/cipa", loader: () => import("@/pages/setor-rh/cipa-page") },
   {
     path: "/setor-administrativo/almoxarifado",
     loader: () => import("@/pages/setor-administrativo/almoxarifado-page")
@@ -254,6 +255,10 @@ const routeModules: RouteModuleDefinition[] = [
   {
     path: "/portal-parceiro-financiador",
     loader: () => import("@/pages/portais/portal-externo-page")
+  },
+  {
+    path: "/cipa/eleicao/:identificador",
+    loader: () => import("@/pages/portais/cipa-eleicao-portal-page")
   },
   { path: "/configuracoes/usuarios", loader: () => import("@/pages/configuracoes/usuarios-page") },
   { path: "/configuracoes/perfis-acesso", loader: () => import("@/pages/configuracoes/perfis-acesso-page") },

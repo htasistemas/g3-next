@@ -1,10 +1,10 @@
-{
-  "latestVersion": "1.00.870",
-  "releaseDate": "2026-08-23",
-  "description": "Correção definitiva do conflito do container durante as migrações do deploy.",
-  "packageName": "",
-  "checksum": "",
-  "minCompatibleVersion": "1.00.870",
-  "releaseType": "stable",
-  "downloadUrl": null
+﻿{
+    "latestVersion":  "1.00.871",
+    "releaseDate":  "2026-08-23",
+    "description":  "CorreÃ§Ã£o definitiva do conflito do container durante as migraÃ§Ãµes do deploy.",
+    "packageName":  "",
+    "checksum":  "",
+    "minCompatibleVersion":  "1.00.871",
+    "releaseType":  "stable",
+    "downloadUrl":  null
 }

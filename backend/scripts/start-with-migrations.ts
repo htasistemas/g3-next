@@ -29,7 +29,7 @@ function portaEmUso(): Promise<boolean> {
   });
 }
 
-if (await portaEmUso()) {
+if (!process.argv.includes("--migrations-only") && await portaEmUso()) {
   console.warn(
     `[g3n-backend-node] API já está em execução em ${apiHost}:${apiPort}; nenhuma nova instância foi iniciada.`
   );
@@ -49,7 +49,10 @@ if (migration.status !== 0) {
   const bancoLegado = migrationOutput.includes("P3005") || migrationOutput.includes("schema is not empty");
   const migrationsDir = resolve(process.cwd(), "prisma", "migrations");
     const migrations = existsSync(migrationsDir)
-    ? readdirSync(migrationsDir).filter((name) => name.includes("educacional") || name.includes("tipo_unidade") || name.includes("login_contexto_organizacional") || name.includes("prestacao_contas_profissional") || name.includes("gestao_parcerias_instrumentos") || name.includes("harden_gestao_parcerias") || name.includes("vinculo_termo_fomento_parceria") || name.includes("portal_inscricoes")).sort()
+    ? readdirSync(migrationsDir).filter((name) => name.includes("educacional") || name.includes("tipo_unidade") || name.includes("login_contexto_organizacional") || name.includes("prestacao_contas_profissional") || name.includes("gestao_parcerias_instrumentos") || name.includes("harden_gestao_parcerias") || name.includes("vinculo_termo_fomento_parceria") || name.includes("portal_inscricoes") || name.includes("rh_colaboradores_cipa_core") || name.includes("cipa_portal_sessions") || name.includes("cipa_apuracao_live") || name.includes("cipa_public_identifier_global") || name.includes("cipa_participation_extension") || name.includes("cipa_desempate_auditado")).sort((a, b) => {
+      const prioridade = (name: string) => name.includes("rh_colaboradores_cipa_core") ? 0 : name.includes("cipa_portal_sessions") ? 1 : 2;
+      return prioridade(a) - prioridade(b) || a.localeCompare(b);
+    })
     : [];
 
   if (migrations.length === 0) {
@@ -60,6 +63,7 @@ if (migration.status !== 0) {
     console.warn("[g3n-backend-node] Banco legado detectado; aplicando migrations compatíveis sem apagar dados.");
   } else {
     console.error("[g3n-backend-node] Falha ao aplicar migrations do banco:", migrationOutput.trim());
+    process.exit(migration.status ?? 1);
   }
   for (const migrationName of migrations) {
     const file = join(migrationsDir, migrationName, "migration.sql");

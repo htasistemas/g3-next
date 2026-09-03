@@ -66,6 +66,7 @@ import { portaisExternosRoutes } from "../modules/portais-externos/routes/portai
 import { perfisAcessoRoutes } from "../modules/perfis-acesso/routes/perfis-acesso.routes.js";
 import { portalInscricoesRoutes } from "../modules/portal-inscricoes/portal-inscricoes.routes.js";
 import { educacionalRoutes } from "../modules/educacional/routes/educacional.routes.js";
+import { cipaRoutes } from "../modules/cipa/routes/cipa.routes.js";
 import { parceriasPublicasRoutes } from "../modules/educacional/parcerias-publicas.routes.js";
 import { importacaoDadosRoutes } from "../modules/importacao-dados/importacao-dados.routes.js";
 import { obterAtualizacaoSistemaPaths } from "../modules/atualizacao-sistema/services/atualizacao-sistema.paths.js";
@@ -138,6 +139,7 @@ appRoutes.use("/api/financeiro/contabilidade", contabilidadeRoutes);
 appRoutes.use("/api/transparencias", transparenciasRoutes);
 appRoutes.use("/api/financeiro/prestacao-contas", transparenciasRoutes);
 appRoutes.use("/api/rh/contratacao", rhContratacaoRoutes);
+appRoutes.use("/api/rh/cipa", cipaRoutes);
 appRoutes.use("/api/arquivos", arquivosRoutes);
 appRoutes.use("/api/dashboard", dashboardRoutes);
 appRoutes.use("/api/chamados-tecnicos", chamadoTecnicoRoutes);

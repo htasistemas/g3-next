@@ -26,6 +26,7 @@ export type StorageScopeKey =
   | "captacao_campanha_banner"
   | "educacional_documento"
   | "prestacao_contas_documento"
+  | "cipa_documento"
   | "geral_outro";
 
 export type StoragePolicy = {
@@ -358,6 +359,15 @@ export const storagePolicies: Record<StorageScopeKey, StoragePolicy> = {
     allowedMimeTypes: documentMimeTypes,
     maxSizeBytes: 25 * 1024 * 1024,
     generateThumbnail: true
+  },
+  cipa_documento: {
+    entidadeTipo: "cipa_eleicao",
+    categoria: "documento",
+    subdirectory: "cipa/eleicoes/documentos",
+    allowedExtensions: ["pdf"],
+    allowedMimeTypes: ["application/pdf"],
+    maxSizeBytes: 20 * 1024 * 1024,
+    generateThumbnail: false
   },
   geral_outro: {
     entidadeTipo: "geral",

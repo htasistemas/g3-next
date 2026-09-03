@@ -168,6 +168,7 @@ const RegistroDoacaoPage = carregarPagina("/financeiro/registro-doacao", "Regist
 const DoacoesRealizadasPage = carregarPagina("/financeiro/doacoes-realizadas", "DoacoesRealizadasPage");
 const RegistroPontoPage = carregarPagina("/setor-rh/registro-ponto", "RegistroPontoPage");
 const ContratacaoPage = carregarPagina("/setor-rh/contratacao", "ContratacaoPage");
+const CipaPage = carregarPagina("/setor-rh/cipa", "CipaPage");
 const AlmoxarifadoPage = carregarPagina("/setor-administrativo/almoxarifado", "AlmoxarifadoPage");
 const ControleVeiculosPage = carregarPagina(
   "/setor-administrativo/controle-veiculos",
@@ -266,6 +267,7 @@ const PortalParceiroFinanciadorPage = carregarPagina(
   "/portal-parceiro-financiador",
   "PortalParceiroFinanciadorPage"
 );
+const CipaEleicaoPortalPage = carregarPagina("/cipa/eleicao/:identificador", "CipaEleicaoPortalPage");
 
 export const router = createBrowserRouter([
   {
@@ -336,6 +338,11 @@ export const router = createBrowserRouter([
   {
     path: "/portal-parceiro-financiador",
     element: PortalParceiroFinanciadorPage,
+    errorElement: <RouteErrorBoundary />
+  },
+  {
+    path: "/cipa/eleicao/:identificador",
+    element: CipaEleicaoPortalPage,
     errorElement: <RouteErrorBoundary />
   },
   {
@@ -414,6 +421,7 @@ export const router = createBrowserRouter([
       { path: "/financeiro/doacoes-realizadas", element: DoacoesRealizadasPage },
       { path: "/setor-rh/registro-ponto", element: RegistroPontoPage },
       { path: "/setor-rh/contratacao", element: ContratacaoPage },
+      { path: "/setor-rh/cipa", element: <RequirePermission permissions={["ADMINISTRADOR", "CIPA_VISUALIZAR"]}>{CipaPage}</RequirePermission> },
       { path: "/setor-vendas/historico", element: HistoricoVendasPage },
       {
         path: "/setor-vendas/carteira-digital-evento",
