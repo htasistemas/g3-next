@@ -1268,22 +1268,143 @@ const secoesManual: ManualSecao[] = [
         nome: "Eleição CIPA",
         objetivo: "Organizar o processo eleitoral da CIPA com cronograma, eleitores, candidaturas, votação secreta, apuração e documentos.",
         comoUsar: [
-          "No menu Recursos humanos, abra CIPA e depois Eleição CIPA para criar uma eleição e preencher o cronograma; o período de inscrições deve respeitar a regra mínima configurada.",
-          "Cadastre ou importe os colaboradores aptos por CSV, XLS ou XLSX, revise as inconsistências e confirme a lista de eleitores antes da votação.",
-          "Abra as inscrições, acompanhe as candidaturas pelo portal, analise os candidatos e defina a comissão eleitoral antes de publicar a eleição.",
-          "Gere a zerésima antes de abrir a urna. Depois divulgue o link ou QR Code e acompanhe a participação no dashboard ao vivo.",
-          "Após o encerramento, execute a apuração, revise titulares e suplentes, publique o resultado e gere os documentos oficiais do processo."
-          ,"Depois de confirmar o voto, use Imprimir ou salvar em PDF para guardar o comprovante de participação; ele não informa o candidato escolhido.",
-          "Na central Documentos e relatórios da eleição, use os botões de Relatórios para baixar listas de eleitores, candidatos, participação, apuração, resultado e auditoria em CSV compatível com Excel."
+          "Esta seção funciona como uma apostila de treinamento. Leia os capítulos na ordem antes de iniciar uma eleição real e use uma eleição de homologação para treinar a comissão.",
+          "No menu Recursos humanos, abra CIPA e depois Eleição CIPA. A tela usa abas laterais numeradas; a aba Visão geral mostra a lista de eleições e, depois da seleção, os indicadores da eleição ativa.",
+          "O fluxo recomendado é: preparar a instituição e a unidade, criar a eleição, revisar o cronograma, cadastrar eleitores, abrir inscrições, analisar candidaturas, definir a comissão, publicar, gerar a zerésima, abrir a votação, encerrar, apurar, publicar o resultado e arquivar os documentos.",
+          "Antes de iniciar, defina quem será o responsável da organização e quem fará parte da comissão eleitoral. O sistema registra o usuário operador na auditoria, mas a condução formal do processo continua sendo da organização.",
+          "O sistema foi estruturado para apoiar o atendimento aos requisitos aplicáveis da NR-5. Confira sempre a versão vigente da norma, os atos internos, os prazos e as orientações da organização antes de publicar o cronograma."
         ],
         atencoes: [
-          "A urna valida CPF, data de nascimento, aptidão, eleição, janela de votação e sessão no backend; o navegador não é fonte de autoridade.",
-          "O voto é armazenado separado do registro de participação. O administrador consegue confirmar que o eleitor participou, mas não consulta diretamente em quem ele votou.",
-          "A unicidade do banco, a transação e o bloqueio da sessão impedem uma segunda participação, inclusive em requisições simultâneas.",
-          "O QR Code abre apenas o portal público da eleição. O comprovante confirma a participação e não revela a opção escolhida.",
-          "O módulo apoia o atendimento aos requisitos aplicáveis da NR-5; a condução formal, a comissão eleitoral e a guarda documental continuam sob responsabilidade da organização.",
-          "A tela respeita o tenant autenticado. Não informe tenant manualmente nem compartilhe CPF completo em relatórios ou dashboards.",
-          "Os relatórios exigem a permissão CIPA_DOCUMENTOS e exportam o CPF mascarado; revise os destinatários antes de compartilhar arquivos."
+          "Não crie uma eleição definitiva para testar telas. Use uma eleição de homologação com colaboradores de teste e não compartilhe o link de votação com o público.",
+          "A organização e a comissão eleitoral continuam responsáveis pela convocação, condução formal, comunicação aos empregados, guarda dos registros e decisões do processo.",
+          "Se a eleição for cancelada, a ação é registrada e as sessões eleitorais ativas são revogadas; não trate o cancelamento como exclusão simples."
+        ]
+      },
+      {
+        nome: "Capítulo 1 — Criar a eleição e configurar o cronograma",
+        objetivo: "Cadastrar a identificação da eleição e transformar as datas do processo em uma sequência clara e validada.",
+        comoUsar: [
+          "Na aba Visão geral, clique em Nova eleição. O assistente abre em etapas para evitar uma tela extensa e permite revisar cada grupo de informações antes da gravação final.",
+          "Na etapa Identificação, informe nome da eleição, gestão, instituição, CNPJ, estabelecimento, unidade, descrição e observações. Confirme se a unidade selecionada corresponde ao grupo de empregados que participará da eleição.",
+          "Na etapa Cronograma, informe início e fim das inscrições, data de divulgação dos candidatos, início e fim da votação, apuração, publicação prevista e posse. Use a linha do tempo para conferir a ordem visual das etapas.",
+          "O servidor valida datas inexistentes, a sequência cronológica e o período mínimo de inscrição configurado. Divulgação não pode ocorrer antes do encerramento das inscrições; votação não pode começar antes da etapa de divulgação; apuração, publicação e posse devem respeitar a sequência.",
+          "Na etapa Regras da eleição, informe a quantidade de titulares e suplentes, votos permitidos por eleitor, voto branco, voto nulo e critério de desempate. Se o eleitor puder escolher mais de um candidato, o limite precisa refletir a regra definida pela comissão.",
+          "Na etapa Segurança, revise autenticação, votação por celular, bloqueio após confirmação, proteção contra repetição, auditoria e separação entre participação e voto.",
+          "Na etapa Publicação, revise o checklist. Só conclua quando eleitores, candidatos, comissão, cronograma, regras, documentos e urna estiverem preparados. A gravação do wizard ocorre ao finalizar o assistente."
+        ],
+        atencoes: [
+          "Depois que as inscrições forem abertas, a edição da configuração fica restrita pelo status da eleição. Depois da publicação, candidaturas e regras críticas ficam congeladas.",
+          "A data da votação precisa estar coerente com o horário real do servidor. A abertura antecipada ou posterior ao período configurado é bloqueada pelo backend.",
+          "Uma eleição pronta exige zerésima antes da abertura da urna. A zerésima registra responsável, horário, integridade e quantidade inicial de votos."
+        ]
+      },
+      {
+        nome: "Capítulo 2 — Cadastrar colaboradores e montar a lista de eleitores",
+        objetivo: "Preparar uma lista eleitoral baseada no cadastro oficial de colaboradores, com validação e histórico.",
+        comoUsar: [
+          "Abra a aba Eleitores e comece pela seleção individual. Busque por nome ou matrícula; a consulta já é filtrada no servidor pela unidade e pelo tenant da sessão.",
+          "Se o colaborador existir no cadastro de profissionais, use-o como origem para preencher dados básicos, mas confirme os dados trabalhistas no cadastro de colaborador. Profissional não é automaticamente sinônimo de empregado apto.",
+          "Para cadastrar um novo colaborador, informe nome completo, CPF, data de nascimento, matrícula, cargo, setor, turno e situação. O CPF é validado, normalizado e armazenado sem máscara.",
+          "Para vários registros, abra o importador e envie uma planilha CSV, XLS ou XLSX conforme o modelo exibido. Primeiro valide a planilha; depois revise linhas inválidas, CPF inválido, duplicidades, campos ausentes e colaboradores fora da unidade.",
+          "Inclua como eleitor somente quem estiver apto e vinculado à eleição. O painel mostra quantidade de eleitores ativos e preserva removidos no histórico.",
+          "Para corrigir uma inclusão antes da votação, use Remover. A remoção é lógica, gera auditoria e pode reativar o mesmo registro sem criar uma segunda linha histórica. Depois que houver participação registrada, a remoção é bloqueada.",
+          "Antes de publicar, confira a lista completa, a quantidade total e os filtros por unidade, situação e busca. A lista eleitoral deve ser congelada antes de iniciar a votação."
+        ],
+        atencoes: [
+          "Não importe CPF completo em mensagens, capturas de tela ou planilhas compartilhadas sem necessidade. O painel mascara o CPF nas listagens.",
+          "Uma planilha aceita não significa que todos os registros foram incluídos: leia o resumo de inconsistências e corrija as linhas rejeitadas.",
+          "Após o início da votação, não remova nem altere a lista eleitoral para corrigir um problema operacional. Registre a ocorrência e encaminhe à comissão."
+        ]
+      },
+      {
+        nome: "Capítulo 3 — Abrir inscrições e analisar candidaturas",
+        objetivo: "Receber candidaturas, revisar informações, controlar a aprovação e publicar somente candidatos aptos.",
+        comoUsar: [
+          "Na aba Visão geral, use Próxima etapa para abrir inscrições quando a eleição estiver em configuração. A abertura muda o status e libera o período de candidatura.",
+          "O colaborador pode acessar o Portal da eleição, autenticar-se com CPF e data de nascimento, conferir seus dados, preencher apresentação e proposta, declarar ciência das regras e enviar a candidatura.",
+          "A candidatura enviada recebe protocolo e número gerado automaticamente. O número não é reutilizado dentro da mesma eleição, mesmo se a candidatura for reprovada ou desistir.",
+          "Na aba Candidatos, a comissão consulta nome público, foto quando permitida, número, cargo, setor, unidade, apresentação, proposta, data, protocolo e situação.",
+          "Para cada candidatura em análise, escolha Aprovar, Reprovar ou Solicitar correção. Use uma justificativa clara e suficiente para que o candidato saiba o que precisa corrigir.",
+          "Acompanhe os contadores de inscritos, em análise, aprovados, reprovados e desistentes. Só publique quando a comissão tiver finalizado a análise e os dados divulgáveis estiverem revisados.",
+          "Depois da publicação, o sistema libera no portal público somente candidatos aprovados e bloqueia alterações administrativas incompatíveis com a eleição pronta."
+        ],
+        atencoes: [
+          "Não divulgue candidatos em análise como se fossem aprovados. A relação pública só deve ser usada após a publicação da eleição.",
+          "Não inclua matrícula, CPF, dados pessoais ou informações internas na apresentação pública se não forem necessários para identificar o candidato.",
+          "A comissão deve manter os critérios de análise e as justificativas junto aos documentos do processo. O sistema preserva o histórico de alterações administrativas."
+        ]
+      },
+      {
+        nome: "Capítulo 4 — Divulgar e abrir a urna",
+        objetivo: "Publicar as instruções de acesso, comprovar que a urna está vazia e iniciar a votação no período correto.",
+        comoUsar: [
+          "Abra a aba Votação e use o card Divulgação da eleição para copiar o link oficial, compartilhar pelo recurso disponível ou imprimir o cartaz.",
+          "O QR Code direciona para `/cipa/eleicao/{identificador}` e abre o portal público da eleição. O portal mostra identificação, período, instruções e candidatos aprovados, sem dados administrativos.",
+          "Antes de abrir a votação, gere a Zerésima na aba Visão geral ou pelas ações do cabeçalho. Confira responsável, data, hora, identificador e quantidade inicial igual a zero.",
+          "A ação Abrir votação só funciona quando a eleição estiver pronta, houver zerésima e o horário atual estiver dentro da janela configurada. Se o horário ainda não chegou, aguarde a data prevista.",
+          "Durante a votação, acompanhe a aba Votação e o dashboard. O acompanhamento mostra eleitores aptos, votantes, pendentes, participação por período, unidade, setor e turno, sem revelar a escolha individual.",
+          "Para estender a votação quando a regra aplicável permitir, use a ação de extensão e registre a justificativa operacional. O sistema controla as rodadas e recalcula o mínimo de participação conforme a configuração."
+        ],
+        atencoes: [
+          "Por padrão, não divulgue ranking ou quantidade de votos por candidato enquanto a votação estiver aberta.",
+          "O QR Code e o link são formas de acesso; eles não substituem a autenticação do eleitor nem liberam voto para quem não estiver apto.",
+          "Se a zerésima não for gerada ou o relógio do servidor estiver fora do esperado, não force a abertura. Corrija a preparação antes de iniciar."
+        ]
+      },
+      {
+        nome: "Capítulo 5 — Como o colaborador vota pelo celular",
+        objetivo: "Orientar o eleitor em um fluxo simples, acessível e protegido contra repetição.",
+        comoUsar: [
+          "O colaborador abre o link ou lê o QR Code, entra no portal e toca em Votar. A urna funciona no navegador do Android, iPhone, tablet ou computador, sem instalação de aplicativo.",
+          "Na autenticação, informa CPF e data de nascimento. O backend confere o cadastro oficial, a aptidão, a inclusão na eleição, o período de votação, bloqueios e se já existe participação.",
+          "Depois da autenticação, a urna mostra o primeiro nome do eleitor, a gestão e as instruções. O eleitor seleciona um ou mais candidatos conforme o limite definido na configuração.",
+          "O eleitor pode abrir a apresentação do candidato antes de selecionar. A urna não mostra quantidade de votos nem ranking durante a escolha.",
+          "Na confirmação, o sistema exibe os candidatos selecionados e oferece Voltar e alterar ou Confirmar voto. A confirmação é a ação definitiva e exige apenas um clique intencional.",
+          "Após a confirmação, a sessão é encerrada, a participação é bloqueada para nova votação e aparece um protocolo de comprovante. O comprovante confirma que houve participação, mas não revela o candidato escolhido.",
+          "Se o navegador fechar antes da confirmação, o eleitor pode iniciar novamente. Se a confirmação tiver sido concluída, uma nova tentativa exibirá que o voto já foi registrado."
+        ],
+        atencoes: [
+          "Não peça ao eleitor que envie foto do comprovante mostrando candidato; o comprovante foi desenhado para não revelar a opção escolhida.",
+          "CPF e data de nascimento são dados pessoais. Oriente o eleitor a digitá-los somente no portal oficial e a não compartilhá-los em grupos.",
+          "Em caso de acesso expirado, use a mensagem para iniciar a votação novamente. Não tente reutilizar token, voltar para uma etapa antiga ou repetir uma requisição."
+        ]
+      },
+      {
+        nome: "Capítulo 6 — Encerrar, apurar e publicar o resultado",
+        objetivo: "Fechar a urna, executar a apuração oficial e separar titulares, suplentes e não eleitos.",
+        comoUsar: [
+          "Quando o período terminar, abra a ação Encerrar votação e leia a confirmação forte. Após o encerramento, novos votos não poderão ser registrados.",
+          "O encerramento bloqueia novas sessões e congela a base eleitoral e as candidaturas. Se a participação mínima configurada não for atingida e houver possibilidade regulamentar, use a extensão antes de encerrar definitivamente.",
+          "Com a eleição encerrada, abra a aba Apuração e resultado. A apuração só é permitida para uma urna encerrada e é executada de forma transacional.",
+          "Confira total de eleitores, participantes, participação, votos válidos, brancos, nulos, candidatos, votos, percentuais e classificação.",
+          "Quando houver empate que não possa ser resolvido automaticamente, registre o desempate auditado com critério e justificativa antes de repetir a apuração.",
+          "Revise a quantidade de titulares e suplentes definida no início. A classificação deve separar claramente titulares, suplentes e não eleitos.",
+          "Publique o resultado somente após a conferência da comissão. Depois use a central de documentos para gerar o relatório oficial, ata de eleição, resultado e demais documentos necessários."
+        ],
+        atencoes: [
+          "Não publique resultado durante a votação, salvo se a comissão tiver definido uma regra específica para visualização administrativa; o portal do eleitor não deve exibir ranking antecipado.",
+          "A apuração não deve ser editada manualmente para ajustar classificação. Correções precisam ocorrer pela regra de desempate auditado ou por decisão formal registrada.",
+          "Resultado publicado é uma etapa final. Evite publicar antes de revisar totais, critérios, titulares, suplentes e documentos."
+        ]
+      },
+      {
+        nome: "Capítulo 7 — Documentos, auditoria e solução de problemas",
+        objetivo: "Guardar evidências operacionais, emitir relatórios e orientar a resposta para os problemas mais comuns.",
+        comoUsar: [
+          "Na aba Documentos, gere edital, comunicado, relação de candidatos, zerésima, relatório de apuração, resultado oficial, ata de eleição e ata de posse conforme a etapa permitida.",
+          "Cada documento possui versão, eleição, responsável, data e checksum. O arquivo fica no storage oficial; o PostgreSQL guarda os metadados e a referência lógica.",
+          "Use os relatórios para baixar eleitores aptos, eleitores que votaram, pendentes, candidatos, participação, apuração, resultado, auditoria e histórico em CSV compatível com Excel.",
+          "Na aba Auditoria, consulte criação, edição, publicação, inclusão ou remoção de eleitor, análise de candidato, abertura, encerramento, apuração, publicação e geração de documentos.",
+          "Se a API retornar erro ao carregar eleições, atualize a página e confira a saúde do sistema. Se persistir, registre horário, usuário, URL e mensagem, sem enviar CPF ou token.",
+          "Se o eleitor não for encontrado, confirme CPF, data de nascimento, aptidão e inclusão na eleição. Se já votou, o sistema deve informar que a participação foi registrada.",
+          "Se o link abrir, mas a votação estiver bloqueada, confira status, data/hora do servidor, zerésima e eventual cancelamento. Não tente contornar o bloqueio pelo navegador.",
+          "Ao finalizar, arquive documentos oficiais, relatórios, atas, protocolos e justificativas conforme a política de retenção da organização."
+        ],
+        atencoes: [
+          "A permissão CIPA_DOCUMENTOS controla documentos e relatórios; CIPA_AUDITORIA controla a trilha. Não conceda essas permissões automaticamente a qualquer usuário administrativo.",
+          "A auditoria identifica o operador administrativo, mas os registros de voto não relacionam diretamente eleitor e candidato.",
+          "Faça backup conforme a política do G3N antes de alterações estruturais e mantenha o acesso aos arquivos restrito ao tenant correto.",
+          "O sistema não declara validade jurídica garantida. Ele oferece estrutura operacional e registros para apoiar o processo, cuja responsabilidade formal permanece com a organização e a comissão eleitoral."
         ]
       }
     ]

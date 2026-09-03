@@ -14,7 +14,9 @@ const scanTargets = [
 ];
 
 const allowedExtensions = new Set([".ts", ".tsx", ".js", ".jsx", ".css", ".scss", ".html"]);
-const brokenPatterns = [/Ã/g, /ï¿½/g, /�/g];
+// Detecta sequências de mojibake, sem acusar letras válidas do português,
+// como o "Ã" presente em palavras legítimas (por exemplo, "ELEIÇÃO").
+const brokenPatterns = [/Ã[\u0080-\u00bf]/g, /ï¿½/g, /�/g];
 
 function collectFiles(targetPath, output) {
   if (!fs.existsSync(targetPath)) return;
