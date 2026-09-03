@@ -444,6 +444,8 @@ export class CipaRepository {
     const result = await prisma.$transaction(async (tx) => {
       const election = await tx.$queryRaw<Array<{ status: string }>>(Prisma.sql`SELECT status FROM cipa_eleicao WHERE id = ${electionId} AND tenant_id = ${tenantId}::uuid FOR UPDATE`);
       if (election[0]?.status !== "ELEICAO_PRONTA") throw new AppError("Publique a eleição antes de gerar a zerésima.", 409);
+      const existente = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`SELECT id FROM cipa_eleicao_zeresima WHERE tenant_id = ${tenantId}::uuid AND eleicao_id = ${electionId} LIMIT 1`);
+      if (existente[0]) return existente[0].id;
       const votes = await tx.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`SELECT COUNT(*)::bigint total FROM cipa_voto WHERE tenant_id = ${tenantId}::uuid AND eleicao_id = ${electionId}`);
       if (Number(votes[0]?.total)) throw new AppError("A urna não está vazia e a zerésima não pode ser gerada.", 409);
       const integrity = hashToken(`${tenantId}:${eleicaoId}:ZERESIMA:0`);

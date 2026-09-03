@@ -23,6 +23,10 @@ const abas: AdminTab[] = [
   { id: "visao-geral", label: "Visão geral", icon: BarChart3 }, { id: "eleitores", label: "Eleitores", icon: UsersRound }, { id: "candidatos", label: "Candidatos", icon: Gavel }, { id: "votacao", label: "Votação", icon: Activity }, { id: "apuracao", label: "Apuração e resultado", icon: ListChecks }, { id: "documentos", label: "Documentos", icon: FileText }, { id: "auditoria", label: "Auditoria", icon: ShieldCheck }, { id: "gestao", label: "Gestão da CIPA", icon: Archive }
 ];
 function statusLabel(status: string) { return status.replaceAll("_", " ").toLowerCase().replace(/^./u, (letra) => letra.toUpperCase()); }
+function mensagemErroCipa(erro: unknown) {
+  const resposta = (erro as { response?: { data?: { message?: string } } })?.response;
+  return resposta?.data?.message ?? (erro instanceof Error ? erro.message : "Não foi possível concluir a ação.");
+}
 
 export function CipaPage() {
   const eleicoesQuery = useEleicoesCipa(); const unidadesQuery = useUnidadesAssistenciais({}); const acaoMutation = useAcaoEleicaoCipa();
@@ -50,5 +54,5 @@ export function CipaPage() {
   }
   if (mostrarFormulario) return <main className="min-h-screen bg-[var(--g3-bg)] p-4 md:p-6"><CipaWizardEleicao onConcluida={() => { setMostrarFormulario(false); void eleicoesQuery.refetch(); }} /></main>;
   if (eleicaoEditando) { const item = eleicoes.find((candidate) => candidate.id === eleicaoEditando); if (item) return <main className="min-h-screen bg-[var(--g3-bg)] p-4 md:p-6"><CipaEditarEleicao eleicao={item} onConcluida={() => { setEleicaoEditando(undefined); void eleicoesQuery.refetch(); }} /></main>; }
-  return <AdminPageLayout tabs={abas} activeTab={abaAtiva} onChangeTab={(tabId) => setAbaAtiva(tabId as AbaCipa)} actions={acoes} sectionLabel="Recursos humanos · CIPA" pageTitle="Eleição CIPA" activeTitle={abas.find((item) => item.id === abaAtiva)?.label} activeIcon={abas.find((item) => item.id === abaAtiva)?.icon} codeBadge={eleicao ? `Gestão ${eleicao.gestao}` : "Visão geral"}>{acaoMutation.isError ? <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{acaoMutation.error instanceof Error ? acaoMutation.error.message : "Não foi possível concluir a ação."}</p> : null}{conteudo}</AdminPageLayout>;
+  return <AdminPageLayout tabs={abas} activeTab={abaAtiva} onChangeTab={(tabId) => setAbaAtiva(tabId as AbaCipa)} actions={acoes} sectionLabel="Recursos humanos · CIPA" pageTitle="Eleição CIPA" activeTitle={abas.find((item) => item.id === abaAtiva)?.label} activeIcon={abas.find((item) => item.id === abaAtiva)?.icon} codeBadge={eleicao ? `Gestão ${eleicao.gestao}` : "Visão geral"}>{acaoMutation.isError ? <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{mensagemErroCipa(acaoMutation.error)}</p> : null}{conteudo}</AdminPageLayout>;
 }
