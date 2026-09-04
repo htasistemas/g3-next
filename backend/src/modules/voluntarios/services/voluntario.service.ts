@@ -46,7 +46,7 @@ export class VoluntarioService {
     const input = voluntarioInputSchema.parse(inputNormalizado);
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
     const tenantId = this.parseTenant(rawTenantId);
-    const foto = await this.prepararFoto(input.foto_3x4, input.nome_completo, usuarioId);
+    const foto = await this.prepararFoto(input.foto_3x4, input.nome_completo, usuarioId, undefined, tenantId);
 
     try {
       let voluntario;
@@ -70,7 +70,7 @@ export class VoluntarioService {
 
       if (foto.novoCaminho) {
         try {
-          await storageService.vincularEntidade(foto.novoCaminho, voluntario.id);
+          await storageService.vincularEntidade(foto.novoCaminho, voluntario.id, tenantId);
         } catch (error) {
           if (error instanceof AppError) {
             throw error;
@@ -86,7 +86,7 @@ export class VoluntarioService {
       }
       return this.buscarPorId(voluntario.id.toString(), tenantId);
     } catch (error) {
-      await storageService.rollbackArquivos([foto.novoCaminho]);
+      await storageService.rollbackArquivos([foto.novoCaminho], tenantId);
       throw error;
     }
   }
@@ -98,7 +98,7 @@ export class VoluntarioService {
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
     const tenantId = this.parseTenant(rawTenantId);
     const existente = await this.repository.buscarPorIdOuFalhar(id, tenantId);
-    const foto = await this.prepararFoto(input.foto_3x4, input.nome_completo, usuarioId, id);
+    const foto = await this.prepararFoto(input.foto_3x4, input.nome_completo, usuarioId, id, tenantId);
 
     try {
       let voluntario;
@@ -123,7 +123,7 @@ export class VoluntarioService {
 
       if (foto.novoCaminho) {
         try {
-          await storageService.vincularEntidade(foto.novoCaminho, id);
+          await storageService.vincularEntidade(foto.novoCaminho, id, tenantId);
         } catch (error) {
           if (error instanceof AppError) {
             throw error;
@@ -142,14 +142,14 @@ export class VoluntarioService {
         existente.foto3x4 !== voluntario.foto3x4
       ) {
         try {
-          await storageService.desativarPorCaminho(existente.foto3x4, usuarioId);
+          await storageService.desativarPorCaminho(existente.foto3x4, usuarioId, tenantId);
         } catch (error) {
           console.warn("[voluntario] falha ao limpar foto antiga apos atualizar cadastro:", error);
         }
       }
       return this.buscarPorId(id.toString(), tenantId);
     } catch (error) {
-      await storageService.rollbackArquivos([foto.novoCaminho]);
+      await storageService.rollbackArquivos([foto.novoCaminho], tenantId);
       throw error;
     }
   }
@@ -235,7 +235,8 @@ export class VoluntarioService {
     valor?: string,
     nomeCompleto?: string,
     usuarioId?: bigint,
-    entidadeId?: bigint
+    entidadeId?: bigint,
+    tenantId?: string
   ) {
     let arquivo;
     try {
@@ -245,7 +246,9 @@ export class VoluntarioService {
         nomeOriginal: `${nomeCompleto?.replace(/\s+/g, "-").toLowerCase() || "voluntario"}-foto.jpg`,
         mimeType: "image/jpeg",
         entidadeId,
+        entidadeTipo: "voluntario",
         usuarioUploadId: usuarioId,
+        tenantId,
         observacao: "Foto de colaborador"
       });
     } catch (error) {

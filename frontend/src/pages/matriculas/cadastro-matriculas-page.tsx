@@ -356,11 +356,7 @@ function mapFormularioParaPayload(
         ? undefined
         : Number(values.carga_horaria),
     horario_inicial: values.horario_inicial?.trim() || undefined,
-    controle_horario_atendimento:
-      values.tipo.trim().toUpperCase() === "ATENDIMENTO" &&
-      !!values.horario_inicial?.trim() &&
-      !!values.horario_final_atendimento?.trim() &&
-      Number(values.duracao_horas) > 0,
+    controle_horario_atendimento: values.tipo.trim().toUpperCase() === "ATENDIMENTO" && !!values.controle_horario_atendimento,
     horario_final_atendimento: values.horario_final_atendimento?.trim() || undefined,
     intervalo_atendimento_minutos:
       values.intervalo_atendimento_minutos === undefined || values.intervalo_atendimento_minutos === null
@@ -547,6 +543,7 @@ export function CadastroMatriculasPage() {
     profissional_nome: "",
     confirmacao_presenca: false
   });
+  const [inscricaoEditandoIndex, setInscricaoEditandoIndex] = useState<number | null>(null);
   const [novoFilaEspera, setNovoFilaEspera] = useState<MatriculaFilaEspera>({
     beneficiario_nome: "",
     cpf: "",
@@ -662,6 +659,7 @@ export function CadastroMatriculasPage() {
   const horarioInicialAtendimento = String(watch("horario_inicial") ?? "");
   const horarioFinalAtendimento = String(watch("horario_final_atendimento") ?? "");
   const duracaoAtendimentoMinutos = Number(watch("duracao_horas") ?? 0);
+  const controleHorarioSelecionado = Boolean(watch("controle_horario_atendimento"));
   const imagemAtual = String(watch("imagem") ?? "");
   const profissionalResponsavelValor = String(watch("profissional") ?? "");
   const unidadeIdFormulario = String(watch("unidade_id") ?? "");
@@ -708,13 +706,10 @@ export function CadastroMatriculasPage() {
   const profissionaisAgendaCatalogo = profissionaisAgendaCatalogoData?.profissionais ?? [];
   const cursoSelecionadoInscricao =
     matriculas.find((item) => item.id_matricula === (idSelecionado ?? matriculaIdFormulario)) ?? null;
+  const ehAtendimentoSelecionado = (cursoSelecionadoInscricao?.tipo ?? "").trim().toUpperCase() === "ATENDIMENTO";
   const ehInscricaoAtendimento = (cursoSelecionadoInscricao?.tipo ?? "").trim().toUpperCase() === "ATENDIMENTO";
   const ehTipoAtendimento = tipoMatriculaAtual.trim().toUpperCase() === "ATENDIMENTO";
-  const controleHorarioAtendimento =
-    ehTipoAtendimento &&
-    !!horarioInicialAtendimento.trim() &&
-    !!horarioFinalAtendimento.trim() &&
-    duracaoAtendimentoMinutos > 0;
+  const controleHorarioAtendimento = ehTipoAtendimento && controleHorarioSelecionado;
   const horariosAtendimento = useMemo(
     () =>
       ehTipoAtendimento && controleHorarioAtendimento
@@ -875,20 +870,18 @@ export function CadastroMatriculasPage() {
     return !cpf || validarCpf(cpf);
   }, [novaInscricao.beneficiario_nome, novaInscricao.cpf]);
   const horariosDisponiveisInscricao = useMemo(() => {
-    const horarios = new Set<string>();
-    const horarioCurso = String(cursoSelecionadoInscricao?.horario_inicial ?? "").trim();
-    if (horarioCurso) horarios.add(horarioCurso);
-
-    inscricoes.forEach((item) => {
-      const hora = String(item.hora_agendada ?? "").trim();
-      if (hora) horarios.add(hora);
-    });
-
-    const horaAtual = String(novaInscricao.hora_agendada ?? "").trim();
-    if (horaAtual) horarios.add(horaAtual);
-
-    return Array.from(horarios).sort((a, b) => a.localeCompare(b));
-  }, [cursoSelecionadoInscricao?.horario_inicial, inscricoes, novaInscricao.hora_agendada]);
+    if (!ehAtendimentoSelecionado || !controleHorarioAtendimento || !horariosAtendimento.length) return [];
+    const dataSelecionada = normalizarDataIso(novaInscricao.data_agendada);
+    const ocupados = new Set(
+      inscricoes
+        .filter((item, index) => index !== inscricaoEditandoIndex && (item.status ?? "ATIVO").trim().toUpperCase() === "ATIVO")
+        .filter((item) => !dataSelecionada || normalizarDataIso(item.data_agendada) === dataSelecionada)
+        .map((item) => String(item.hora_agendada ?? "").trim())
+        .filter(Boolean)
+    );
+    const horarioAtual = String(novaInscricao.hora_agendada ?? "").trim();
+    return horariosAtendimento.filter((hora) => !ocupados.has(hora) || hora === horarioAtual);
+  }, [controleHorarioAtendimento, ehAtendimentoSelecionado, horariosAtendimento, inscricaoEditandoIndex, inscricoes, novaInscricao.data_agendada, novaInscricao.hora_agendada]);
   const profissionaisDisponiveisInscricao = useMemo(() => {
     const mapa = new Map<string, { nome: string; categoria?: string; id_profissional?: string }>();
     const adicionar = (nome?: string, categoria?: string, idProfissional?: string) => {
@@ -934,8 +927,9 @@ export function CadastroMatriculasPage() {
       matriculas.find((item) => item.id_matricula === cursoIdSelecionado)?.vagas_totais ?? vagasTotaisFormulario ?? 0
     );
     const totalInscritosAtivos = inscricoes.filter((item) => (item.status ?? "ATIVO").trim().toUpperCase() === "ATIVO").length;
-    return Math.max(vagasTotaisCurso - totalInscritosAtivos, 0);
-  }, [idSelecionado, matriculaIdFormulario, matriculas, vagasTotaisFormulario, inscricoes]);
+    const vagaLiberadaParaEdicao = inscricaoEditandoIndex !== null ? 1 : 0;
+    return Math.max(vagasTotaisCurso - totalInscritosAtivos + vagaLiberadaParaEdicao, 0);
+  }, [idSelecionado, matriculaIdFormulario, matriculas, vagasTotaisFormulario, inscricaoEditandoIndex, inscricoes]);
   const inscricoesAgendaCatalogo = useMemo(() => {
     const termo = formatarTextoPadrao(termoAgendaBeneficiario);
     const termoNome = normalizarNomeComparacaoTexto(termo);
@@ -2235,7 +2229,8 @@ export function CadastroMatriculasPage() {
       return;
     }
 
-    const inscricaoDuplicada = inscricoes.some((item) => {
+    const inscricaoDuplicada = inscricoes.some((item, index) => {
+      if (index === inscricaoEditandoIndex) return false;
       const cpfItem = somenteDigitos(item.cpf);
       const nomeItem = normalizarNomeComparacao(item.beneficiario_nome);
       if (cpf && cpfItem && cpf === cpfItem) return true;
@@ -2263,17 +2258,24 @@ export function CadastroMatriculasPage() {
     const vagasDisponiveis = Math.max(vagasTotaisCurso - totalInscritosAtivos, 0);
     const horariosOcupados = new Set(
       inscricoes
-        .filter((item) => (item.status ?? "ATIVO").trim().toUpperCase() === "ATIVO")
+        .filter((item, index) => index !== inscricaoEditandoIndex && (item.status ?? "ATIVO").trim().toUpperCase() === "ATIVO")
+        .filter((item) => !novaInscricao.data_agendada || normalizarDataIso(item.data_agendada) === normalizarDataIso(novaInscricao.data_agendada))
         .map((item) => String(item.hora_agendada ?? "").trim())
         .filter(Boolean)
     );
     const horaSolicitada = String(novaInscricao.hora_agendada ?? "").trim();
-    const horaAgendadaAtendimento =
-      ehAtendimento && controleHorarioAtendimento && horariosAtendimento.length > 0
-        ? (horaSolicitada && !horariosOcupados.has(horaSolicitada) && horariosAtendimento.includes(horaSolicitada)
-            ? horaSolicitada
-            : horariosAtendimento.find((hora) => !horariosOcupados.has(hora)) ?? "")
-        : horaSolicitada;
+    const horariosLivres = horariosAtendimento.filter((hora) => !horariosOcupados.has(hora));
+    if (ehAtendimento && controleHorarioAtendimento) {
+      if (!novaInscricao.data_agendada) {
+        setPopupMensagem({ tipo: "aviso", titulo: "Horário", texto: "Informe a data para consultar os horários disponíveis." });
+        return;
+      }
+      if (horaSolicitada && !horariosLivres.includes(horaSolicitada)) {
+        setPopupMensagem({ tipo: "aviso", titulo: "Horário indisponível", texto: "Esse horário já foi utilizado ou não pertence ao período configurado. Escolha um horário disponível." });
+        return;
+      }
+    }
+    const horaAgendadaAtendimento = ehAtendimento && controleHorarioAtendimento ? (horaSolicitada || horariosLivres[0] || "") : horaSolicitada;
 
     if (statusInscricao === "ATIVO" && vagasDisponiveis <= 0) {
       const filaDuplicada = filaEspera.some((item) => {
@@ -2321,9 +2323,7 @@ export function CadastroMatriculasPage() {
       return;
     }
 
-    setInscricoes((atual) => [
-      ...atual,
-      {
+    const inscricaoAtualizada: MatriculaInscricao = {
         ...novaInscricao,
         id_matricula_item: cursoIdSelecionado,
         beneficiario_nome: nome,
@@ -2334,9 +2334,11 @@ export function CadastroMatriculasPage() {
         hora_agendada: ehAtendimento ? horaAgendadaAtendimento || undefined : undefined,
         status_agendamento: ehAtendimento ? novaInscricao.status_agendamento?.trim() || undefined : undefined,
         profissional_nome: profissionalInscricao || undefined,
-        data_matricula: obterDataAtualIso()
-      }
-    ]);
+        data_matricula: inscricaoEditandoIndex !== null ? inscricoes[inscricaoEditandoIndex]?.data_matricula : obterDataAtualIso()
+      };
+    setInscricoes((atual) => inscricaoEditandoIndex === null
+      ? [...atual, inscricaoAtualizada]
+      : atual.map((item, index) => index === inscricaoEditandoIndex ? { ...item, ...inscricaoAtualizada } : item));
 
     const horariosOcupadosAposInclusao = new Set([...horariosOcupados, horaAgendadaAtendimento]);
     const proximoHorario =
@@ -2354,8 +2356,19 @@ export function CadastroMatriculasPage() {
       profissional_nome: "",
       confirmacao_presenca: false
     });
+    setInscricaoEditandoIndex(null);
     setTermoCatalogoBeneficiario("");
     setTermoCatalogoProfissional("");
+  }
+
+  function editarInscricao(index: number) {
+    const inscricao = inscricoes[index];
+    if (!inscricao) return;
+    setInscricaoEditandoIndex(index);
+    setNovaInscricao({ ...inscricao });
+    setTermoCatalogoBeneficiario(inscricao.beneficiario_nome);
+    setTermoCatalogoProfissional(inscricao.profissional_nome ?? "");
+    setPopupMensagem({ tipo: "aviso", titulo: "Edição de inscrição", texto: "Altere os dados e escolha somente um horário disponível. Depois clique em Atualizar inscrição." });
   }
 
   function removerInscricao(index: number) {
@@ -3153,12 +3166,23 @@ export function CadastroMatriculasPage() {
                       <div className="space-y-2 rounded-lg border border-sky-200 bg-sky-50/70 p-3 xl:col-span-4">
                         <div>
                           <div>
-                            <Label htmlFor="horario_final_atendimento">Controle automático de vagas por horário</Label>
+                            <Label>Como deseja controlar as vagas?</Label>
                             <p className="text-[11px] text-sky-800/80">
-                              Informe o horário final. Com o horário inicial e a duração em minutos, o sistema calculará as vagas.
+                              Escolha horário para criar vagas como 19:00, 19:30 e 20:00, ou período para usar uma quantidade total.
                             </p>
                           </div>
                         </div>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <label className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 ${controleHorarioSelecionado ? "border-emerald-400 bg-emerald-50" : "border-sky-200 bg-white"}`}>
+                            <input type="radio" name="modo-vagas-atendimento" checked={controleHorarioSelecionado} onChange={() => setValue("controle_horario_atendimento", true, { shouldDirty: true, shouldValidate: true })} className="mt-1" />
+                            <span><strong className="block text-sm text-slate-800">Controlar por horário</strong><span className="text-xs text-slate-600">Uma vaga por intervalo de atendimento.</span></span>
+                          </label>
+                          <label className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 ${!controleHorarioSelecionado ? "border-emerald-400 bg-emerald-50" : "border-sky-200 bg-white"}`}>
+                            <input type="radio" name="modo-vagas-atendimento" checked={!controleHorarioSelecionado} onChange={() => setValue("controle_horario_atendimento", false, { shouldDirty: true, shouldValidate: true })} className="mt-1" />
+                            <span><strong className="block text-sm text-slate-800">Controlar por período</strong><span className="text-xs text-slate-600">Uma quantidade total de vagas no período.</span></span>
+                          </label>
+                        </div>
+                        {controleHorarioAtendimento ? <p className="text-xs font-medium text-emerald-800">As vagas totais serão calculadas automaticamente a partir do horário inicial, final e duração.</p> : <p className="text-xs font-medium text-slate-700">Informe manualmente a quantidade de vagas totais e disponíveis abaixo.</p>}
                         <div className="space-y-1">
                           <Label htmlFor="horario_final_atendimento">Horário final *</Label>
                           <Input id="horario_final_atendimento" type="time" {...register("horario_final_atendimento")} />
@@ -3849,15 +3873,16 @@ export function CadastroMatriculasPage() {
 
                           <div className="space-y-1 xl:col-span-2">
                             <Label htmlFor="inscricao-hora-agendada">Hora agendada</Label>
-                            {horariosDisponiveisInscricao.length ? (
+                            {ehAtendimentoSelecionado && controleHorarioAtendimento ? (
                               <Select
                                 id="inscricao-hora-agendada"
                                 value={novaInscricao.hora_agendada ?? ""}
+                                disabled={!horariosDisponiveisInscricao.length}
                                 onChange={(event) =>
                                   setNovaInscricao((atual) => ({ ...atual, hora_agendada: event.target.value }))
                                 }
                               >
-                                <option value="">Selecione</option>
+                                <option value="">{horariosDisponiveisInscricao.length ? "Selecione um horário disponível" : "Não há horários disponíveis"}</option>
                                 {horariosDisponiveisInscricao.map((hora) => (
                                   <option key={hora} value={hora}>
                                     {hora}
@@ -3960,7 +3985,7 @@ export function CadastroMatriculasPage() {
                           className="h-full min-h-[56px] w-full shadow-sm hover:shadow-md"
                           disabled={!podeAdicionarInscricao}
                         >
-                          Inscrição
+                          {inscricaoEditandoIndex === null ? "Inscrição" : "Atualizar inscrição"}
                         </Button>
                       </div>
 
@@ -4023,6 +4048,9 @@ export function CadastroMatriculasPage() {
                                       onClick={() => removerInscricao(index)}
                                     >
                                       Remover
+                                    </Button>
+                                    <Button type="button" size="sm" variant="outline" onClick={() => editarInscricao(index)}>
+                                      Editar horário
                                     </Button>
                                   </td>
                                 </tr>

@@ -53,7 +53,7 @@ import { somenteDigitos } from "@/lib/validators";
 import { formatarTextoPorCampo, normalizarObjetoTexto } from "@/lib/text-formatter";
 import { mapaCamposTextoVoluntarioForm } from "@/lib/text-format-config";
 import { reservarJanelaRelatorio } from "@/lib/report-utils";
-import { resolverUrlArquivo } from "@/lib/arquivos";
+import { obterUrlArquivoAutenticado, resolverUrlArquivo } from "@/lib/arquivos";
 import {
   ajustarParaFotoTresPorQuatro,
   capturarFotoTresPorQuatroDoVideo,
@@ -209,6 +209,7 @@ export function CadastroVoluntariadoPage() {
   const [imprimindoRelatorio, setImprimindoRelatorio] = useState(false);
   const [webcamAberta, setWebcamAberta] = useState(false);
   const [carregandoWebcam, setCarregandoWebcam] = useState(false);
+  const [fotoPreviewUrl, setFotoPreviewUrl] = useState("");
   const inputFotoRef = useRef<HTMLInputElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamWebcamRef = useRef<MediaStream | null>(null);
@@ -249,6 +250,7 @@ export function CadastroVoluntariadoPage() {
   const cpfAtual = watch("cpf") || "";
   const emailAtual = watch("email") || "";
   const telefoneAtual = watch("telefone") || "";
+  const fotoAtual = watch("foto_3x4") || "";
   const cidadeContatoAtual = watch("cidade") || "";
   const estadoContatoAtual = watch("estado") || "";
   const logradouroAtual = watch("logradouro") || "";
@@ -265,6 +267,40 @@ export function CadastroVoluntariadoPage() {
     setSnapshot(values);
     ultimoCepConsultadoRef.current = somenteDigitos(values.cep ?? "");
   }, [detalhesData, reset]);
+
+  useEffect(() => {
+    let ativo = true;
+    let revogar: (() => void) | undefined;
+
+    if (!fotoAtual.trim()) {
+      setFotoPreviewUrl("");
+      return;
+    }
+
+    if (fotoAtual.startsWith("data:") || fotoAtual.startsWith("blob:") || /^https?:\/\//i.test(fotoAtual)) {
+      setFotoPreviewUrl(fotoAtual);
+      return;
+    }
+
+    void (async () => {
+      try {
+        const arquivo = await obterUrlArquivoAutenticado(fotoAtual, { cache: true, auditar: false });
+        if (!ativo) {
+          arquivo.revoke?.();
+          return;
+        }
+        revogar = arquivo.revoke;
+        setFotoPreviewUrl(arquivo.url || resolverUrlArquivo(fotoAtual));
+      } catch {
+        if (ativo) setFotoPreviewUrl(resolverUrlArquivo(fotoAtual));
+      }
+    })();
+
+    return () => {
+      ativo = false;
+      revogar?.();
+    };
+  }, [fotoAtual]);
 
   useEffect(() => {
     const cepNormalizado = somenteDigitos(cepAtual);
@@ -747,8 +783,8 @@ export function CadastroVoluntariadoPage() {
                     <div className="sm:col-span-2 xl:col-span-3 flex flex-col items-start space-y-2">
                       <Label>Foto 4x3</Label>
                       <div className="w-full max-w-[170px] aspect-[4/3] overflow-hidden rounded-md border border-[var(--g3-border)] bg-[var(--g3-card-soft)]">
-                        {watch("foto_3x4") ? (
-                          <img src={resolverUrlArquivo(watch("foto_3x4"))} alt="Foto do voluntário" className="h-full w-full object-cover" />
+                        {fotoPreviewUrl ? (
+                          <img src={fotoPreviewUrl} alt="Foto do voluntário" className="h-full w-full object-cover" />
                         ) : (
                           <div className="flex h-full items-center justify-center text-xs text-[var(--g3-muted)]">Sem foto</div>
                         )}

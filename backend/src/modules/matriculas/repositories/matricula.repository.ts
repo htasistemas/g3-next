@@ -121,6 +121,41 @@ function calcularVagasPorHorario(input: MatriculaInput) {
   return Math.floor((fimMinutos - inicioMinutos) / intervalo);
 }
 
+function validarHorariosInscricoes(input: MatriculaInput) {
+  if (!input.controle_horario_atendimento) return;
+
+  const inicio = input.horario_inicial ? input.horario_inicial.split(":").map(Number) : [];
+  const fim = input.horario_final_atendimento ? input.horario_final_atendimento.split(":").map(Number) : [];
+  const intervalo = Number(input.duracao_horas ?? input.intervalo_atendimento_minutos ?? 0);
+  const inicioMinutos = (inicio[0] ?? 0) * 60 + (inicio[1] ?? 0);
+  const fimMinutos = (fim[0] ?? 0) * 60 + (fim[1] ?? 0);
+  const horariosPermitidos = new Set<string>();
+
+  if (fimMinutos > inicioMinutos && intervalo > 0) {
+    for (let minuto = inicioMinutos; minuto + intervalo <= fimMinutos; minuto += intervalo) {
+      horariosPermitidos.add(`${String(Math.floor(minuto / 60)).padStart(2, "0")}:${String(minuto % 60).padStart(2, "0")}`);
+    }
+  }
+
+  const utilizados = new Set<string>();
+  for (const inscricao of input.matriculas ?? []) {
+    if ((inscricao.status ?? "ATIVO").trim().toUpperCase() === "CANCELADO") continue;
+    const data = inscricao.data_agendada?.trim();
+    const hora = inscricao.hora_agendada?.trim().slice(0, 5);
+    if (!data || !hora) {
+      throw new AppError("No controle por horário, informe a data e o horário de cada atendimento ativo.", 422);
+    }
+    if (horariosPermitidos.size === 0 || !horariosPermitidos.has(hora)) {
+      throw new AppError(`O horário ${hora} não pertence aos horários disponíveis do atendimento.`, 422);
+    }
+    const chave = `${data}|${hora}`;
+    if (utilizados.has(chave)) {
+      throw new AppError(`O horário ${hora} da data ${data} já está utilizado. Escolha outro horário disponível.`, 409);
+    }
+    utilizados.add(chave);
+  }
+}
+
 type MatriculaResumoRow = {
   cursos_no_catalogo: bigint | number | null;
   total_vagas: bigint | number | null;
@@ -228,6 +263,7 @@ const estruturaMatriculasSql = [
   "ALTER TABLE cursos_atendimentos_matriculas ALTER COLUMN profissional_tipo TYPE VARCHAR(80)",
   "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS confirmacao_presenca BOOLEAN NOT NULL DEFAULT FALSE",
   "CREATE INDEX IF NOT EXISTS cursos_atendimentos_matriculas_tenant_curso_idx ON cursos_atendimentos_matriculas (tenant_id, curso_id)",
+  "CREATE UNIQUE INDEX IF NOT EXISTS cursos_atendimentos_matriculas_horario_uidx ON cursos_atendimentos_matriculas (tenant_id, curso_id, data_agendada, hora_agendada) WHERE COALESCE(UPPER(status), 'ATIVO') <> 'CANCELADO' AND data_agendada IS NOT NULL AND hora_agendada IS NOT NULL",
   `
     CREATE TABLE IF NOT EXISTS cursos_atendimentos_fila_espera (
       id BIGSERIAL PRIMARY KEY,
@@ -723,6 +759,7 @@ export class MatriculaRepository {
 
   async criar(input: MatriculaInput, tenantId: string) {
     await this.ensureEstrutura();
+    validarHorariosInscricoes(input);
     const cursoId = await prisma.$transaction(async (tx) => {
       const diasSemana = joinList(input.dias_semana);
       const faixaEtaria = joinList(input.faixa_etaria);
@@ -812,9 +849,15 @@ export class MatriculaRepository {
 
   async atualizar(id: bigint, input: MatriculaInput, tenantId: string) {
     await this.ensureEstrutura();
+    validarHorariosInscricoes(input);
     await this.buscarPorIdOuFalhar(id, tenantId);
 
     await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw(Prisma.sql`
+        SELECT id FROM cursos_atendimentos
+        WHERE id = ${id} AND tenant_id::text = ${tenantId}
+        FOR UPDATE
+      `);
       const diasSemana = joinList(input.dias_semana);
       const faixaEtaria = joinList(input.faixa_etaria);
       const vagasTotais = calcularVagasPorHorario(input);
