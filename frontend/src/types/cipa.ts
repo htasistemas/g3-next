@@ -5,10 +5,16 @@ export type CipaEleicao = {
   gestao: string;
   status: string;
   unidadeId: string;
+  instituicaoNome?: string;
+  instituicaoCnpj?: string;
+  unidadeNome?: string;
+  descricao?: string;
+  observacoes?: string;
   inscricoesInicio: string;
   inscricoesFim: string;
   votacaoInicio: string;
   votacaoFim: string;
+  divulgacaoCandidatosEm?: string;
   configuracao?: {
     titulares: number;
     suplentes: number;

@@ -40,7 +40,8 @@ function mapColaborador(row: Record<string, unknown>) {
 function mapEleicao(row: Record<string, unknown>) {
   return {
     id: String(row.id), tenantId: row.tenant_id, instituicaoId: row.instituicao_id,
-    unidadeId: String(row.unidade_id), identificadorPublico: row.identificador_publico,
+    unidadeId: String(row.unidade_id), instituicaoNome: row.instituicao_nome, instituicaoCnpj: row.instituicao_cnpj,
+    unidadeNome: row.unidade_nome, identificadorPublico: row.identificador_publico,
     nome: row.nome, gestao: row.gestao, descricao: row.descricao, observacoes: row.observacoes,
     status: row.status, inscricoesInicio: row.inscricoes_inicio, inscricoesFim: row.inscricoes_fim,
     divulgacaoCandidatosEm: row.divulgacao_candidatos_em, votacaoInicio: row.votacao_inicio,
@@ -120,12 +121,12 @@ export class CipaRepository {
   }
 
   async listarEleicoes(tenantId: string) {
-    const rows = await prisma.$queryRaw<Record<string, unknown>[]>(Prisma.sql`SELECT e.*, c.titulares, c.suplentes, c.votos_por_eleitor, c.permite_voto_branco, c.permite_voto_nulo, c.permite_votacao_celular, c.permite_votacao_presencial, c.regra_desempate, c.regras_versao FROM cipa_eleicao e LEFT JOIN cipa_eleicao_configuracao c ON c.eleicao_id = e.id AND c.tenant_id = e.tenant_id WHERE e.tenant_id = ${tenantId}::uuid ORDER BY e.criado_em DESC`);
+    const rows = await prisma.$queryRaw<Record<string, unknown>[]>(Prisma.sql`SELECT e.*, COALESCE(i.nome_fantasia, i.razao_social) AS instituicao_nome, i.cnpj AS instituicao_cnpj, ua.nome_fantasia AS unidade_nome, c.titulares, c.suplentes, c.votos_por_eleitor, c.permite_voto_branco, c.permite_voto_nulo, c.permite_votacao_celular, c.permite_votacao_presencial, c.regra_desempate, c.regras_versao FROM cipa_eleicao e LEFT JOIN instituicoes i ON i.id = e.instituicao_id AND i.tenant_id = e.tenant_id LEFT JOIN unidade_assistencial ua ON ua.id = e.unidade_id AND ua.tenant_id = e.tenant_id LEFT JOIN cipa_eleicao_configuracao c ON c.eleicao_id = e.id AND c.tenant_id = e.tenant_id WHERE e.tenant_id = ${tenantId}::uuid ORDER BY e.criado_em DESC`);
     return { eleicoes: rows.map(mapEleicao) };
   }
 
   async buscarEleicao(tenantId: string, eleicaoId: string) {
-    const rows = await prisma.$queryRaw<Record<string, unknown>[]>(Prisma.sql`SELECT e.*, c.titulares, c.suplentes, c.votos_por_eleitor, c.permite_voto_branco, c.permite_voto_nulo, c.permite_votacao_celular, c.permite_votacao_presencial, c.regra_desempate, c.regras_versao FROM cipa_eleicao e LEFT JOIN cipa_eleicao_configuracao c ON c.eleicao_id = e.id AND c.tenant_id = e.tenant_id WHERE e.id = ${id(eleicaoId, "Eleição")} AND e.tenant_id = ${tenantId}::uuid LIMIT 1`);
+    const rows = await prisma.$queryRaw<Record<string, unknown>[]>(Prisma.sql`SELECT e.*, COALESCE(i.nome_fantasia, i.razao_social) AS instituicao_nome, i.cnpj AS instituicao_cnpj, ua.nome_fantasia AS unidade_nome, c.titulares, c.suplentes, c.votos_por_eleitor, c.permite_voto_branco, c.permite_voto_nulo, c.permite_votacao_celular, c.permite_votacao_presencial, c.regra_desempate, c.regras_versao FROM cipa_eleicao e LEFT JOIN instituicoes i ON i.id = e.instituicao_id AND i.tenant_id = e.tenant_id LEFT JOIN unidade_assistencial ua ON ua.id = e.unidade_id AND ua.tenant_id = e.tenant_id LEFT JOIN cipa_eleicao_configuracao c ON c.eleicao_id = e.id AND c.tenant_id = e.tenant_id WHERE e.id = ${id(eleicaoId, "Eleição")} AND e.tenant_id = ${tenantId}::uuid LIMIT 1`);
     return rows[0] ? mapEleicao(rows[0]) : null;
   }
 

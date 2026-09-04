@@ -289,3 +289,16 @@ Foi diagnosticado e corrigido o erro `404 Not Found` da tela administrativa: o m
 A tela administrativa foi concluída no padrão visual do cadastro de beneficiários por meio do `AdminPageLayout`: abas laterais numeradas, cabeçalho de ações, tabela de eleições, contexto da eleição selecionada, estados de carregamento/erro/vazio e conteúdo operacional separado em Visão geral, Eleitores, Candidatos, Votação, Apuração e resultado, Documentos, Auditoria e Gestão da CIPA. As ações de edição, publicação, zerésima, abertura, encerramento, apuração e cancelamento permanecem condicionadas ao status e às permissões do backend.
 
 O Manual do sistema passou a conter uma apostila completa e didática da Eleição CIPA. O conteúdo foi organizado em capítulos sobre criação e cronograma, colaboradores e eleitores, candidaturas, divulgação e urna, votação pelo celular, encerramento e apuração, documentos, auditoria e solução de problemas. Cada capítulo explica objetivo, sequência operacional, responsáveis, cuidados, mensagens esperadas e próximos passos, incluindo a orientação de que o sistema apoia o processo estruturado sem declarar validade jurídica garantida.
+# Atualização — documentos, relatórios e cartaz
+
+## Entrega
+
+- Documentos oficiais da eleição continuam sendo persistidos, versionados e baixados pelo storage oficial. A geração passou a utilizar cabeçalho institucional, CNPJ, unidade, título do processo e rodapé com data/hora e orientação de conformidade.
+- Relatórios da aba Documentos possuem exportação para Excel e impressão no padrão G3N, com cabeçalho, identificação, tabela, repetição de cabeçalho em páginas e rodapé.
+- O cartaz da aba Votação passou a ser um layout A4 próprio para impressão/PDF, com QR Code, instituição, CNPJ, unidade, gestão, cronograma e instruções em três passos.
+
+## Validação
+
+- `backend`: typecheck e build aprovados.
+- `frontend`: typecheck, build e verificação de acentuação pt-BR aprovados.
+- O script `test:cipa` não existe no pacote frontend e foi registrado como não executado.

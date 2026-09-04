@@ -7,11 +7,14 @@ import { createHash } from "node:crypto";
 
 export type CipaDocumentoTipo = "EDITAL" | "COMUNICADO" | "RELACAO_CANDIDATOS" | "ZERESIMA" | "APURACAO" | "RESULTADO_OFICIAL" | "ATA_ELEICAO" | "ATA_POSSE";
 
-function pdf(linhas: string[]) {
+function pdf(linhas: string[], contexto: { instituicao: string; cnpj: string; unidade: string; emitidoEm: string }) {
   return new Promise<Buffer>((resolve, reject) => {
     const documento = new PDFDocument({ size: "A4", margin: 48 }); const partes: Buffer[] = [];
     documento.on("data", (parte: Buffer) => partes.push(parte)); documento.on("end", () => resolve(Buffer.concat(partes))); documento.on("error", reject);
-    documento.fontSize(16).text("G3N — Gestão de Eleições da CIPA", { align: "center" }).moveDown();
+    const rodape = () => { documento.save().fontSize(8).fillColor("#64756d").text(`G3N · ${contexto.instituicao} · Emitido em ${contexto.emitidoEm}`, 48, 780, { align: "center", width: 499 }).restore(); };
+    documento.on("pageAdded", rodape);
+    documento.fontSize(15).fillColor("#12352a").text(contexto.instituicao, { align: "center" }).fontSize(9).fillColor("#64756d").text(`CNPJ: ${contexto.cnpj || "Não informado"} · Unidade: ${contexto.unidade || "Não informada"}`, { align: "center" }).moveDown();
+    documento.fontSize(16).fillColor("#075b38").text("G3N — Gestão de Eleições da CIPA", { align: "center" }).moveDown();
     linhas.forEach((linha) => documento.fontSize(linha.startsWith("#") ? 13 : 10).text(linha.replace(/^#\s?/u, ""), { paragraphGap: 5 }));
     documento.moveDown().fontSize(8).fillColor("#555").text("Processo estruturado para apoiar o atendimento aos requisitos aplicáveis da NR-5. A condução formal permanece sob responsabilidade da organização e da comissão eleitoral.");
     documento.end();
@@ -19,7 +22,7 @@ function pdf(linhas: string[]) {
 }
 
 export async function gerarDocumentoCipa(tenantId: string, eleicaoId: string, tipo: CipaDocumentoTipo, usuarioId: string) {
-  const electionId = BigInt(eleicaoId); const election = (await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`SELECT id, nome, gestao, status, inscricoes_inicio, inscricoes_fim, votacao_inicio, votacao_fim FROM cipa_eleicao WHERE id = ${electionId} AND tenant_id = ${tenantId}::uuid LIMIT 1`))[0];
+  const electionId = BigInt(eleicaoId); const election = (await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`SELECT e.id, e.nome, e.gestao, e.status, e.inscricoes_inicio, e.inscricoes_fim, e.votacao_inicio, e.votacao_fim, COALESCE(i.nome_fantasia, i.razao_social) AS instituicao_nome, i.cnpj AS instituicao_cnpj, ua.nome_fantasia AS unidade_nome FROM cipa_eleicao e LEFT JOIN instituicoes i ON i.id = e.instituicao_id AND i.tenant_id = e.tenant_id LEFT JOIN unidade_assistencial ua ON ua.id = e.unidade_id AND ua.tenant_id = e.tenant_id WHERE e.id = ${electionId} AND e.tenant_id = ${tenantId}::uuid LIMIT 1`))[0];
   if (!election) throw new AppError("Eleição não encontrada no ambiente atual.", 404);
   if (["APURACAO", "RESULTADO_OFICIAL", "ATA_ELEICAO", "ATA_POSSE"].includes(tipo) && !["APURACAO", "RESULTADO_PUBLICADO", "ENCERRADA"].includes(String(election.status))) throw new AppError("Este documento só pode ser emitido após o encerramento e a apuração do processo.", 409);
   if (tipo === "ZERESIMA" && !["ELEICAO_PRONTA", "VOTACAO_ABERTA", "VOTACAO_ENCERRADA", "APURACAO", "RESULTADO_PUBLICADO", "ENCERRADA"].includes(String(election.status))) throw new AppError("Gere a zerésima antes de emitir este documento.", 409);
@@ -37,7 +40,7 @@ export async function gerarDocumentoCipa(tenantId: string, eleicaoId: string, ti
   }
   if (tipo === "ATA_ELEICAO") linhas.push("Ata de eleição: registre os presentes e as deliberações da comissão eleitoral conforme o procedimento interno.");
   if (tipo === "ATA_POSSE") linhas.push("Ata de posse: registre a composição empossada e as assinaturas conforme o procedimento interno.");
-  const buffer = await pdf(linhas); const nomeArquivo = `cipa-${tipo.toLowerCase()}-${eleicaoId}.pdf`; const arquivo = await storageService.salvarArquivo({ scope: "cipa_documento", conteudo: `data:application/pdf;base64,${buffer.toString("base64")}`, nomeOriginal: nomeArquivo, tenantId, entidadeId: electionId, entidadeTipo: "cipa_eleicao", usuarioUploadId: BigInt(usuarioId), observacao: `Documento ${tipo} da eleição ${eleicaoId}` });
+  const buffer = await pdf(linhas, { instituicao: String(election.instituicao_nome ?? "Instituição responsável"), cnpj: String(election.instituicao_cnpj ?? ""), unidade: String(election.unidade_nome ?? ""), emitidoEm: new Date().toLocaleString("pt-BR") }); const nomeArquivo = `cipa-${tipo.toLowerCase()}-${eleicaoId}.pdf`; const arquivo = await storageService.salvarArquivo({ scope: "cipa_documento", conteudo: `data:application/pdf;base64,${buffer.toString("base64")}`, nomeOriginal: nomeArquivo, tenantId, entidadeId: electionId, entidadeTipo: "cipa_eleicao", usuarioUploadId: BigInt(usuarioId), observacao: `Documento ${tipo} da eleição ${eleicaoId}` });
   const checksum = createHash("sha256").update(buffer).digest("hex"); const versaoRows = await prisma.$queryRaw<Array<{ versao: number }>>(Prisma.sql`SELECT COALESCE(MAX(versao), 0) + 1 AS versao FROM cipa_eleicao_documento WHERE tenant_id = ${tenantId}::uuid AND eleicao_id = ${electionId} AND tipo = ${tipo}`); const versao = Number(versaoRows[0]?.versao ?? 1);
   const categoria = tipo === "EDITAL" || tipo === "COMUNICADO" ? "CONVOCACAO" : tipo === "RELACAO_CANDIDATOS" ? "CANDIDATURAS" : tipo === "RESULTADO_OFICIAL" || tipo === "APURACAO" ? "RESULTADO" : tipo === "ATA_POSSE" ? "POSSE" : "ELEICAO";
   const rows = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`INSERT INTO cipa_eleicao_documento (tenant_id, eleicao_id, categoria, tipo, versao, nome_arquivo, content_type, tamanho_bytes, checksum, caminho_logico, usuario_id) VALUES (${tenantId}::uuid, ${electionId}, ${categoria}, ${tipo}, ${versao}, ${nomeArquivo}, 'application/pdf', ${buffer.length}, ${checksum}, ${arquivo.caminhoArquivo}, ${BigInt(usuarioId)}) RETURNING id`);
