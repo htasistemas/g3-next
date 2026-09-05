@@ -841,13 +841,31 @@ export function ParametrosSistemaPage() {
                         <Input type="number" value={integracaoSelecionada.tentativas} onChange={(event) => atualizarIntegracao("tentativas", Number(event.target.value) || 1)} />
                       </div>
                       <div className="md:col-span-2">
-                        <Label>Credencial</Label>
+                        <Label>{integracaoSelecionada.tipo === "MERCADO_PAGO" ? "Access token do Mercado Pago" : "Credencial"}</Label>
                         <Input
                           type="password"
                           placeholder={integracaoSelecionada.credencial_mascarada ? `Chave configurada: ${integracaoSelecionada.credencial_mascarada}` : "Informe para configurar ou rotacionar"}
                           onChange={(event) => atualizarIntegracao("credencial", event.target.value)}
                         />
                       </div>
+                      {integracaoSelecionada.tipo === "MERCADO_PAGO" ? (
+                        <div className="md:col-span-2">
+                          <Label>Segredo do webhook</Label>
+                          <Input
+                            type="password"
+                            placeholder={integracaoSelecionada.credencial_secundaria_mascarada ? `Segredo configurado: ${integracaoSelecionada.credencial_secundaria_mascarada}` : "Informe o segredo gerado no Mercado Pago"}
+                            onChange={(event) => atualizarIntegracao("credencial_secundaria", event.target.value)}
+                          />
+                          <p className="mt-1 text-xs text-slate-500">O segredo é usado para validar notificações recebidas e nunca é exibido novamente.</p>
+                        </div>
+                      ) : null}
+                      {integracaoSelecionada.tipo === "MERCADO_PAGO" ? (
+                        <div className="md:col-span-2">
+                          <Label>URL pública do webhook</Label>
+                          <Input value={integracaoSelecionada.webhook_url ?? ""} placeholder="https://seu-dominio/api/captacao-recursos/webhooks/mercado-pago/{tenant_id}" onChange={(event) => atualizarIntegracao("webhook_url", event.target.value)} />
+                          <p className="mt-1 text-xs text-slate-500">Use a URL com o tenant da instituição para que o sistema localize a configuração correta.</p>
+                        </div>
+                      ) : null}
                       <div className="md:col-span-2">
                         <Label>Observação</Label>
                         <Input value={integracaoSelecionada.observacao ?? ""} onChange={(event) => atualizarIntegracao("observacao", event.target.value)} />

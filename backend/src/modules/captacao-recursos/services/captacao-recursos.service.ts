@@ -31,7 +31,9 @@ import {
   captacaoTarefaRelacionamentoInputSchema
 } from "../captacao-recursos.schema.js";
 import { CaptacaoRecursosRepository } from "../repositories/captacao-recursos.repository.js";
-import { MockPaymentProviderService } from "../providers/mock-payment-provider.service.js";
+import { createPaymentProvider } from "../providers/payment-provider.factory.js";
+import { MercadoPagoPaymentProviderService } from "../providers/mercado-pago-payment-provider.service.js";
+import { MercadoPagoConfigRepository } from "../repositories/mercado-pago-config.repository.js";
 import { ReportsRepository } from "../../reports/repositories/reports.repository.js";
 import { StorageService } from "../../arquivos/services/storage.service.js";
 import { EmailService } from "../../email/services/email.service.js";
@@ -99,7 +101,7 @@ function normalizarDoadorPayload(input: ReturnType<typeof captacaoDoadorInputSch
 
 export class CaptacaoRecursosService {
   private readonly repository = new CaptacaoRecursosRepository();
-  private readonly paymentProvider = new MockPaymentProviderService();
+  private readonly mercadoPagoConfigRepository = new MercadoPagoConfigRepository();
   private readonly reportsRepository = new ReportsRepository();
   private readonly storageService = new StorageService();
   private readonly emailService = new EmailService();
@@ -391,16 +393,19 @@ export class CaptacaoRecursosService {
 
   async gerarCobranca(rawId: string, userId?: string, rawTenantId?: string) {
     const tenantId = parseTenant(rawTenantId);
+    const mercadoPagoConfig = await this.mercadoPagoConfigRepository.obter(tenantId);
+    const paymentProvider = mercadoPagoConfig?.ativo ? new MercadoPagoPaymentProviderService(tenantId) : createPaymentProvider(tenantId);
     const row = await this.repository.buscarDoacaoPorIdOuFalhar(parseId(rawId), tenantId);
     const doacao = mapCaptacaoDoacao(row);
     if (["confirmado", "pago", "cancelado", "estornado"].includes(doacao.situacao)) {
       throw new AppError("A cobrança não pode ser gerada para a situação atual da doação.", 400);
     }
 
-    const charge = await this.paymentProvider.createCharge({
+    const charge = await paymentProvider.createCharge({
       donationNumber: doacao.numeroDoacao,
       amount: doacao.valor,
       donorName: doacao.doadorNome ?? "Doador G3N",
+      payerEmail: doacao.doadorEmail,
       paymentMethod: doacao.formaPagamento as "pix" | "cartao" | "boleto",
       dueDate: doacao.dataVencimento,
       campaignName: doacao.campanhaNome
@@ -414,14 +419,41 @@ export class CaptacaoRecursosService {
       await this.repository.salvarTransacaoCartao(parseId(rawId), charge, parseUserId(userId), tenantId);
     }
 
+    await this.repository.salvarReferenciaPagamento(parseId(rawId), charge.externalId, parseUserId(userId), tenantId);
     await this.repository.alterarSituacaoDoacao(parseId(rawId), "aguardando_pagamento", parseUserId(userId), tenantId, {
       txid: typeof charge.txid === "string" ? charge.txid : undefined,
       linkPagamento: charge.paymentLink
     });
-    await this.repository.registrarEventoDoacao(parseId(rawId), "COBRANCA_GERADA", "Cobrança gerada pelo provider mock.", charge.payloadJson, parseUserId(userId), tenantId);
+    await this.repository.registrarEventoDoacao(parseId(rawId), "COBRANCA_GERADA", `Cobrança gerada pelo provider ${charge.provider}.`, charge.payloadJson, parseUserId(userId), tenantId);
     await this.repository.registrarLog("doacao", parseId(rawId), "COBRANCA_GERADA", `Cobrança gerada para ${doacao.numeroDoacao}.`, { paymentMethod: doacao.formaPagamento, provider: charge.provider }, parseUserId(userId), tenantId);
 
     return this.getDoacao(rawId, tenantId);
+  }
+
+  async processarWebhookMercadoPago(input: { tenantId?: string; signature?: string; requestId?: string; dataId?: string; payload: Record<string, unknown> }) {
+    const provider = input.tenantId ? new MercadoPagoPaymentProviderService(input.tenantId) : createPaymentProvider();
+    if (!(provider instanceof MercadoPagoPaymentProviderService)) {
+      throw new AppError("O provider Mercado Pago não está habilitado.", 404);
+    }
+    if (!(await provider.validarAssinaturaWebhook(input.signature, input.requestId, input.dataId))) {
+      throw new AppError("Notificação de pagamento não autenticada.", 401);
+    }
+    if (!input.dataId) throw new AppError("Notificação sem identificador de pagamento.", 400);
+    if (input.payload.type && input.payload.type !== "payment") return { acknowledged: true, processed: false };
+    const detalhe = await provider.getChargeStatus(input.dataId);
+    const doacao = await this.repository.buscarDoacaoPorPagamentoExterno("mercado-pago", input.dataId, typeof detalhe.payload.external_reference === "string" ? detalhe.payload.external_reference : undefined);
+    if (!doacao) return { acknowledged: true, processed: false };
+    const evento = await this.repository.registrarEventoWebhook("mercado-pago", input.dataId, input.requestId, input.payload);
+    if (!evento) return { acknowledged: true, processed: true, duplicate: true };
+    const situacao = detalhe.status === "approved" ? "confirmado" : detalhe.status === "refunded" ? "estornado" : ["cancelled", "rejected"].includes(detalhe.status) ? "cancelado" : "aguardando_pagamento";
+    await this.repository.atualizarStatusPagamentoExterno(BigInt(String(doacao.id)), situacao, detalhe.payload, String(doacao.tenant_id ?? ""));
+    await this.repository.registrarEventoDoacao(BigInt(String(doacao.id)), "WEBHOOK_MERCADO_PAGO", `Status atualizado pelo Mercado Pago: ${situacao}.`, detalhe.payload, undefined, String(doacao.tenant_id ?? ""));
+    if (situacao === "confirmado") {
+      const mapped = mapCaptacaoDoacao(doacao);
+      if (mapped.campanhaId) await this.repository.recalcularMetricasCampanha(parseId(mapped.campanhaId), undefined, String(doacao.tenant_id ?? ""));
+      if (!mapped.comprovanteGerado) await this.emitirComprovante(String(doacao.id), undefined, String(doacao.tenant_id ?? ""));
+    }
+    return { acknowledged: true, processed: true, status: situacao };
   }
 
   async confirmarDoacao(rawId: string, userId?: string, rawTenantId?: string) {

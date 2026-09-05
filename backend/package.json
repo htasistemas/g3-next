@@ -18,6 +18,7 @@
     "test:cipa:edit": "tsx scripts/verify-cipa-edit.ts",
     "test:cipa:eleitor-removal": "tsx scripts/verify-cipa-eleitor-removal.ts",
     "test:cipa:extension": "tsx scripts/verify-cipa-extension.ts",
+    "test:mercado-pago": "tsx --test src/modules/captacao-recursos/providers/__tests__/mercado-pago-payment-provider.test.ts",
     "test:cipa:schedule": "tsx scripts/verify-cipa-schedule.ts",
     "test:cipa:http-auth": "tsx scripts/verify-cipa-http-auth.ts",
     "test:cipa:cancel": "tsx scripts/verify-cipa-cancel.ts",

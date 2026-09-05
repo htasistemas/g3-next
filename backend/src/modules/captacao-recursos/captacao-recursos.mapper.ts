@@ -165,6 +165,7 @@ export function mapCaptacaoDoacao(row: SqlRow) {
     dataHora: toOptionalDateTime(row.data_hora),
     doadorId: toOptionalString(row.doador_id),
     doadorNome: toOptionalString(row.doador_nome),
+    doadorEmail: toOptionalString(row.doador_email),
     campanhaId: toOptionalString(row.campanha_id),
     campanhaNome: toOptionalString(row.campanha_nome),
     recorrenciaId: toOptionalString(row.recorrencia_id),

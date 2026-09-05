@@ -1458,6 +1458,7 @@ export class CaptacaoRecursosRepository {
         SELECT
           d.*,
           doadores.nome AS doador_nome,
+          doadores.email_principal AS doador_email,
           campanhas.nome AS campanha_nome,
           recorrencias.status AS recorrencia_status,
           pix.qr_code_svg,
@@ -1485,6 +1486,7 @@ export class CaptacaoRecursosRepository {
         SELECT
           d.*,
           doadores.nome AS doador_nome,
+          doadores.email_principal AS doador_email,
           campanhas.nome AS campanha_nome,
           recorrencias.status AS recorrencia_status,
           pix.qr_code_svg,
@@ -1677,6 +1679,56 @@ export class CaptacaoRecursosRepository {
 
   async listarEventosDoacao(doacaoId: bigint, tenantId?: string) {
     return this.query(`SELECT * FROM captacao_doacoes_eventos WHERE doacao_id = $1 AND ${tenantFilter("captacao_doacoes_eventos", tenantId)} ORDER BY created_at DESC, id DESC`, [doacaoId]);
+  }
+
+  async salvarReferenciaPagamento(doacaoId: bigint, externalId: string, userId?: bigint, tenantId?: string) {
+    await this.exec(
+      `UPDATE captacao_doacoes SET identificador_externo = $2, updated_by = $3, updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL AND ${tenantFilter("captacao_doacoes", tenantId)}`,
+      [doacaoId, externalId, userId ?? null]
+    );
+  }
+
+  async buscarDoacaoPorPagamentoExterno(provider: string, externalId: string, donationNumber?: string) {
+    const rows = await this.query(
+      `SELECT d.*, doadores.nome AS doador_nome, doadores.email_principal AS doador_email, campanhas.nome AS campanha_nome,
+              recorrencias.status AS recorrencia_status
+         FROM captacao_doacoes d
+         LEFT JOIN captacao_doadores doadores ON doadores.id = d.doador_id
+         LEFT JOIN captacao_campanhas campanhas ON campanhas.id = d.campanha_id
+         LEFT JOIN captacao_recorrencias recorrencias ON recorrencias.id = d.recorrencia_id
+        WHERE d.deleted_at IS NULL AND (d.identificador_externo = $1 OR ($2 IS NOT NULL AND d.numero_doacao = $2))
+        LIMIT 1`,
+      [externalId, donationNumber ?? null]
+    );
+    if (!rows[0]) return null;
+    const providerRows = await this.query<{ provider_nome: string | null }>(
+      `SELECT provider_nome FROM captacao_transacoes_pix WHERE doacao_id = $1
+       UNION ALL SELECT provider_nome FROM captacao_transacoes_cartao WHERE doacao_id = $1
+       UNION ALL SELECT provider_nome FROM captacao_transacoes_boleto WHERE doacao_id = $1`,
+      [rows[0].id]
+    );
+    return providerRows.some((item) => item.provider_nome === provider) ? rows[0] : null;
+  }
+
+  async registrarEventoWebhook(provider: string, externalId: string, requestId: string | undefined, payload: Record<string, unknown>) {
+    const rows = await this.query(
+      `INSERT INTO captacao_pagamento_webhook_eventos (provider, external_id, request_id, payload_json)
+       VALUES ($1, $2, $3, CAST($4 AS JSONB))
+       ON CONFLICT (provider, external_id, request_id) DO NOTHING
+       RETURNING id`,
+      [provider, externalId, requestId ?? null, JSON.stringify(payload)]
+    );
+    return Boolean(rows[0]);
+  }
+
+  async atualizarStatusPagamentoExterno(doacaoId: bigint, situacao: string, payload: Record<string, unknown>, tenantId: string) {
+    await this.exec(
+      `UPDATE captacao_doacoes SET situacao = $2, updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL AND ${tenantFilter("captacao_doacoes", tenantId)}`,
+      [doacaoId, situacao]
+    );
+    await this.exec(`UPDATE captacao_transacoes_pix SET status = $2, payload_json = CAST($3 AS JSONB), updated_at = NOW() WHERE doacao_id = $1`, [doacaoId, situacao, JSON.stringify(payload)]);
+    await this.exec(`UPDATE captacao_transacoes_cartao SET status = $2, payload_json = CAST($3 AS JSONB), updated_at = NOW() WHERE doacao_id = $1`, [doacaoId, situacao, JSON.stringify(payload)]);
+    await this.exec(`UPDATE captacao_transacoes_boleto SET status = $2, payload_json = CAST($3 AS JSONB), updated_at = NOW() WHERE doacao_id = $1`, [doacaoId, situacao, JSON.stringify(payload)]);
   }
 
   async salvarTransacaoPix(doacaoId: bigint, result: Record<string, unknown>, userId?: bigint, tenantId?: string) {

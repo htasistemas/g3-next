@@ -242,6 +242,7 @@ export type PaymentChargeInput = {
   paymentMethod: CaptacaoFormaPagamento;
   dueDate?: string;
   campaignName?: string;
+  payerEmail?: string;
   recurring?: boolean;
 };
 

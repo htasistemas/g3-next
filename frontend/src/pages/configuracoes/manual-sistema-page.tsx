@@ -905,6 +905,8 @@ const secoesManual: ManualSecao[] = [
           "Use o bloco Recuperação de recorrência para preparar ações rápidas de retenção, reativação ou upgrade e salvar tarefas com responsável e data prevista em 1 clique.",
           "Na gestão de doadores, campanhas, doações e comprovantes, trabalhe normalmente com listagem, cadastro, edição, cobrança, confirmação e emissão de comprovante em um clique por ação.",
           "Na área de configurações, mantenha mensagens, parâmetros de pagamento e regras operacionais da captação conforme a necessidade da instituição atual.",
+          "Para usar Mercado Pago, abra Configurações gerais > Integrações e APIs > Mercado Pago e informe o access token, o segredo do webhook, a URL base da API e a URL pública do webhook. Os segredos são cifrados no servidor e nunca retornam ao navegador.",
+          "No fluxo de cobrança, o PIX é criado no Mercado Pago com chave de idempotência; cartão e boleto usam checkout hospedado. O comprovante só é emitido depois da confirmação recebida e validada pelo webhook.",
           "Os relatórios e comprovantes emitidos pela tela passam a usar também os dados institucionais do tenant autenticado."
         ],
         atencoes: [
@@ -912,6 +914,8 @@ const secoesManual: ManualSecao[] = [
           "As tarefas de relacionamento da captação ficam vinculadas apenas ao doador e ao tenant autenticado, sem mistura entre instituições.",
           "A tela Captação de recursos agora lista, abre, cadastra, atualiza e movimenta doadores, campanhas, doações, comprovantes, configurações e logs sempre dentro do tenant autenticado.",
           "O portal do doador continua vinculado ao tenant do próprio cadastro para impedir acesso ou geração de cobrança em dados de outra instituição.",
+          "Em produção, o provider mock é bloqueado. Antes de habilitar o Mercado Pago, faça a homologação com credenciais de teste, valide a URL pública do webhook e confirme uma cobrança de ponta a ponta.",
+          "Doações recorrentes ainda exigem uma etapa específica de assinatura no Mercado Pago e não devem ser tratadas como cobrança avulsa.",
           "Se houver troca de instituição na mesma estação, faça novo login antes de validar a tela para garantir recarga completa do cache por tenant."
         ]
       },
@@ -1795,6 +1799,30 @@ const secoesManual: ManualSecao[] = [
           "A pré-inscrição não confirma vaga até a aprovação da equipe.",
           "O CPF é normalizado e a pessoa não deve ser cadastrada novamente.",
           "Toda decisão fica registrada no histórico e é isolada por instituição."
+        ]
+      }
+    ]
+  },
+  {
+    id: "pessoas-vinculos",
+    titulo: "Pessoas e vínculos",
+    descricao: "Consulte a identidade central e revise os relacionamentos entre os cadastros do G3N.",
+    icon: Link2,
+    telas: [
+      {
+        nome: "Consulta de pessoas e vínculos",
+        objetivo: "Localizar uma pessoa sem duplicar cadastros e visualizar seus vínculos institucionais.",
+        comoUsar: [
+          "Acesse Cadastros em geral > Pessoas e vínculos.",
+          "Use a busca por nome, nome social ou e-mail e, se necessário, filtre pelo tipo de vínculo.",
+          "Clique na linha da pessoa para consultar os vínculos ativos e históricos relacionados.",
+          "O CPF aparece mascarado para reduzir a exposição de dados pessoais.",
+          "Use a aba Duplicidades para revisar possíveis registros com o mesmo CPF antes de solicitar qualquer consolidação."
+        ],
+        atencoes: [
+          "A tela não mescla nem exclui cadastros automaticamente.",
+          "A integração histórica de profissionais e voluntários só deve ser feita após confirmação do tenant e da identidade.",
+          "Se encontrar uma duplicidade, preserve os registros e encaminhe a análise para o responsável autorizado."
         ]
       }
     ]

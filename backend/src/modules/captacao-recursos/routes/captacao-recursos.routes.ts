@@ -11,6 +11,17 @@ const controller = new CaptacaoRecursosController();
 
 export const captacaoRecursosRoutes = Router();
 
+captacaoRecursosRoutes.post(
+  "/webhooks/mercado-pago",
+  rateLimit({ keyPrefix: "captacao-mercado-pago-webhook", windowMs: 60_000, max: 120 }),
+  asyncHandler(controller.webhookMercadoPago.bind(controller))
+);
+captacaoRecursosRoutes.post(
+  "/webhooks/mercado-pago/:tenantId",
+  rateLimit({ keyPrefix: "captacao-mercado-pago-webhook-tenant", windowMs: 60_000, max: 120 }),
+  asyncHandler(controller.webhookMercadoPago.bind(controller))
+);
+
 const permissaoDashboard = ["ADMINISTRADOR", "CAPTACAO_DASHBOARD_VISUALIZAR"];
 const permissaoDoadoresView = ["ADMINISTRADOR", "CAPTACAO_DOADORES_VISUALIZAR"];
 const permissaoDoadoresEdit = ["ADMINISTRADOR", "CAPTACAO_DOADORES_CADASTRAR", "CAPTACAO_DOADORES_EDITAR"];

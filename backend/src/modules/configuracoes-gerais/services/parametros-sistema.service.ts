@@ -8,7 +8,7 @@ import {
   obrigatoriedadeDocumentosBeneficiarioSchema,
   personalizacaoSistemaSchema
 } from "../parametros-sistema.schema.js";
-import { createCipheriv, createHash, randomBytes } from "node:crypto";
+import { criptografarSegredo, mascararSegredo } from "../../../shared/security/secret-crypto.js";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
@@ -86,6 +86,7 @@ const tiposIntegracaoPadrao = [
   "BIOMETRIA",
   "ANTIVIRUS",
   "NOTIFICACOES",
+  "MERCADO_PAGO",
   "OUTROS_PROVEDORES"
 ] as const;
 
@@ -128,28 +129,6 @@ function normalizarTipoIntegracao(tipo: unknown) {
   const valor = String(tipo ?? "").trim().toUpperCase();
   if (!valor) throw new AppError("Informe o tipo da integracao.", 422);
   return valor;
-}
-
-function chaveCriptografia() {
-  const base = process.env.G3N_CREDENTIAL_KEY || process.env.JWT_SECRET || "g3-next-dev-credential-key";
-  return createHash("sha256").update(base).digest();
-}
-
-function criptografarSegredo(valor?: unknown) {
-  const texto = typeof valor === "string" ? valor.trim() : "";
-  if (!texto) return null;
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", chaveCriptografia(), iv);
-  const criptografado = Buffer.concat([cipher.update(texto, "utf8"), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  return `${iv.toString("base64")}.${tag.toString("base64")}.${criptografado.toString("base64")}`;
-}
-
-function mascararSegredo(valor?: unknown) {
-  const texto = typeof valor === "string" ? valor.trim() : "";
-  if (!texto) return undefined;
-  const fim = texto.slice(-4);
-  return `${"•".repeat(12)}${fim}`;
 }
 
 export class ParametrosSistemaService {
@@ -510,7 +489,7 @@ export class ParametrosSistemaService {
     const tenant = parseTenantId(tenantId);
     const rows = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
       SELECT tipo, ativo, fornecedor, ambiente, url_base, timeout_ms, tentativas,
-             credencial_mascarada, limite_uso, observacao, ultima_tentativa_em,
+             credencial_mascarada, credencial_secundaria_mascarada, webhook_url, limite_uso, observacao, ultima_tentativa_em,
              ultimo_sucesso_em, ultimo_erro, atualizado_em
       FROM integracao_configuracao
       WHERE tenant_id::text = ${tenant}
@@ -530,6 +509,8 @@ export class ParametrosSistemaService {
           timeout_ms: Number(row?.timeout_ms ?? 5000),
           tentativas: Number(row?.tentativas ?? 1),
           credencial_mascarada: row?.credencial_mascarada ? String(row.credencial_mascarada) : undefined,
+          credencial_secundaria_mascarada: row?.credencial_secundaria_mascarada ? String(row.credencial_secundaria_mascarada) : undefined,
+          webhook_url: row?.webhook_url ? String(row.webhook_url) : undefined,
           limite_uso: row?.limite_uso ? Number(row.limite_uso) : undefined,
           observacao: row?.observacao ? String(row.observacao) : "",
           ultima_tentativa_em: row?.ultima_tentativa_em instanceof Date ? row.ultima_tentativa_em.toISOString() : undefined,
@@ -547,17 +528,19 @@ export class ParametrosSistemaService {
     const tipo = normalizarTipoIntegracao(payload.tipo);
     const segredoCriptografado = criptografarSegredo(payload.credencial);
     const segredoMascarado = mascararSegredo(payload.credencial);
+    const segredoSecundarioCriptografado = criptografarSegredo(payload.credencial_secundaria);
+    const segredoSecundarioMascarado = mascararSegredo(payload.credencial_secundaria);
     const usuario = Number(usuarioId);
     await prisma.$executeRaw(Prisma.sql`
       INSERT INTO integracao_configuracao (
         tenant_id, tipo, ativo, fornecedor, ambiente, url_base, timeout_ms, tentativas,
-        credencial_mascarada, credencial_criptografada, limite_uso, observacao, atualizado_por,
+        credencial_mascarada, credencial_criptografada, credencial_secundaria_mascarada, credencial_secundaria_criptografada, webhook_url, limite_uso, observacao, atualizado_por,
         criado_em, atualizado_em
       ) VALUES (
         ${tenant}::uuid, ${tipo}, ${Boolean(payload.ativo)}, ${String(payload.fornecedor ?? "").trim() || null},
         ${String(payload.ambiente ?? "HOMOLOGACAO").trim().toUpperCase()},
         ${String(payload.url_base ?? "").trim() || null}, ${Number(payload.timeout_ms ?? 5000)},
-        ${Number(payload.tentativas ?? 1)}, ${segredoMascarado ?? null}, ${segredoCriptografado},
+        ${Number(payload.tentativas ?? 1)}, ${segredoMascarado ?? null}, ${segredoCriptografado}, ${segredoSecundarioMascarado ?? null}, ${segredoSecundarioCriptografado}, ${String(payload.webhook_url ?? "").trim() || null},
         ${payload.limite_uso ? Number(payload.limite_uso) : null}, ${String(payload.observacao ?? "").trim() || null},
         ${Number.isInteger(usuario) && usuario > 0 ? BigInt(usuario) : null}, NOW(), NOW()
       )
@@ -571,6 +554,9 @@ export class ParametrosSistemaService {
         tentativas = EXCLUDED.tentativas,
         credencial_mascarada = COALESCE(EXCLUDED.credencial_mascarada, integracao_configuracao.credencial_mascarada),
         credencial_criptografada = COALESCE(EXCLUDED.credencial_criptografada, integracao_configuracao.credencial_criptografada),
+        credencial_secundaria_mascarada = COALESCE(EXCLUDED.credencial_secundaria_mascarada, integracao_configuracao.credencial_secundaria_mascarada),
+        credencial_secundaria_criptografada = COALESCE(EXCLUDED.credencial_secundaria_criptografada, integracao_configuracao.credencial_secundaria_criptografada),
+        webhook_url = EXCLUDED.webhook_url,
         limite_uso = EXCLUDED.limite_uso,
         observacao = EXCLUDED.observacao,
         atualizado_por = EXCLUDED.atualizado_por,

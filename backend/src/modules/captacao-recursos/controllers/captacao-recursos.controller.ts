@@ -209,4 +209,16 @@ export class CaptacaoRecursosController {
   async portalCancelarRecorrencia(request: Request, response: Response) {
     return response.json(await service.cancelarRecorrenciaPortal(String(request.query.token ?? ""), request.params.id));
   }
+
+  async webhookMercadoPago(request: Request, response: Response) {
+    const dataId = typeof request.query["data.id"] === "string" ? request.query["data.id"] : typeof (request.body as any)?.data?.id === "string" ? (request.body as any).data.id : undefined;
+    const result = await service.processarWebhookMercadoPago({
+      tenantId: typeof request.params.tenantId === "string" ? request.params.tenantId : undefined,
+      signature: request.header("x-signature"),
+      requestId: request.header("x-request-id"),
+      dataId,
+      payload: request.body ?? {}
+    });
+    return response.json(result);
+  }
 }

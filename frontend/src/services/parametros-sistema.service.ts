@@ -113,6 +113,9 @@ export type IntegracaoApiSettings = {
   tentativas: number;
   credencial?: string;
   credencial_mascarada?: string;
+  credencial_secundaria?: string;
+  credencial_secundaria_mascarada?: string;
+  webhook_url?: string;
   limite_uso?: number;
   observacao?: string;
   ultima_tentativa_em?: string;

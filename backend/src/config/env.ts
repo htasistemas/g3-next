@@ -72,7 +72,13 @@ const envSchema = z
     MAIL_HOST: z.string().min(1).default("smtp.gmail.com"),
     MAIL_PORT: z.coerce.number().int().positive().default(587),
     MAIL_USER: z.string().min(1).default("htasistemas@gmail.com"),
-    MAIL_PASS: optionalTrimmedStringFromEnv
+    MAIL_PASS: optionalTrimmedStringFromEnv,
+    CAPTACAO_PAYMENT_PROVIDER: z.enum(["mock-g3n", "mercado-pago"]).default("mock-g3n"),
+    MERCADOPAGO_ACCESS_TOKEN: optionalTrimmedStringFromEnv,
+    MERCADOPAGO_WEBHOOK_SECRET: optionalTrimmedStringFromEnv,
+    MERCADOPAGO_WEBHOOK_URL: optionalTrimmedStringFromEnv,
+    MERCADOPAGO_API_URL: z.string().url().default("https://api.mercadopago.com"),
+    MERCADOPAGO_WEBHOOK_MAX_SKEW_SECONDS: z.coerce.number().int().positive().default(300)
   })
   .superRefine((env, ctx) => {
     if (env.APP_STORAGE_DRIVER === "minio") {
@@ -138,6 +144,22 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ["MAIL_PASS"],
         message: "MAIL_PASS nao configurada"
+      });
+    }
+
+    if (env.CAPTACAO_PAYMENT_PROVIDER === "mercado-pago" && !env.MERCADOPAGO_ACCESS_TOKEN) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["MERCADOPAGO_ACCESS_TOKEN"],
+        message: "MERCADOPAGO_ACCESS_TOKEN obrigatorio quando o provider Mercado Pago estiver habilitado"
+      });
+    }
+
+    if (env.NODE_ENV === "production" && env.CAPTACAO_PAYMENT_PROVIDER === "mock-g3n") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["CAPTACAO_PAYMENT_PROVIDER"],
+        message: "Provider mock-g3n nao pode ser usado em producao"
       });
     }
   });
