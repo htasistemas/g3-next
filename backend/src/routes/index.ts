@@ -69,6 +69,7 @@ import { educacionalRoutes } from "../modules/educacional/routes/educacional.rou
 import { cipaRoutes } from "../modules/cipa/routes/cipa.routes.js";
 import { parceriasPublicasRoutes } from "../modules/educacional/parcerias-publicas.routes.js";
 import { importacaoDadosRoutes } from "../modules/importacao-dados/importacao-dados.routes.js";
+import { pessoasRoutes } from "../modules/pessoas/pessoas.routes.js";
 import { obterAtualizacaoSistemaPaths } from "../modules/atualizacao-sistema/services/atualizacao-sistema.paths.js";
 
 export const appRoutes = Router();
@@ -95,6 +96,7 @@ appRoutes.use("/api/semente", ensureAuthenticated, sementeRoutes);
 appRoutes.use("/api/central-atendimentos", centralAtendimentosRoutes);
 appRoutes.use("/api/agendamentos", agendamentosRoutes);
 appRoutes.use("/api/beneficiarios", beneficiarioRoutes);
+appRoutes.use("/api/pessoas", pessoasRoutes);
 appRoutes.use("/api/familias", familiaRoutes);
 appRoutes.use("/api/unidades-assistenciais", unidadeAssistencialRoutes);
 // Alias compatível com a nomenclatura atual; a rota antiga permanece ativa para não quebrar integrações.

@@ -6,6 +6,7 @@ import {
   Banknote,
   CheckCircle2,
   ClipboardList,
+  Clock3,
   FileArchive,
   FileCheck,
   FileSpreadsheet,
@@ -46,6 +47,10 @@ import { PrestacaoContasProfissionalPanel } from "./prestacao-contas-profissiona
 import {
   useExcluirPrestacaoContas,
   useAlterarWorkflowPrestacao,
+  usePublicarPrestacao,
+  useRetirarPublicacaoPrestacao,
+  usePrazosPrestacao,
+  useDashboardFinanceiroSocial,
   usePrestacoesContas,
   useSalvarPrestacaoContas
 } from "@/features/prestacao-contas/use-prestacao-contas";
@@ -65,6 +70,7 @@ import type {
 type AbaId =
   | "listagem"
   | "visao-geral"
+  | "prazos"
   | "receitas"
   | "aplicacao"
   | "documentos"
@@ -122,6 +128,7 @@ type ApiErrorPayload = {
 const abas: AdminTab[] = [
   { id: "listagem", label: "Listagem", icon: List },
   { id: "visao-geral", label: "Visão geral", icon: BadgeDollarSign },
+  { id: "prazos", label: "Prazos e obrigações", icon: Clock3 },
   { id: "receitas", label: "Receitas", icon: ReceiptText },
   { id: "aplicacao", label: "Aplicação dos recursos", icon: ClipboardList },
   { id: "documentos", label: "Documentos e checklist", icon: FileCheck },
@@ -553,6 +560,10 @@ export function PrestacaoContasPage() {
   const salvarMutation = useSalvarPrestacaoContas();
   const excluirMutation = useExcluirPrestacaoContas();
   const workflowMutation = useAlterarWorkflowPrestacao();
+  const publicarMutation = usePublicarPrestacao();
+  const retirarPublicacaoMutation = useRetirarPublicacaoPrestacao();
+  const prazosQuery = usePrazosPrestacao();
+  const financeiroSocialQuery = useDashboardFinanceiroSocial();
 
   const prestacoes = prestacoesQuery.data ?? [];
   const fontesReceitaContabilidade = useMemo(() => {
@@ -574,7 +585,7 @@ export function PrestacaoContasPage() {
     return Array.from(fontes).sort((a, b) => a.localeCompare(b, "pt-BR"));
   }, [contasBancariasQuery.data, lancamentosContabeisQuery.data]);
   const resumoAtual = useMemo(() => calcularResumo(form), [form]);
-  const processando = salvarMutation.isPending || excluirMutation.isPending || workflowMutation.isPending || enviandoArquivo;
+  const processando = salvarMutation.isPending || excluirMutation.isPending || workflowMutation.isPending || publicarMutation.isPending || retirarPublicacaoMutation.isPending || enviandoArquivo;
 
   const registrosFiltrados = useMemo(() => {
     const termo = normalizarBusca(filtro.trim());
@@ -694,6 +705,26 @@ export function PrestacaoContasPage() {
       setPopup({ tipo: "sucesso", titulo: "Workflow atualizado", texto: `A prestação agora está: ${getWorkflowLabel(registro.statusWorkflow)}.` });
     } catch (error: any) {
       setPopup({ tipo: "erro", titulo: "Não foi possível avançar", texto: extrairMensagemErro(error, "Revise os requisitos da etapa antes de continuar.") });
+    }
+  }
+
+  async function publicarPrestacao() {
+    if (!registroSelecionadoId) return;
+    try {
+      await publicarMutation.mutateAsync(registroSelecionadoId);
+      setPopup({ tipo: "sucesso", titulo: "Prestação publicada", texto: "A versão congelada da prestação foi publicada no portal de transparência." });
+    } catch (error: any) {
+      setPopup({ tipo: "erro", titulo: "Não foi possível publicar", texto: extrairMensagemErro(error, "A prestação precisa estar aprovada e possuir uma versão enviada para análise.") });
+    }
+  }
+
+  async function retirarPublicacao() {
+    if (!registroSelecionadoId) return;
+    try {
+      await retirarPublicacaoMutation.mutateAsync({ id: registroSelecionadoId, motivo: "Retirada solicitada pelo administrador." });
+      setPopup({ tipo: "sucesso", titulo: "Publicação retirada", texto: "A prestação deixou de aparecer como publicação ativa." });
+    } catch (error: any) {
+      setPopup({ tipo: "erro", titulo: "Não foi possível retirar", texto: extrairMensagemErro(error, "Não foi possível retirar a publicação.") });
     }
   }
 
@@ -877,7 +908,7 @@ export function PrestacaoContasPage() {
       : workflowStatus === "EM_DILIGENCIA"
         ? [{ label: "Reenviar para análise", icon: FileCheck, onClick: () => void alterarWorkflow("ENVIAR_ANALISE"), variant: "default", disabled: processando || !podeEditar }]
         : workflowStatus === "APROVADA" || workflowStatus === "APROVADA_RESSALVAS"
-          ? [{ label: "Encerrar prestação", icon: CheckCircle2, onClick: () => void alterarWorkflow("ENCERRAR"), variant: "default", disabled: processando || !podeAprovar }]
+          ? [{ label: "Encerrar prestação", icon: CheckCircle2, onClick: () => void alterarWorkflow("ENCERRAR"), variant: "default", disabled: processando || !podeAprovar }, ...(permissoes.includes("ADMINISTRADOR") ? [{ label: "Publicar no portal", icon: FileCheck, onClick: () => void publicarPrestacao(), variant: "outline" as const, disabled: processando }, { label: "Retirar publicação", icon: X, onClick: () => void retirarPublicacao(), variant: "outline" as const, disabled: processando }] : [])]
           : [];
 
   const areasProfissionais = {
@@ -1049,8 +1080,15 @@ export function PrestacaoContasPage() {
           </section>
         ) : null}
 
+        {abaAtiva === "prazos" ? (
+          <section className="space-y-4">
+            <Card><CardHeader><CardTitle>Prazos e obrigações</CardTitle><p className="text-sm text-[var(--g3-muted)]">Acompanhe obrigações das prestações por prazo, situação e responsável.</p></CardHeader><CardContent><div className="overflow-x-auto rounded-xl border border-[var(--g3-border)]"><table className="min-w-full text-sm"><thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Obrigação</th><th className="px-3 py-2 text-left">Tipo</th><th className="px-3 py-2 text-left">Prazo</th><th className="px-3 py-2 text-left">Responsável</th><th className="px-3 py-2 text-left">Situação</th></tr></thead><tbody>{(prazosQuery.data ?? []).map((item) => <tr key={item.id} className="border-t border-[var(--g3-border)]"><td className="px-3 py-2 font-medium">{item.descricao}</td><td className="px-3 py-2">{item.tipo}</td><td className="px-3 py-2">{new Date(`${item.prazo}T00:00:00`).toLocaleDateString("pt-BR")}{item.status === "ABERTA" && item.dias_restantes !== null && item.dias_restantes !== undefined ? <span className={cn("ml-2 text-xs", item.dias_restantes < 0 ? "text-red-700" : item.dias_restantes <= 7 ? "text-amber-700" : "text-[var(--g3-muted)]")}>{item.dias_restantes < 0 ? `${Math.abs(item.dias_restantes)} dia(s) atrasada` : `${item.dias_restantes} dia(s)`}</span> : null}</td><td className="px-3 py-2">{item.responsavel || "Não informado"}</td><td className="px-3 py-2"><Badge variant={item.status === "ABERTA" ? "warning" : item.status === "CONCLUIDA" ? "success" : "default"}>{item.status === "ABERTA" ? "Aberta" : item.status === "CONCLUIDA" ? "Concluída" : "Cancelada"}</Badge></td></tr>)}</tbody></table>{!prazosQuery.isLoading && !(prazosQuery.data ?? []).length ? <div className="p-6"><p className="text-center text-sm text-[var(--g3-muted)]">Nenhuma obrigação cadastrada para a instituição.</p></div> : null}</div></CardContent></Card>
+          </section>
+        ) : null}
+
         {abaAtiva === "visao-geral" ? (
           <section className="space-y-4">
+            <Card><CardHeader><CardTitle>Resumo financeiro e social da instituição</CardTitle><p className="text-sm text-[var(--g3-muted)]">Consolidação das prestações e dos indicadores dos projetos vinculados.</p></CardHeader><CardContent><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">{[{ label: "Instrumentos", value: financeiroSocialQuery.data?.resumo.instrumentos ?? 0 }, { label: "Recebido", value: formatarMoedaBr(financeiroSocialQuery.data?.resumo.recebido ?? 0) }, { label: "Aplicado", value: formatarMoedaBr(financeiroSocialQuery.data?.resumo.aplicado ?? 0) }, { label: "Indicadores", value: financeiroSocialQuery.data?.resumo.indicadores ?? 0 }, { label: "Meta social", value: financeiroSocialQuery.data?.resumo.meta ?? 0 }, { label: "Realizado social", value: financeiroSocialQuery.data?.resumo.realizado ?? 0 }].map((item) => <div key={item.label} className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3"><p className="text-xs uppercase tracking-wide text-[var(--g3-muted)]">{item.label}</p><p className="mt-1 text-lg font-bold text-[var(--g3-foreground)]">{item.value}</p></div>)}</div></CardContent></Card>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <Card>
                 <CardContent className="space-y-1 p-3">

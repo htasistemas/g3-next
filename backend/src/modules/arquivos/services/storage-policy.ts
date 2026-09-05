@@ -27,6 +27,7 @@ export type StorageScopeKey =
   | "educacional_documento"
   | "prestacao_contas_documento"
   | "cipa_documento"
+  | "projeto_indicador_evidencia"
   | "geral_outro";
 
 export type StoragePolicy = {
@@ -368,6 +369,15 @@ export const storagePolicies: Record<StorageScopeKey, StoragePolicy> = {
     allowedMimeTypes: ["application/pdf"],
     maxSizeBytes: 20 * 1024 * 1024,
     generateThumbnail: false
+  },
+  projeto_indicador_evidencia: {
+    entidadeTipo: "projeto_indicador",
+    categoria: "evidencia",
+    subdirectory: "projetos/indicadores/evidencias",
+    allowedExtensions: documentExtensions,
+    allowedMimeTypes: documentMimeTypes,
+    maxSizeBytes: 25 * 1024 * 1024,
+    generateThumbnail: true
   },
   geral_outro: {
     entidadeTipo: "geral",

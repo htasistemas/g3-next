@@ -34,4 +34,21 @@ export class TransparenciasController {
     const transparencia = await service.alterarWorkflow(request.params.id, request.body, request.authUser);
     return response.json({ transparencia });
   }
+
+  async publicar(request: AuthenticatedRequest, response: Response) {
+    return response.status(201).json({ publicacao: await service.publicar(request.params.id, request.authUser) });
+  }
+
+  async retirarPublicacao(request: AuthenticatedRequest, response: Response) {
+    await service.retirarPublicacao(request.params.id, typeof request.body?.motivo === "string" ? request.body.motivo : undefined, request.authUser);
+    return response.status(204).send();
+  }
+
+  async listarObrigacoes(request: AuthenticatedRequest, response: Response) {
+    return response.json({ obrigacoes: await service.listarObrigacoes(typeof request.query.status === "string" ? request.query.status : undefined, request.authUser?.tenant_id) });
+  }
+
+  async dashboardFinanceiroSocial(request: AuthenticatedRequest, response: Response) {
+    return response.json(await service.dashboardFinanceiroSocial(request.authUser?.tenant_id));
+  }
 }

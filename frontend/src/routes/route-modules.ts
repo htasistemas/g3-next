@@ -41,6 +41,7 @@ const routeModules: RouteModuleDefinition[] = [
     path: "/cadastros/beneficiarios",
     loader: () => import("@/pages/beneficiarios/cadastro-beneficiario-page")
   },
+  { path: "/cadastros/pessoas", loader: () => import("@/pages/cadastros/pessoas-page") },
   {
     path: "/cadastros/profissionais",
     loader: () => import("@/pages/profissionais/cadastro-profissional-page")

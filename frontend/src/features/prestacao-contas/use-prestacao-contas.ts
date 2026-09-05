@@ -53,6 +53,32 @@ export function useAlterarWorkflowPrestacao() {
   });
 }
 
+export function usePublicarPrestacao() {
+  const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? "sem-tenant";
+  return useMutation({ mutationFn: (id: string) => prestacaoContasService.publicar(id), onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["prestacao-contas", tenantId] }); } });
+}
+
+export function useRetirarPublicacaoPrestacao() {
+  const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? "sem-tenant";
+  return useMutation({ mutationFn: ({ id, motivo }: { id: string; motivo?: string }) => prestacaoContasService.retirarPublicacao(id, motivo), onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["prestacao-contas", tenantId] }); } });
+}
+
+export function usePrazosPrestacao(status?: string) {
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? "sem-tenant";
+  return useQuery({ queryKey: ["prestacao-contas", tenantId, "prazos", status ?? "todos"], queryFn: () => prestacaoContasService.listarPrazos(status), staleTime: 30_000 });
+}
+
+export function useDashboardFinanceiroSocial() {
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? "sem-tenant";
+  return useQuery({ queryKey: ["prestacao-contas", tenantId, "dashboard-financeiro-social"], queryFn: () => prestacaoContasService.dashboardFinanceiroSocial(), staleTime: 30_000 });
+}
+
 export function usePrestacaoProfissionalVisaoGeral() {
   const { usuario } = useAuth();
   const tenantId = usuario?.tenant_id ?? "sem-tenant";

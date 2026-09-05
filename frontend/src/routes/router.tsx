@@ -151,6 +151,7 @@ const PowerBiPage = carregarPagina("/dashboard/power-bi", "PowerBiPage");
 const DashboardGerencialPage = carregarPagina("/dashboard/gerencial", "DashboardGerencialPage");
 const VulnerabilidadePage = carregarPagina("/dashboard/vulnerabilidade", "VulnerabilidadePage");
 const CadastroBeneficiarioPage = carregarPagina("/cadastros/beneficiarios", "CadastroBeneficiarioPage");
+const PessoasPage = carregarPagina("/cadastros/pessoas", "PessoasPage");
 const CadastroProfissionalPage = carregarPagina("/cadastros/profissionais", "CadastroProfissionalPage");
 const CadastroVoluntariadoPage = carregarPagina("/cadastros/voluntariado", "CadastroVoluntariadoPage");
 const CadastroMatriculasPage = carregarPagina("/atendimentos/matriculas", "CadastroMatriculasPage");
@@ -380,6 +381,7 @@ export const router = createBrowserRouter([
         )
       },
       { path: "/cadastros/beneficiarios", element: CadastroBeneficiarioPage },
+      { path: "/cadastros/pessoas", element: <RequirePermission permissions={["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "PESSOAS_VISUALIZAR"]}>{PessoasPage}</RequirePermission> },
       { path: "/cadastros/profissionais", element: CadastroProfissionalPage },
       { path: "/cadastros/voluntariado", element: CadastroVoluntariadoPage },
       {

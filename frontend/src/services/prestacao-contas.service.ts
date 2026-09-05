@@ -43,6 +43,25 @@ export const prestacaoContasService = {
     return data.transparencia;
   },
 
+  async publicar(id: string) {
+    const { data } = await httpClient.post<{ publicacao: Record<string, unknown> }>(`${baseUrl}/${id}/publicacao`);
+    return data.publicacao;
+  },
+
+  async retirarPublicacao(id: string, motivo?: string) {
+    await httpClient.delete(`${baseUrl}/${id}/publicacao`, { data: { motivo } });
+  },
+
+  async listarPrazos(status?: string) {
+    const { data } = await httpClient.get<{ obrigacoes: Array<{ id: number; transparencia_id: number; tipo: string; descricao: string; prazo: string; responsavel?: string | null; status: string; dias_restantes?: number | null }> }>(`${baseUrl}/prazos`, { params: status ? { status } : undefined });
+    return data.obrigacoes ?? [];
+  },
+
+  async dashboardFinanceiroSocial() {
+    const { data } = await httpClient.get<{ resumo: { instrumentos: number; recebido: number; aplicado: number; indicadores: number; meta: number; realizado: number }; porInstrumento: Array<{ instrumento: string; recebido: number; aplicado: number; indicadores: number; realizado: number }> }>(`${baseUrl}/dashboard-financeiro-social`);
+    return data;
+  },
+
   async obterVisaoGeralProfissional() {
     const { data } = await httpClient.get<{ dados: PrestacaoProfissionalVisaoGeral }>(
       `${baseUrl}/profissional/visao-geral`

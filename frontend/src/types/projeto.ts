@@ -26,6 +26,32 @@ export type ProjetoTarefaTipo =
 
 export type ProjetoTarefaStatus = "NAO_INICIADO" | "EM_ANDAMENTO" | "PARADO" | "CONCLUIDO";
 
+export type ProjetoIndicador = {
+  id: number;
+  projeto_id: number;
+  nome: string;
+  descricao?: string | null;
+  tipo: "PROCESSO" | "PRODUTO" | "RESULTADO" | "IMPACTO";
+  unidade_medida: string;
+  linha_base: number | null;
+  meta: number;
+  valor_atual: number;
+  periodicidade: "UNICA" | "MENSAL" | "TRIMESTRAL" | "SEMESTRAL" | "ANUAL";
+  fonte_dado?: string | null;
+  responsavel?: string | null;
+  status: "ATIVO" | "INATIVO";
+};
+
+export type ProjetoIndicadorPayload = Omit<ProjetoIndicador, "id" | "projeto_id" | "linha_base" | "valor_atual" | "status"> & {
+  linha_base?: number;
+  valor_atual?: number;
+  status?: "ATIVO" | "INATIVO";
+};
+
+export type ProjetoIndicadorMedicao = { id: number; indicador_id: number; competencia: string; valor: number; observacao?: string | null; registrado_em: string };
+export type ProjetoIndicadorEvidencia = { id: number; indicador_id: number; nome_arquivo: string; referencia_logica: string; mime_type?: string | null; tamanho_bytes?: number | null; checksum?: string | null; enviado_em: string; ativo: boolean };
+export type ProjetoImpactoDashboard = { resumo: { totalIndicadores: number; indicadoresAtivos: number; metaTotal: number; realizadoTotal: number; percentualMedio: number }; porTipo: Array<{ tipo: string; total: number }>; evolucao: Array<{ competencia: string; total: number }> };
+
 export type ProjetoFiltros = {
   nome?: string;
   responsavel?: string;

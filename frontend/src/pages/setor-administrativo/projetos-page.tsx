@@ -51,6 +51,11 @@ import { useAuth } from "@/hooks/use-auth";
 import { useUnidadesAssistenciais } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
 import {
   useHistoricoProjeto,
+  useDashboardIndicadoresProjeto,
+  useEvidenciasIndicadorProjeto,
+  useEnviarEvidenciaIndicador,
+  useRegistrarMedicaoIndicador,
+  useIndicadoresProjeto,
   useInativarProjeto,
   useMoverTarefaProjeto,
   useProjetos,
@@ -58,13 +63,16 @@ import {
   useRelatorioProjeto,
   useSalvarProjeto,
   useSalvarTarefaProjeto,
+  useSalvarIndicadorProjeto,
   useProjeto
 } from "@/features/projetos/use-projetos";
 import { abrirRelatorioPdf, reservarJanelaRelatorio } from "@/lib/report-utils";
 import { cn } from "@/lib/utils";
+import { abrirArquivoAutenticado } from "@/lib/arquivos";
 import { formatarDataPtBr, normalizarEmail } from "@/lib/br-utils";
 import type {
   Projeto,
+  ProjetoIndicadorPayload,
   ProjetoArea,
   ProjetoDashboardItem,
   ProjetoFiltros,
@@ -77,11 +85,12 @@ import type {
   ProjetoTarefaTipo
 } from "@/types/projeto";
 
-type AbaId = "visao-geral" | "projetos" | "kanban" | "relatorios";
+type AbaId = "visao-geral" | "projetos" | "indicadores" | "kanban" | "relatorios";
 
 const abas: AdminTab[] = [
   { id: "visao-geral", label: "Visão geral", icon: BarChart3 },
   { id: "projetos", label: "Projetos", icon: LayoutGrid },
+  { id: "indicadores", label: "Indicadores", icon: BarChart3 },
   { id: "kanban", label: "Kanban", icon: FolderKanban },
   { id: "relatorios", label: "Relatórios", icon: FileText }
 ];
@@ -260,6 +269,10 @@ export function ProjetosPage() {
   const [projetoForm, setProjetoForm] = useState<ProjetoPayload & { id?: string }>(emptyProjetoPayload);
   const [tarefaForm, setTarefaForm] = useState<ProjetoTarefaPayload & { id?: string }>(emptyTarefaPayload);
   const [projetoSelecionadoId, setProjetoSelecionadoId] = useState<string>("");
+  const [indicadorForm, setIndicadorForm] = useState<ProjetoIndicadorPayload>({ nome: "", descricao: "", tipo: "RESULTADO", unidade_medida: "", meta: 0, periodicidade: "MENSAL", fonte_dado: "", responsavel: "" });
+  const [indicadorEvidenciaId, setIndicadorEvidenciaId] = useState<number>();
+  const [medicaoForm, setMedicaoForm] = useState({ competencia: "", valor: 0, observacao: "", evidencia_id: "" });
+  const [impactoFiltros, setImpactoFiltros] = useState({ periodo_de: "", periodo_ate: "", unidade_id: "" });
   const [tarefaArrastadaId, setTarefaArrastadaId] = useState<string>("");
   const [popupMensagem, setPopupMensagem] = useState<PopupMensagemState | null>(null);
   const [confirmarInativacao, setConfirmarInativacao] = useState(false);
@@ -268,11 +281,17 @@ export function ProjetosPage() {
   const dashboardQuery = useProjetosDashboard(filtrosAplicados, activeTab === "visao-geral");
   const projetoSelecionadoQuery = useProjeto(projetoSelecionadoId, !!projetoSelecionadoId);
   const historicoQuery = useHistoricoProjeto(projetoSelecionadoId, activeTab !== "visao-geral");
+  const indicadoresQuery = useIndicadoresProjeto(projetoSelecionadoId, activeTab === "indicadores");
+  const impactoQuery = useDashboardIndicadoresProjeto({ projeto_id: projetoSelecionadoId || undefined, ...impactoFiltros }, activeTab === "indicadores");
+  const evidenciasQuery = useEvidenciasIndicadorProjeto(projetoSelecionadoId, indicadorEvidenciaId, activeTab === "indicadores");
   const salvarProjetoMutation = useSalvarProjeto();
   const inativarProjetoMutation = useInativarProjeto();
   const salvarTarefaMutation = useSalvarTarefaProjeto();
   const moverTarefaMutation = useMoverTarefaProjeto();
   const relatorioMutation = useRelatorioProjeto();
+  const salvarIndicadorMutation = useSalvarIndicadorProjeto();
+  const enviarEvidenciaMutation = useEnviarEvidenciaIndicador();
+  const registrarMedicaoMutation = useRegistrarMedicaoIndicador();
 
   const projetos = projetosQuery.data ?? [];
   const projetoDetalhado = projetoSelecionadoQuery.data ?? projetos.find((item) => item.id === projetoSelecionadoId) ?? null;
@@ -566,6 +585,48 @@ export function ProjetosPage() {
     }
   }
 
+  async function salvarIndicador() {
+    if (!projetoSelecionadoId) {
+      setPopupMensagem({ tipo: "aviso", titulo: "Selecione um projeto", texto: "Escolha um projeto para cadastrar o indicador." });
+      return;
+    }
+    if (!indicadorForm.nome.trim() || !indicadorForm.unidade_medida.trim() || indicadorForm.meta < 0) {
+      setPopupMensagem({ tipo: "aviso", titulo: "Validação", texto: "Informe nome, unidade de medida e uma meta válida." });
+      return;
+    }
+    try {
+      await salvarIndicadorMutation.mutateAsync({ projetoId: projetoSelecionadoId, payload: { ...indicadorForm, nome: indicadorForm.nome.trim(), unidade_medida: indicadorForm.unidade_medida.trim(), descricao: indicadorForm.descricao?.trim() || undefined, fonte_dado: indicadorForm.fonte_dado?.trim() || undefined, responsavel: indicadorForm.responsavel?.trim() || undefined } });
+      setIndicadorForm({ nome: "", descricao: "", tipo: "RESULTADO", unidade_medida: "", meta: 0, periodicidade: "MENSAL", fonte_dado: "", responsavel: "" });
+      setPopupMensagem({ tipo: "sucesso", titulo: "Indicador cadastrado", texto: "O indicador foi salvo e já está disponível para acompanhamento." });
+    } catch (error) {
+      setPopupMensagem({ tipo: "erro", titulo: "Erro ao salvar indicador", texto: error instanceof Error ? error.message : "Não foi possível salvar o indicador." });
+    }
+  }
+
+  async function enviarEvidencia(arquivo: File) {
+    if (!projetoSelecionadoId || !indicadorEvidenciaId) return;
+    try {
+      await enviarEvidenciaMutation.mutateAsync({ projetoId: projetoSelecionadoId, indicadorId: indicadorEvidenciaId, arquivo });
+      setPopupMensagem({ tipo: "sucesso", titulo: "Evidência enviada", texto: "O arquivo foi armazenado e vinculado ao indicador." });
+    } catch (error) {
+      setPopupMensagem({ tipo: "erro", titulo: "Erro ao enviar evidência", texto: error instanceof Error ? error.message : "Não foi possível enviar o arquivo." });
+    }
+  }
+
+  async function registrarMedicao() {
+    if (!projetoSelecionadoId || !indicadorEvidenciaId || !medicaoForm.competencia) {
+      setPopupMensagem({ tipo: "aviso", titulo: "Validação", texto: "Selecione um indicador e informe a competência da medição." });
+      return;
+    }
+    try {
+      await registrarMedicaoMutation.mutateAsync({ projetoId: projetoSelecionadoId, indicadorId: indicadorEvidenciaId, payload: { competencia: medicaoForm.competencia, valor: Number(medicaoForm.valor), observacao: medicaoForm.observacao.trim() || undefined, evidencia_id: medicaoForm.evidencia_id ? Number(medicaoForm.evidencia_id) : undefined } });
+      setMedicaoForm({ competencia: "", valor: 0, observacao: "", evidencia_id: "" });
+      setPopupMensagem({ tipo: "sucesso", titulo: "Medição registrada", texto: "O resultado foi registrado para a competência informada." });
+    } catch (error) {
+      setPopupMensagem({ tipo: "erro", titulo: "Erro ao registrar medição", texto: error instanceof Error ? error.message : "Não foi possível registrar a medição." });
+    }
+  }
+
   async function moverTarefa(tarefa: ProjetoTarefa, status: ProjetoTarefaStatus) {
     const projetoId = projetoPadraoKanban?.id;
     if (!projetoId || tarefa.status === status) return;
@@ -668,7 +729,9 @@ export function ProjetosPage() {
           activeTab === "visao-geral"
             ? "Visão geral"
             : activeTab === "projetos"
-              ? "Projetos"
+                ? "Projetos"
+              : activeTab === "indicadores"
+                ? "Indicadores e resultados"
               : activeTab === "kanban"
                 ? "Kanban"
                 : "Relatórios"
@@ -1059,6 +1122,35 @@ export function ProjetosPage() {
                 </Card>
               </div>
             </div>
+          </section>
+        ) : null}
+
+        {activeTab === "indicadores" ? (
+          <section className="space-y-4">
+            <Card>
+              <CardHeader><CardTitle>Indicadores e resultados</CardTitle><p className="text-sm text-[var(--g3-muted)]">Acompanhe metas e resultados reais do projeto por competência.</p></CardHeader>
+              <CardContent className="space-y-4">
+                <label className="block max-w-xl space-y-1"><span className="text-sm font-medium">Projeto</span><Select value={projetoSelecionadoId} onChange={(event) => setProjetoSelecionadoId(event.target.value)}><option value="">Selecione um projeto</option>{projetos.map((projeto) => <option key={projeto.id} value={projeto.id}>{projeto.nome}</option>)}</Select></label>
+                <div className="grid gap-3 md:grid-cols-3"><CampoTexto label="Período inicial" type="date" value={impactoFiltros.periodo_de} onChange={(value) => setImpactoFiltros((atual) => ({ ...atual, periodo_de: value }))} /><CampoTexto label="Período final" type="date" value={impactoFiltros.periodo_ate} onChange={(value) => setImpactoFiltros((atual) => ({ ...atual, periodo_ate: value }))} /><label className="space-y-1"><span className="text-sm font-medium">Unidade</span><Select value={impactoFiltros.unidade_id} onChange={(event) => setImpactoFiltros((atual) => ({ ...atual, unidade_id: event.target.value }))}><option value="">Todas as unidades</option>{unidades.map((unidade) => <option key={unidade.id_unidade} value={unidade.id_unidade}>{unidade.nome_fantasia}</option>)}</Select></label></div>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{[{ label: "Indicadores", value: impactoQuery.data?.resumo.totalIndicadores ?? 0 }, { label: "Ativos", value: impactoQuery.data?.resumo.indicadoresAtivos ?? 0 }, { label: "Meta total", value: impactoQuery.data?.resumo.metaTotal ?? 0 }, { label: "Realizado", value: impactoQuery.data?.resumo.realizadoTotal ?? 0 }, { label: "Execução média", value: `${(impactoQuery.data?.resumo.percentualMedio ?? 0).toFixed(1)}%` }].map((item) => <div key={item.label} className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3"><p className="text-xs uppercase tracking-wide text-[var(--g3-muted)]">{item.label}</p><p className="mt-1 text-xl font-bold text-[var(--g3-foreground)]">{item.value}</p></div>)}</div>
+                {projetoSelecionadoId ? <>
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <CampoTexto label="Nome do indicador" value={indicadorForm.nome} onChange={(value) => setIndicadorForm((atual) => ({ ...atual, nome: value }))} />
+                    <CampoTexto label="Unidade de medida" value={indicadorForm.unidade_medida} onChange={(value) => setIndicadorForm((atual) => ({ ...atual, unidade_medida: value }))} />
+                    <CampoTexto label="Linha de base" type="number" value={String(indicadorForm.linha_base ?? "")} onChange={(value) => setIndicadorForm((atual) => ({ ...atual, linha_base: value === "" ? undefined : Number(value) }))} />
+                    <CampoTexto label="Meta" type="number" value={String(indicadorForm.meta)} onChange={(value) => setIndicadorForm((atual) => ({ ...atual, meta: Number(value) }))} />
+                    <CampoSelect label="Tipo" value={indicadorForm.tipo} onChange={(value) => value && setIndicadorForm((atual) => ({ ...atual, tipo: value as ProjetoIndicadorPayload["tipo"] }))} options={[{ value: "PROCESSO", label: "Processo" }, { value: "PRODUTO", label: "Produto" }, { value: "RESULTADO", label: "Resultado" }, { value: "IMPACTO", label: "Impacto" }]} />
+                    <CampoSelect label="Periodicidade" value={indicadorForm.periodicidade} onChange={(value) => value && setIndicadorForm((atual) => ({ ...atual, periodicidade: value as ProjetoIndicadorPayload["periodicidade"] }))} options={[{ value: "UNICA", label: "Única" }, { value: "MENSAL", label: "Mensal" }, { value: "TRIMESTRAL", label: "Trimestral" }, { value: "SEMESTRAL", label: "Semestral" }, { value: "ANUAL", label: "Anual" }]} />
+                    <CampoTexto label="Responsável" value={indicadorForm.responsavel ?? ""} onChange={(value) => setIndicadorForm((atual) => ({ ...atual, responsavel: value }))} />
+                    <CampoTexto label="Fonte do dado" value={indicadorForm.fonte_dado ?? ""} onChange={(value) => setIndicadorForm((atual) => ({ ...atual, fonte_dado: value }))} />
+                  </div>
+                  <CampoTextoArea label="Descrição" value={indicadorForm.descricao ?? ""} onChange={(value) => setIndicadorForm((atual) => ({ ...atual, descricao: value }))} />
+                  <Button type="button" onClick={() => void salvarIndicador()} disabled={salvarIndicadorMutation.isPending}><Save className="mr-2 h-4 w-4" />{salvarIndicadorMutation.isPending ? "Salvando..." : "Cadastrar indicador"}</Button>
+                  <div className="overflow-x-auto rounded-xl border border-[var(--g3-border)]"><table className="min-w-full text-sm"><thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Indicador</th><th className="px-3 py-2 text-left">Tipo</th><th className="px-3 py-2 text-left">Atual / meta</th><th className="px-3 py-2 text-left">Periodicidade</th><th className="px-3 py-2 text-left">Evidências</th></tr></thead><tbody>{(indicadoresQuery.data ?? []).map((indicador) => <tr key={indicador.id} className="border-t border-[var(--g3-border)]"><td className="px-3 py-2 font-medium">{indicador.nome}<div className="text-xs text-[var(--g3-muted)]">{indicador.unidade_medida}</div></td><td className="px-3 py-2">{indicador.tipo}</td><td className="px-3 py-2">{indicador.valor_atual} / {indicador.meta}</td><td className="px-3 py-2">{indicador.periodicidade}</td><td className="px-3 py-2"><Button type="button" size="sm" variant="outline" onClick={() => setIndicadorEvidenciaId(indicador.id)}>Gerenciar</Button></td></tr>)}</tbody></table>{!indicadoresQuery.isLoading && !(indicadoresQuery.data ?? []).length ? <EstadoVazio texto="Nenhum indicador cadastrado para este projeto." /> : null}</div>
+                  {indicadorEvidenciaId ? <Card className="border-[var(--g3-border)]"><CardHeader><CardTitle className="text-sm">Evidências e medições</CardTitle><p className="text-sm text-[var(--g3-muted)]">Envie documentos comprobatórios e registre o resultado de cada competência.</p></CardHeader><CardContent className="space-y-4"><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"><CampoTexto label="Competência" type="date" value={medicaoForm.competencia} onChange={(value) => setMedicaoForm((atual) => ({ ...atual, competencia: value }))} /><CampoTexto label="Valor realizado" type="number" value={String(medicaoForm.valor)} onChange={(value) => setMedicaoForm((atual) => ({ ...atual, valor: Number(value) }))} /><label className="space-y-1"><span className="text-sm font-medium">Evidência da medição</span><Select value={medicaoForm.evidencia_id} onChange={(event) => setMedicaoForm((atual) => ({ ...atual, evidencia_id: event.target.value }))}><option value="">Sem evidência</option>{(evidenciasQuery.data ?? []).map((evidencia) => <option key={evidencia.id} value={evidencia.id}>{evidencia.nome_arquivo}</option>)}</Select></label><div className="flex items-end"><Button type="button" onClick={() => void registrarMedicao()} disabled={registrarMedicaoMutation.isPending}>{registrarMedicaoMutation.isPending ? "Registrando..." : "Registrar medição"}</Button></div></div><Input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx,.csv,.txt" disabled={enviarEvidenciaMutation.isPending} onChange={(event) => { const arquivo = event.target.files?.[0]; if (arquivo) void enviarEvidencia(arquivo); event.currentTarget.value = ""; }} />{evidenciasQuery.isLoading ? <p className="text-sm text-[var(--g3-muted)]">Carregando evidências...</p> : null}{(evidenciasQuery.data ?? []).map((evidencia) => <div key={evidencia.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--g3-border)] px-3 py-2 text-sm"><span>{evidencia.nome_arquivo}</span><Button type="button" size="sm" variant="outline" onClick={() => void abrirArquivoAutenticado(evidencia.referencia_logica, evidencia.nome_arquivo)}>Visualizar</Button></div>)}{!evidenciasQuery.isLoading && !(evidenciasQuery.data ?? []).length ? <EstadoVazio texto="Nenhuma evidência enviada para este indicador." compact /> : null}</CardContent></Card> : null}
+                </> : <EstadoVazio texto="Selecione um projeto para acompanhar indicadores e resultados." />}
+              </CardContent>
+            </Card>
           </section>
         ) : null}
 

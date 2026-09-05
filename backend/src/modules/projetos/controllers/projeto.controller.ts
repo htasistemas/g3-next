@@ -2,9 +2,11 @@ import type { Response } from "express";
 import type { AuthenticatedRequest } from "../../auth/middlewares/auth.middleware.js";
 import { ProjetoService } from "../services/projeto.service.js";
 import { ProjetoReportService } from "../services/projeto-report.service.js";
+import { ProjetoIndicadoresService } from "../services/projeto-indicadores.service.js";
 
 const service = new ProjetoService();
 const reportService = new ProjetoReportService();
+const indicadoresService = new ProjetoIndicadoresService();
 
 function getActor(request: AuthenticatedRequest) {
   return {
@@ -82,5 +84,33 @@ export class ProjetoController {
     response.setHeader("Content-Type", "application/pdf");
     response.setHeader("Content-Disposition", `inline; filename="${resultado.filename}"`);
     return response.send(resultado.pdf);
+  }
+
+  async listarIndicadores(request: AuthenticatedRequest, response: Response) {
+    return response.json({ indicadores: await indicadoresService.listar(request.params.id, getActor(request)) });
+  }
+
+  async dashboardIndicadores(request: AuthenticatedRequest, response: Response) {
+    return response.json(await indicadoresService.dashboard({ projeto_id: typeof request.query.projeto_id === "string" ? request.query.projeto_id : undefined, periodo_de: typeof request.query.periodo_de === "string" ? request.query.periodo_de : undefined, periodo_ate: typeof request.query.periodo_ate === "string" ? request.query.periodo_ate : undefined, unidade_id: typeof request.query.unidade_id === "string" ? request.query.unidade_id : undefined }, getActor(request)));
+  }
+
+  async criarIndicador(request: AuthenticatedRequest, response: Response) {
+    return response.status(201).json({ indicador: await indicadoresService.criar(request.params.id, request.body, getActor(request)) });
+  }
+
+  async listarMedicoesIndicador(request: AuthenticatedRequest, response: Response) {
+    return response.json({ medicoes: await indicadoresService.listarMedicoes(request.params.id, request.params.indicadorId, getActor(request)) });
+  }
+
+  async registrarMedicaoIndicador(request: AuthenticatedRequest, response: Response) {
+    return response.status(201).json({ medicao: await indicadoresService.registrarMedicao(request.params.id, request.params.indicadorId, request.body, getActor(request)) });
+  }
+
+  async listarEvidenciasIndicador(request: AuthenticatedRequest, response: Response) {
+    return response.json({ evidencias: await indicadoresService.listarEvidencias(request.params.id, request.params.indicadorId, getActor(request)) });
+  }
+
+  async enviarEvidenciaIndicador(request: AuthenticatedRequest, response: Response) {
+    return response.status(201).json({ evidencia: await indicadoresService.enviarEvidencia(request.params.id, request.params.indicadorId, request.file, getActor(request)) });
   }
 }

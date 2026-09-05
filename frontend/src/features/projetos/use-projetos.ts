@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { projetosService } from "@/services/projetos.service";
-import type { ProjetoFiltros, ProjetoPayload, ProjetoTarefaPayload, ProjetoTarefaStatus } from "@/types/projeto";
+import type { ProjetoFiltros, ProjetoIndicadorPayload, ProjetoPayload, ProjetoTarefaPayload, ProjetoTarefaStatus } from "@/types/projeto";
 
 export function useProjetos(filtros: ProjetoFiltros, enabled = true) {
   const { usuario } = useAuth();
@@ -115,5 +115,38 @@ export function useRelatorioProjeto() {
     mutationFn: ({ tipo, payload }: { tipo: string; payload: Record<string, unknown> }) =>
       projetosService.relatorioPdf(tipo, payload)
   });
+}
+
+export function useIndicadoresProjeto(id?: string, enabled = true) {
+  const { usuario } = useAuth();
+  return useQuery({ queryKey: ["projetos", usuario?.tenant_id ?? "sem-tenant", id ?? "", "indicadores"], queryFn: () => projetosService.listarIndicadores(id as string), enabled: enabled && !!id, staleTime: 15_000 });
+}
+
+export function useDashboardIndicadoresProjeto(params?: { projeto_id?: string; periodo_de?: string; periodo_ate?: string; unidade_id?: string }, enabled = true) {
+  const { usuario } = useAuth();
+  return useQuery({ queryKey: ["projetos", usuario?.tenant_id ?? "sem-tenant", "impacto-dashboard", params ?? {}], queryFn: () => projetosService.dashboardIndicadores(params), enabled, staleTime: 15_000 });
+}
+
+export function useSalvarIndicadorProjeto() {
+  const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  return useMutation({ mutationFn: ({ projetoId, payload }: { projetoId: string; payload: ProjetoIndicadorPayload }) => projetosService.criarIndicador(projetoId, payload), onSuccess: async (_data, variables) => { await queryClient.invalidateQueries({ queryKey: ["projetos", usuario?.tenant_id ?? "sem-tenant", variables.projetoId, "indicadores"] }); } });
+}
+
+export function useEvidenciasIndicadorProjeto(projetoId?: string, indicadorId?: number, enabled = true) {
+  const { usuario } = useAuth();
+  return useQuery({ queryKey: ["projetos", usuario?.tenant_id ?? "sem-tenant", projetoId ?? "", "indicador-evidencias", indicadorId ?? ""], queryFn: () => projetosService.listarEvidencias(projetoId as string, indicadorId as number), enabled: enabled && !!projetoId && !!indicadorId, staleTime: 15_000 });
+}
+
+export function useEnviarEvidenciaIndicador() {
+  const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  return useMutation({ mutationFn: ({ projetoId, indicadorId, arquivo }: { projetoId: string; indicadorId: number; arquivo: File }) => projetosService.enviarEvidencia(projetoId, indicadorId, arquivo), onSuccess: async (_data, variables) => { await queryClient.invalidateQueries({ queryKey: ["projetos", usuario?.tenant_id ?? "sem-tenant", variables.projetoId, "indicadores"] }); await queryClient.invalidateQueries({ queryKey: ["projetos", usuario?.tenant_id ?? "sem-tenant", variables.projetoId, "indicador-evidencias", variables.indicadorId] }); } });
+}
+
+export function useRegistrarMedicaoIndicador() {
+  const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  return useMutation({ mutationFn: ({ projetoId, indicadorId, payload }: { projetoId: string; indicadorId: number; payload: { competencia: string; valor: number; observacao?: string; evidencia_id?: number } }) => projetosService.registrarMedicao(projetoId, indicadorId, payload), onSuccess: async (_data, variables) => { await queryClient.invalidateQueries({ queryKey: ["projetos", usuario?.tenant_id ?? "sem-tenant", variables.projetoId, "indicadores"] }); } });
 }
 

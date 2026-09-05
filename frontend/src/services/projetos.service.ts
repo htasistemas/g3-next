@@ -7,6 +7,7 @@ import type {
   ProjetoTarefa,
   ProjetoTarefaPayload,
   ProjetoTarefaStatus
+  ,ProjetoImpactoDashboard, ProjetoIndicador, ProjetoIndicadorEvidencia, ProjetoIndicadorMedicao, ProjetoIndicadorPayload
 } from "@/types/projeto";
 
 export const projetosService = {
@@ -79,6 +80,43 @@ export const projetosService = {
       responseType: "blob"
     });
     return data as Blob;
+  },
+
+  async listarIndicadores(projetoId: string) {
+    const { data } = await httpClient.get<{ indicadores: ProjetoIndicador[] }>(`/api/administrativo/projetos/${projetoId}/indicadores`);
+    return data.indicadores ?? [];
+  },
+
+  async dashboardIndicadores(params?: { projeto_id?: string; periodo_de?: string; periodo_ate?: string; unidade_id?: string }) {
+    const { data } = await httpClient.get<ProjetoImpactoDashboard>("/api/administrativo/projetos/indicadores/dashboard", { params });
+    return data;
+  },
+
+  async criarIndicador(projetoId: string, payload: ProjetoIndicadorPayload) {
+    const { data } = await httpClient.post<{ indicador: ProjetoIndicador }>(`/api/administrativo/projetos/${projetoId}/indicadores`, payload);
+    return data.indicador;
+  },
+
+  async listarMedicoes(projetoId: string, indicadorId: number) {
+    const { data } = await httpClient.get<{ medicoes: ProjetoIndicadorMedicao[] }>(`/api/administrativo/projetos/${projetoId}/indicadores/${indicadorId}/medicoes`);
+    return data.medicoes ?? [];
+  },
+
+  async registrarMedicao(projetoId: string, indicadorId: number, payload: { competencia: string; valor: number; observacao?: string; evidencia_id?: number }) {
+    const { data } = await httpClient.post<{ medicao: ProjetoIndicadorMedicao }>(`/api/administrativo/projetos/${projetoId}/indicadores/${indicadorId}/medicoes`, payload);
+    return data.medicao;
+  },
+
+  async listarEvidencias(projetoId: string, indicadorId: number) {
+    const { data } = await httpClient.get<{ evidencias: ProjetoIndicadorEvidencia[] }>(`/api/administrativo/projetos/${projetoId}/indicadores/${indicadorId}/evidencias`);
+    return data.evidencias ?? [];
+  },
+
+  async enviarEvidencia(projetoId: string, indicadorId: number, arquivo: File) {
+    const formData = new FormData();
+    formData.append("arquivo", arquivo);
+    const { data } = await httpClient.post<{ evidencia: ProjetoIndicadorEvidencia }>(`/api/administrativo/projetos/${projetoId}/indicadores/${indicadorId}/evidencias`, formData);
+    return data.evidencia;
   }
 };
 

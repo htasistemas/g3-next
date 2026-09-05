@@ -151,6 +151,34 @@ transparenciasRoutes.post(
   asyncHandler(controller.alterarWorkflow.bind(controller))
 );
 
+transparenciasRoutes.get(
+  "/prazos",
+  ensureAuthenticated,
+  ensurePermissions(permissoesProfissionaisLeitura),
+  asyncHandler(controller.listarObrigacoes.bind(controller))
+);
+
+transparenciasRoutes.get(
+  "/dashboard-financeiro-social",
+  ensureAuthenticated,
+  ensurePermissions(permissoesProfissionaisLeitura),
+  asyncHandler(controller.dashboardFinanceiroSocial.bind(controller))
+);
+
+transparenciasRoutes.post(
+  "/:id/publicacao",
+  ensureAuthenticated,
+  ensurePermissions(["ADMINISTRADOR"]),
+  asyncHandler(controller.publicar.bind(controller))
+);
+
+transparenciasRoutes.delete(
+  "/:id/publicacao",
+  ensureAuthenticated,
+  ensurePermissions(["ADMINISTRADOR"]),
+  asyncHandler(controller.retirarPublicacao.bind(controller))
+);
+
 transparenciasRoutes.delete(
   "/:id",
   ensureAuthenticated,

@@ -408,11 +408,28 @@ export class TransparenciasRepository {
     tenantId: string,
     usuarioId?: string,
     usuarioNome?: string,
-    observacao?: string
+    observacao?: string,
+    snapshot?: { payload: Record<string, unknown>; checksum: string }
   ) {
     await ensureTransparenciasEstrutura();
     const atual = await this.buscarPorIdOuFalhar(id, tenantId);
     await prisma.$transaction(async (tx) => {
+      if (snapshot) {
+        await tx.$executeRaw(Prisma.sql`
+          SELECT pg_advisory_xact_lock(hashtextextended(${`${tenantId}:${id.toString()}`}, 0))
+        `);
+        const versoes = await tx.$queryRaw<Array<{ versao: number }>>(Prisma.sql`
+          SELECT COALESCE(MAX(versao), 0)::int AS versao
+          FROM transparencia_prestacao_snapshot
+          WHERE tenant_id = ${tenantId}::uuid AND transparencia_id = ${id}
+        `);
+        const versao = Number(versoes[0]?.versao ?? 0) + 1;
+        await tx.$executeRaw(Prisma.sql`
+          INSERT INTO transparencia_prestacao_snapshot
+            (tenant_id, transparencia_id, versao, payload, checksum, criado_por)
+          VALUES (${tenantId}::uuid, ${id}, ${versao}, ${JSON.stringify(snapshot.payload)}::jsonb, ${snapshot.checksum}, ${usuarioId ?? null})
+        `);
+      }
       await tx.$executeRaw(Prisma.sql`
         UPDATE transparencia
         SET status_workflow = ${status}, atualizado_em = NOW()
@@ -426,6 +443,78 @@ export class TransparenciasRepository {
       `);
     });
     return this.buscarPorIdOuFalhar(id, tenantId);
+  }
+
+  async publicarSnapshot(id: bigint, tenantId: string, usuarioId?: string, usuarioNome?: string) {
+    const registro = await this.buscarPorIdOuFalhar(id, tenantId);
+    if (!["APROVADA", "APROVADA_RESSALVAS"].includes(registro.transparencia.status_workflow ?? "")) {
+      throw new AppError("A prestação precisa estar aprovada antes da publicação.", 409);
+    }
+    return prisma.$transaction(async (tx) => {
+      const snapshot = await tx.$queryRaw<Array<{ id: bigint; versao: number }>>(Prisma.sql`
+        SELECT id, versao FROM transparencia_prestacao_snapshot
+        WHERE tenant_id = ${tenantId}::uuid AND transparencia_id = ${id}
+        ORDER BY versao DESC LIMIT 1
+      `);
+      if (!snapshot[0]) throw new AppError("Envie a prestação para análise para gerar uma versão publicável.", 409);
+      await tx.$executeRaw(Prisma.sql`UPDATE transparencia_publicacao SET status = 'RETIRADA', retirada_por = ${usuarioId ?? null}, retirada_em = NOW() WHERE tenant_id = ${tenantId}::uuid AND transparencia_id = ${id} AND status = 'PUBLICADA'`);
+      const rows = await tx.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+        INSERT INTO transparencia_publicacao (tenant_id, transparencia_id, snapshot_id, publicado_por)
+        VALUES (${tenantId}::uuid, ${id}, ${snapshot[0].id}, ${usuarioId ?? null})
+        RETURNING id, transparencia_id, snapshot_id, status, publicado_em
+      `);
+      await tx.$executeRaw(Prisma.sql`INSERT INTO transparencia_auditoria (tenant_id, transparencia_id, acao, status_anterior, status_novo, usuario_id, usuario_nome, observacao) VALUES (${tenantId}::uuid, ${id}, 'PUBLICAR_SNAPSHOT', ${registro.transparencia.status_workflow ?? null}, ${registro.transparencia.status_workflow ?? null}, ${usuarioId ?? null}, ${usuarioNome ?? null}, ${`Snapshot v${snapshot[0].versao} publicado.`})`);
+      return rows[0];
+    });
+  }
+
+  async retirarPublicacao(id: bigint, tenantId: string, usuarioId?: string, usuarioNome?: string, motivo?: string) {
+    await this.buscarPorIdOuFalhar(id, tenantId);
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw(Prisma.sql`UPDATE transparencia_publicacao SET status = 'RETIRADA', retirada_por = ${usuarioId ?? null}, retirada_em = NOW(), motivo = ${motivo ?? null} WHERE tenant_id = ${tenantId}::uuid AND transparencia_id = ${id} AND status = 'PUBLICADA'`);
+      await tx.$executeRaw(Prisma.sql`INSERT INTO transparencia_auditoria (tenant_id, transparencia_id, acao, usuario_id, usuario_nome, observacao) VALUES (${tenantId}::uuid, ${id}, 'RETIRAR_PUBLICACAO', ${usuarioId ?? null}, ${usuarioNome ?? null}, ${motivo ?? 'Publicação retirada.'})`);
+    });
+  }
+
+  async listarObrigacoes(tenantId: string, status?: string) {
+    return prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      SELECT o.id, o.transparencia_id, o.tipo, o.descricao, o.prazo, o.responsavel, o.status,
+             CASE WHEN o.status = 'ABERTA' THEN (o.prazo - CURRENT_DATE) ELSE NULL END AS dias_restantes
+      FROM transparencia_obrigacao_prazo o
+      WHERE o.tenant_id = ${tenantId}::uuid
+        AND (${status ?? null}::text IS NULL OR o.status = ${status ?? null})
+      ORDER BY CASE WHEN o.status = 'ABERTA' THEN 0 ELSE 1 END, o.prazo ASC, o.id ASC
+      LIMIT 500
+    `);
+  }
+
+  async dashboardFinanceiroSocial(tenantId: string) {
+    const [resumo] = await prisma.$queryRaw<Array<{ instrumentos: bigint; recebido: number; aplicado: number; indicadores: bigint; meta: number; realizado: number }>>(Prisma.sql`
+      SELECT COUNT(DISTINCT t.id)::BIGINT AS instrumentos,
+             COALESCE(SUM(t.total_recebido), 0)::float8 AS recebido,
+             COALESCE(SUM(t.total_aplicado), 0)::float8 AS aplicado,
+             COUNT(DISTINCT i.id)::BIGINT AS indicadores,
+             COALESCE(SUM(i.meta), 0)::float8 AS meta,
+             COALESCE(SUM(i.valor_atual), 0)::float8 AS realizado
+      FROM transparencia t
+      LEFT JOIN prestacao_contas_instrumento pc ON pc.id = t.prestacao_instrumento_id AND pc.tenant_id = t.tenant_id
+      LEFT JOIN projeto_indicador i ON i.projeto_id = pc.projeto_id AND i.tenant_id = pc.tenant_id AND i.status = 'ATIVO'
+      WHERE t.tenant_id = ${tenantId}::uuid
+    `);
+    const porInstrumento = await prisma.$queryRaw<Array<{ instrumento: string; recebido: number; aplicado: number; indicadores: bigint; realizado: number }>>(Prisma.sql`
+      SELECT COALESCE(t.instrumento, CONCAT('Prestação ', t.id::text)) AS instrumento,
+             COALESCE(t.total_recebido, 0)::float8 AS recebido,
+             COALESCE(t.total_aplicado, 0)::float8 AS aplicado,
+             COUNT(DISTINCT i.id)::BIGINT AS indicadores,
+             COALESCE(SUM(i.valor_atual), 0)::float8 AS realizado
+      FROM transparencia t
+      LEFT JOIN prestacao_contas_instrumento pc ON pc.id = t.prestacao_instrumento_id AND pc.tenant_id = t.tenant_id
+      LEFT JOIN projeto_indicador i ON i.projeto_id = pc.projeto_id AND i.tenant_id = pc.tenant_id AND i.status = 'ATIVO'
+      WHERE t.tenant_id = ${tenantId}::uuid
+      GROUP BY t.id, t.instrumento, t.total_recebido, t.total_aplicado
+      ORDER BY t.atualizado_em DESC LIMIT 12
+    `);
+    return { resumo: { instrumentos: Number(resumo?.instrumentos ?? 0), recebido: Number(resumo?.recebido ?? 0), aplicado: Number(resumo?.aplicado ?? 0), indicadores: Number(resumo?.indicadores ?? 0), meta: Number(resumo?.meta ?? 0), realizado: Number(resumo?.realizado ?? 0) }, porInstrumento: porInstrumento.map((item) => ({ instrumento: item.instrumento, recebido: Number(item.recebido ?? 0), aplicado: Number(item.aplicado ?? 0), indicadores: Number(item.indicadores ?? 0), realizado: Number(item.realizado ?? 0) })) };
   }
 
   private async validarUnidade(unidadeId: string | null | undefined, tenantId: string) {

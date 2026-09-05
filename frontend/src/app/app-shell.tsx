@@ -228,6 +228,7 @@ const menuSectionsBase: MenuSection[] = [
     icon: FolderOpen,
     itens: [
       { id: "cadastros-beneficiarios", to: "/cadastros/beneficiarios", label: "Beneficiários", icon: UserRound },
+      { id: "cadastros-pessoas", to: "/cadastros/pessoas", label: "Pessoas e vínculos", icon: UsersRound, requiredPermissions: ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "PESSOAS_VISUALIZAR"] },
       {
         id: "cadastros-profissionais",
         to: "/cadastros/profissionais",

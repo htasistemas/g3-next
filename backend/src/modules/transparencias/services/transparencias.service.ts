@@ -1,4 +1,5 @@
 import { AppError } from "../../../shared/errors/app-error.js";
+import { createHash } from "node:crypto";
 import { mapaCamposTextoPrestacaoContas } from "../../../utils/text-format-config.js";
 import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
 import { mapTransparenciaToResponse } from "../transparencias.mapper.js";
@@ -136,7 +137,10 @@ export class TransparenciasService {
       if (input.acao === "APROVAR_RESSALVAS" && !registro.transparencia.parecer_ressalvas?.trim()) erros.push("Informe as ressalvas do parecer.");
       if (erros.length) throw new AppError(erros.join(" "), 422);
     }
-    const atualizado = await this.repository.atualizarStatusWorkflow(id, destino, tenantId, actor?.id, actor?.nomeUsuario);
+    const snapshot = input.acao === "ENVIAR_ANALISE"
+      ? this.criarSnapshot(registro)
+      : undefined;
+    const atualizado = await this.repository.atualizarStatusWorkflow(id, destino, tenantId, actor?.id, actor?.nomeUsuario, undefined, snapshot);
     return mapTransparenciaToResponse(atualizado.transparencia, atualizado.recebimentos, atualizado.destinacoes, atualizado.comprovantes, atualizado.timelines, atualizado.checklist, atualizado.despesas, atualizado.parecerHistorico);
   }
 
@@ -162,5 +166,29 @@ export class TransparenciasService {
       rawInput as Record<string, unknown>,
       mapaCamposTextoPrestacaoContas
     );
+  }
+
+  async publicar(rawId: string, actor?: { id?: string; nomeUsuario?: string; tenant_id?: string }) {
+    return this.repository.publicarSnapshot(this.parseId(rawId), this.parseTenant(actor?.tenant_id), actor?.id, actor?.nomeUsuario);
+  }
+
+  async retirarPublicacao(rawId: string, motivo: string | undefined, actor?: { id?: string; nomeUsuario?: string; tenant_id?: string }) {
+    await this.repository.retirarPublicacao(this.parseId(rawId), this.parseTenant(actor?.tenant_id), actor?.id, actor?.nomeUsuario, motivo);
+  }
+
+  async listarObrigacoes(status: string | undefined, rawTenantId?: string) {
+    const permitidos = ["ABERTA", "CONCLUIDA", "CANCELADA"];
+    if (status && !permitidos.includes(status)) throw new AppError("Status de obrigação inválido.", 400);
+    return this.repository.listarObrigacoes(this.parseTenant(rawTenantId), status);
+  }
+
+  async dashboardFinanceiroSocial(rawTenantId?: string) {
+    return this.repository.dashboardFinanceiroSocial(this.parseTenant(rawTenantId));
+  }
+
+  private criarSnapshot(registro: any) {
+    const payload = JSON.parse(JSON.stringify(registro)) as Record<string, unknown>;
+    const canonical = JSON.stringify(payload);
+    return { payload, checksum: createHash("sha256").update(canonical, "utf8").digest("hex") };
   }
 }
