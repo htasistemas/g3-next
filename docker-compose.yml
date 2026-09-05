@@ -61,8 +61,8 @@ services:
       APP_STORAGE_SECRET_ACCESS_KEY: ${APP_STORAGE_SECRET_ACCESS_KEY:-g3nminio123}
       APP_STORAGE_REGION: ${APP_STORAGE_REGION:-us-east-1}
       APP_STORAGE_FORCE_PATH_STYLE: ${APP_STORAGE_FORCE_PATH_STYLE:-true}
-      APP_GOOGLE_CLIENT_ID: ${APP_GOOGLE_CLIENT_ID:-}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      APP_GOOGLE_CLIENT_ID: ${APP_GOOGLE_CLIENT_ID:-324955391921-cb42mh8f88pu7o0l1h4bl8sur5soh3vv.apps.googleusercontent.com}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-324955391921-cb42mh8f88pu7o0l1h4bl8sur5soh3vv.apps.googleusercontent.com}
       APP_GEMINI_API_KEY: ${APP_GEMINI_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GOOGLE_GEMINI_API_KEY: ${GOOGLE_GEMINI_API_KEY:-}
@@ -96,8 +96,8 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
       args:
-        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
-        GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-324955391921-cb42mh8f88pu7o0l1h4bl8sur5soh3vv.apps.googleusercontent.com}
+        GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-324955391921-cb42mh8f88pu7o0l1h4bl8sur5soh3vv.apps.googleusercontent.com}
         VITE_GOOGLE_ALLOWED_ORIGINS: ${VITE_GOOGLE_ALLOWED_ORIGINS:-}
         VITE_API_URL: ${VITE_API_URL:-}
     container_name: g3n-frontend
