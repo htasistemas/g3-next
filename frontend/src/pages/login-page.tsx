@@ -44,8 +44,8 @@ function normalizarValorAmbiente(valor: string | undefined) {
 }
 
 const GOOGLE_CLIENT_ID =
-  normalizarValorAmbiente(import.meta.env.VITE_GOOGLE_CLIENT_ID) ??
-  normalizarValorAmbiente(window.__env?.googleClientId);
+  normalizarValorAmbiente(window.__env?.googleClientId) ??
+  normalizarValorAmbiente(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 const GOOGLE_ALLOWED_ORIGINS =
   normalizarValorAmbiente(import.meta.env.VITE_GOOGLE_ALLOWED_ORIGINS) ??
   normalizarValorAmbiente(window.__env?.googleAllowedOrigins) ??

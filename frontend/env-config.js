@@ -10,6 +10,8 @@
   var googleClientId = "__ENV_GOOGLE_CLIENT_ID__";
   if (googleClientId && googleClientId !== "__ENV_GOOGLE_CLIENT_ID__") {
     window.__env.googleClientId = googleClientId;
+  } else {
+    window.__env.googleClientId = "324955391921-cb42mh8f88pu7o0l1h4bl8sur5soh3vv.apps.googleusercontent.com";
   }
 
   var googleAllowedOrigins = "__ENV_GOOGLE_ALLOWED_ORIGINS__";
