@@ -22,7 +22,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          APP_DIR="${DEPLOY_APP_DIR:-/home/srv/g3n}"
+          APP_DIR="${DEPLOY_APP_DIR:-/opt/torresoft/apps/g3n}"
 
           if [ ! -d "$APP_DIR" ]; then
             echo "::error::Diretorio do app nao encontrado: $APP_DIR"
