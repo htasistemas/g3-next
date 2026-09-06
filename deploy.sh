@@ -192,7 +192,9 @@ if ! run_backend_task npx prisma migrate deploy; then
     20260903_cipa_apuracao_live \
     20260904_cipa_public_identifier_global \
     20260905_cipa_participation_extension \
-    20260906_cipa_desempate_auditado; do
+    20260906_cipa_desempate_auditado \
+    20260907_integracao_mercado_pago_credencial_secundaria \
+    20260908_integracao_mercado_pago_global; do
     run_backend_task npx prisma db execute --schema prisma/schema.prisma --file "prisma/migrations/$migration/migration.sql"
   done
 fi
