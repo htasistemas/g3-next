@@ -248,7 +248,7 @@ const secoesManual: ManualSecao[] = [
           "Localize o beneficiário por nome, CPF ou código e selecione o cadastro com um clique.",
           "Escolha a especialidade, registre a evolução e use Salvar rascunho para continuar depois.",
           "Finalize somente quando o registro estiver conferido; alterações posteriores devem ser feitas por adendo.",
-          "A linha do tempo respeita sigilo e permissões. Conteúdos restritos não são exibidos para perfis sem autorização."
+          "A linha do tempo respeita sigilo e permissões. Clique em um atendimento para consultar os dados completos; registros finalizados ficam somente para visualização e podem ser impressos no padrão de relatório do G3N."
         ],
         atencoes: ["Os atendimentos são persistidos no PostgreSQL, vinculados ao tenant e auditados por ação."]
       },
@@ -444,7 +444,7 @@ const secoesManual: ManualSecao[] = [
           "O botão Aguardando cestas concentra famílias e beneficiários com necessidade urgente de alimentos para apoiar priorização operacional.",
           "O botão Cestas entregues mostra cada entrega individualmente no mapa, identificando o beneficiário ou a família que recebeu o benefício.",
           "O botão Mapa de apoio e risco cruza violência, cestas entregues, instituições e doadores em pontos individuais para permitir abertura de cada registro.",
-          "A visualização do mapa passou a usar uma base gratuita CARTO Voyager com Leaflet, sem depender de chave ou faturamento.",
+          "A visualização do mapa usa a base Google Maps; configure a chave pública restrita por domínio e o faturamento no projeto Google responsável pela integração.",
           "A abertura da tela foi compatibilizada com runtimes React que ainda não expõem useEffectEvent, evitando erro de navegação ao entrar no georreferenciamento."
         ],
         atencoes: [

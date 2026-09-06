@@ -39,7 +39,7 @@ const estruturaSql = [
     FROM (
       SELECT tenant_id
       FROM instituicoes
-      ORDER BY criado_em ASC
+      ORDER BY id ASC
       LIMIT 1
     ) ref
     WHERE parametros_sistema.tenant_id IS NULL
@@ -202,7 +202,10 @@ export async function ensureParametrosSistemaEstrutura() {
       for (const comando of estruturaSql) {
         await prisma.$executeRawUnsafe(comando);
       }
-    })();
+    })().catch((error) => {
+      estruturaPromise = null;
+      throw error;
+    });
   }
 
   await estruturaPromise;

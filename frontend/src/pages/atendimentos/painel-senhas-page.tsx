@@ -43,17 +43,17 @@ const NoticiasTicker = memo(function NoticiasTicker({
   const duracao = `${Math.max(18, Number(velocidadeTicker || 60) / 1.35)}s`;
 
   return (
-    <section className="overflow-hidden rounded-[24px] border border-white/20 bg-black/20 shadow-[0_18px_50px_rgba(0,0,0,0.18)]">
+    <section className="overflow-hidden rounded-[24px] border border-[var(--g3-border)] bg-[var(--g3-card-soft)] shadow-[0_18px_50px_rgba(0,0,0,0.18)]">
       <div className="relative overflow-hidden py-4">
         <div
-          className="flex min-w-max items-center gap-10 whitespace-nowrap pr-10 text-sm font-semibold tracking-[0.01em] text-emerald-50 will-change-transform [animation-iteration-count:infinite] [animation-name:marquee] [animation-timing-function:linear] sm:text-base lg:text-lg"
+          className="flex min-w-max items-center gap-10 whitespace-nowrap pr-10 text-sm font-semibold tracking-[0.01em] text-[var(--g3-foreground)] will-change-transform [animation-iteration-count:infinite] [animation-name:marquee] [animation-timing-function:linear] sm:text-base lg:text-lg"
           style={{
             animationDuration: duracao
           }}
         >
           {itensTicker.map((item, index) => (
             <span key={`${item}-${index}`} className="inline-flex items-center gap-3">
-              <span className="h-2.5 w-2.5 rounded-full bg-emerald-300 shadow-[0_0_16px_rgba(110,231,183,0.85)]" />
+              <span className="h-2.5 w-2.5 rounded-full bg-[var(--g3-primary)] shadow-[0_0_16px_var(--g3-primary)]" />
               {item}
             </span>
           ))}
@@ -309,16 +309,16 @@ export function PainelSenhasPage() {
   }, [senhaAtualQuery.refetch]);
 
   return (
-    <main className="h-[100dvh] overflow-hidden bg-[radial-gradient(circle_at_top,#1f8f66_0%,#0f5a43_30%,#072c21_100%)] px-3 py-2 text-white sm:px-4 lg:px-6">
+    <main className="h-[100dvh] overflow-hidden bg-[var(--g3-background)] px-3 py-2 text-[var(--g3-foreground)] sm:px-4 lg:px-6">
       <div className="mx-auto flex h-full w-full max-w-[1600px] flex-col gap-3">
-        <header className="rounded-[28px] border border-white/20 bg-white/10 px-4 py-3 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur sm:px-6">
+        <header className="rounded-[28px] border border-[var(--g3-border)] bg-[var(--g3-card)] px-4 py-3 shadow-[0_18px_60px_rgba(0,0,0,0.12)] sm:px-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0 text-center lg:text-left">
-              <p className="text-xs uppercase tracking-[0.24em] text-white/70">Sistema G3</p>
-              <h1 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl lg:text-4xl">
+              <p className="text-xs uppercase tracking-[0.24em] text-[var(--g3-muted)]">Sistema G3</p>
+              <h1 className="mt-2 text-2xl font-black tracking-tight text-[var(--g3-foreground)] sm:text-3xl lg:text-4xl">
                 {configQuery.data?.tituloTela ?? "Painel de senhas"}
               </h1>
-              <p className="mt-2 text-sm text-white/80 sm:text-base">
+              <p className="mt-2 text-sm text-[var(--g3-muted)] sm:text-base">
                 {configQuery.data?.descricaoTela ?? "Controle de atendimento"}
               </p>
             </div>
@@ -334,15 +334,15 @@ export function PainelSenhasPage() {
             ) : null}
 
             <div className="grid gap-3 text-center sm:grid-cols-2 lg:min-w-[360px] lg:text-right">
-              <div className="rounded-2xl border border-white/15 bg-white/8 px-4 py-3">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-white/65">Atualizado em</p>
-                <p className="mt-1 text-base font-semibold sm:text-lg">
+              <div className="rounded-2xl border border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--g3-muted)]">Atualizado em</p>
+                <p className="mt-1 text-base font-semibold text-[var(--g3-foreground)] sm:text-lg">
                   {agora.toLocaleDateString("pt-BR")}
                 </p>
               </div>
-              <div className="rounded-2xl border border-white/15 bg-white/8 px-4 py-3">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-white/65">Horário</p>
-                <p className="mt-1 text-base font-semibold sm:text-lg">
+              <div className="rounded-2xl border border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--g3-muted)]">Horário</p>
+                <p className="mt-1 text-base font-semibold text-[var(--g3-foreground)] sm:text-lg">
                   {agora.toLocaleTimeString("pt-BR")}
                 </p>
               </div>
@@ -351,35 +351,35 @@ export function PainelSenhasPage() {
         </header>
 
         <section className="grid flex-1 min-h-0 gap-3 xl:grid-cols-[minmax(0,2.45fr)_380px]">
-          <article className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden rounded-[34px] border border-white/20 bg-[linear-gradient(155deg,rgba(255,255,255,0.20),rgba(255,255,255,0.07))] px-5 py-6 text-center shadow-[0_30px_90px_rgba(0,0,0,0.28)] backdrop-blur sm:px-8 lg:px-10">
-            <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-emerald-200 via-emerald-400 to-teal-200" />
-            <span className="rounded-full border border-white/20 bg-white/12 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/75">
+          <article className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden rounded-[34px] border border-[var(--g3-border)] bg-[var(--g3-card)] px-5 py-6 text-center shadow-[0_30px_90px_rgba(0,0,0,0.14)] sm:px-8 lg:px-10">
+            <div className="absolute inset-x-0 top-0 h-1.5 bg-[var(--g3-primary)]" />
+            <span className="rounded-full border border-[var(--g3-border)] bg-[var(--g3-primary-soft)] px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--g3-active)]">
               Chamada atual
             </span>
 
             {chamadaAtual ? (
               <div className="mt-8 flex w-full max-w-5xl flex-col items-center">
-                <p className="max-w-5xl text-5xl font-black leading-[0.95] tracking-tight text-white drop-shadow-[0_10px_30px_rgba(0,0,0,0.35)] sm:text-6xl lg:text-7xl xl:text-[6.5rem]">
+                <p className="max-w-5xl text-5xl font-black leading-[0.95] tracking-tight text-[var(--g3-foreground)] sm:text-6xl lg:text-7xl xl:text-[6.5rem]">
                   {chamadaAtual.nomeBeneficiario}
                 </p>
-                <p className="mt-6 rounded-full bg-amber-300/16 px-6 py-3 text-2xl font-black text-amber-100 sm:text-3xl lg:text-5xl xl:text-6xl">
+                <p className="mt-6 rounded-full bg-[var(--g3-primary-soft)] px-6 py-3 text-2xl font-black text-[var(--g3-active)] sm:text-3xl lg:text-5xl xl:text-6xl">
                   Dirija-se a {chamadaAtual.localAtendimento}
                 </p>
                 <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-                  <span className="rounded-full border border-emerald-200/25 bg-emerald-300/15 px-4 py-2 text-sm font-medium text-emerald-50">
+                  <span className="rounded-full border border-[var(--g3-border)] bg-[var(--g3-primary-soft)] px-4 py-2 text-sm font-medium text-[var(--g3-active)]">
                     {new Date(chamadaAtual.dataHoraChamada).toLocaleString("pt-BR")}
                   </span>
-                  <span className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white/80">
+                  <span className="rounded-full border border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-4 py-2 text-sm font-medium text-[var(--g3-muted)]">
                     Atualização automática a cada 4 segundos
                   </span>
                 </div>
               </div>
             ) : (
               <div className="mt-8 flex flex-col items-center">
-                <p className="text-2xl font-bold text-white/90 sm:text-3xl lg:text-4xl">
+                <p className="text-2xl font-bold text-[var(--g3-foreground)] sm:text-3xl lg:text-4xl">
                   Aguardando chamada
                 </p>
-                <p className="mt-3 max-w-xl text-sm text-white/70 sm:text-base">
+                <p className="mt-3 max-w-xl text-sm text-[var(--g3-muted)] sm:text-base">
                   Assim que uma senha for chamada, o nome do beneficiário aparecerá centralizado
                   neste painel e será anunciado em voz alta.
                 </p>
@@ -388,15 +388,15 @@ export function PainelSenhasPage() {
           </article>
 
           <div className="flex min-h-0 flex-col gap-3">
-            <article className="flex min-h-0 flex-1 flex-col rounded-[30px] border border-white/20 bg-black/20 p-4 shadow-[0_22px_70px_rgba(0,0,0,0.22)] backdrop-blur sm:p-5">
+            <article className="flex min-h-0 flex-1 flex-col rounded-[30px] border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-4 shadow-[0_22px_70px_rgba(0,0,0,0.12)] sm:p-5">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-white/60">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--g3-muted)]">
                     Acompanhamento
                   </p>
-                  <h2 className="mt-1 text-xl font-bold text-white">Últimas chamadas</h2>
+                  <h2 className="mt-1 text-xl font-bold text-[var(--g3-foreground)]">Últimas chamadas</h2>
                 </div>
-                <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium text-white/75">
+                <span className="rounded-full border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-1 text-xs font-medium text-[var(--g3-muted)]">
                   {chamadas.length} registro(s)
                 </span>
               </div>
@@ -405,18 +405,18 @@ export function PainelSenhasPage() {
                 {chamadas.slice(0, limite).map((item, index) => (
                   <li
                     key={item.id}
-                    className="rounded-2xl border border-white/15 bg-white/7 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                    className="rounded-2xl border border-[var(--g3-border)] bg-[var(--g3-card)] px-4 py-3 shadow-sm"
                   >
                     <div className="flex items-start gap-3">
-                      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-300/20 text-sm font-bold text-emerald-100">
+                      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--g3-primary-soft)] text-sm font-bold text-[var(--g3-active)]">
                         {index + 1}
                       </span>
                       <div className="min-w-0">
-                        <p className="truncate text-base font-semibold text-white">
+                        <p className="truncate text-base font-semibold text-[var(--g3-foreground)]">
                           {item.nomeBeneficiario}
                         </p>
-                        <p className="text-sm text-emerald-100">{item.localAtendimento}</p>
-                        <p className="mt-1 text-xs text-white/55">
+                        <p className="text-sm text-[var(--g3-active)]">{item.localAtendimento}</p>
+                        <p className="mt-1 text-xs text-[var(--g3-muted)]">
                           {new Date(item.dataHoraChamada).toLocaleString("pt-BR")}
                         </p>
                       </div>
@@ -424,7 +424,7 @@ export function PainelSenhasPage() {
                   </li>
                 ))}
                 {!chamadas.length ? (
-                  <li className="rounded-2xl border border-dashed border-white/20 bg-white/5 px-4 py-6 text-center text-sm text-white/70">
+                  <li className="rounded-2xl border border-dashed border-[var(--g3-border)] bg-[var(--g3-card)] px-4 py-6 text-center text-sm text-[var(--g3-muted)]">
                     Sem chamadas recentes.
                   </li>
                 ) : null}

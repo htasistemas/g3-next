@@ -270,9 +270,9 @@ function GoogleGeoMap({
   return (
     <MapContainer center={center} zoom={zoom} className="h-full w-full" zoomControl attributionControl>
       <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
-        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-        subdomains={["a", "b", "c", "d"]}
+        attribution='&copy; Google Maps'
+        url="https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
+        subdomains={["0", "1", "2", "3"]}
       />
       <Observer center={center} zoom={zoom} onReady={onReady} onViewportChange={onViewportChange} />
       <ClickCapture modoMarcacao={modoMarcacao} onPick={onPick} />
@@ -652,8 +652,8 @@ export function VulnerabilidadePage() {
         </div>
 
         <div className="absolute bottom-6 left-6 z-30 max-w-sm rounded-2xl border border-white/60 bg-white/95 px-4 py-3 shadow-xl backdrop-blur-md">
-          <p className="text-xs font-semibold text-slate-900">Mapa gratuito ativo</p>
-          <p className="mt-1 text-xs text-slate-600">A tela usa base CARTO Voyager com Leaflet, sem depender de chave ou faturamento.</p>
+          <p className="text-xs font-semibold text-slate-900">Mapa Google ativo</p>
+          <p className="mt-1 text-xs text-slate-600">A visualização utiliza a base de mapas do Google. Consulte a configuração de faturamento e limites da sua conta Google Maps.</p>
         </div>
 
         {/* CARD DE DETALHES FLUTUANTE NO CANTO INFERIOR DIREITO */}

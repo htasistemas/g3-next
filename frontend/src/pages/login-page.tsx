@@ -796,7 +796,7 @@ export function LoginPage() {
                       </>
                     ) : (
                       <p className="mt-1 text-sm text-slate-600">
-                        Informe o CNPJ para localizar o ambiente correto.
+                        Informe o e-mail vinculado ao CNPJ para localizar o ambiente correto.
                       </p>
                     )}
                   </div>

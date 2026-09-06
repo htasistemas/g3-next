@@ -116,9 +116,9 @@ function renderResumoSecao(resumo?: PowerBiValorNomeado[]) {
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
       {resumo.map((item) => (
-        <Card key={item.nome} className="border-emerald-200/60 bg-gradient-to-br from-white via-emerald-50 to-cyan-50 shadow-sm">
+        <Card key={item.nome} className="border-[var(--g3-border)] bg-[var(--g3-dashboard-card-soft)] shadow-sm">
           <CardContent className="space-y-2 p-4 text-center">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700/80">{item.nome}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--g3-active)]">{item.nome}</p>
             <p className="text-2xl font-semibold text-slate-950">{formatarValorResumo(item.valor)}</p>
             {item.descricao ? <p className="text-xs text-slate-500">{item.descricao}</p> : null}
           </CardContent>
@@ -334,20 +334,20 @@ export function PowerBiPage() {
   return (
     <>
       <main ref={painelRef} className={classesTelaPadraoBeneficiario.container} data-power-bi-root="true">
-        <section className="overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-700 p-5 text-white shadow-[0_32px_80px_-42px_rgba(15,118,110,0.9)]">
+        <section className="overflow-hidden rounded-[28px] border border-[var(--g3-border)] bg-[var(--g3-dashboard-card)] p-5 text-[var(--g3-foreground)] shadow-[0_24px_60px_-42px_rgba(15,23,42,0.45)]">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
             <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[var(--g3-border)] bg-[var(--g3-primary-soft)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--g3-active)]">
                 <ChartColumn className="h-3.5 w-3.5" />
                 Dashboard
               </div>
               <div className="space-y-2">
                 <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Power BI</h1>
-                <p className="max-w-3xl text-sm text-white/85 sm:text-base">
+                <p className="max-w-3xl text-sm text-[var(--g3-muted)] sm:text-base">
                   Painel analítico e gerencial da assistência social voltada ao terceiro setor.
                 </p>
               </div>
-              <p className="text-xs text-white/75">
+              <p className="text-xs text-[var(--g3-muted)]">
                 Última atualização: {data ? formatarDataHora(data.atualizadoEm) : "carregando..."}
               </p>
             </div>
@@ -355,7 +355,7 @@ export function PowerBiPage() {
               <Button
                 type="button"
                 size="sm"
-                className="justify-start bg-white text-emerald-800 hover:bg-emerald-50"
+                className="justify-start bg-[var(--g3-primary)] text-white hover:bg-[var(--g3-active)]"
                 onClick={() => void refetch()}
                 disabled={isFetching}
               >
@@ -366,7 +366,7 @@ export function PowerBiPage() {
                 type="button"
                 size="sm"
                 variant="outline"
-                className="justify-start border-white/30 bg-white/10 text-white hover:bg-white/20"
+                className="justify-start border-[var(--g3-border)] bg-[var(--g3-card)] text-[var(--g3-foreground)] hover:bg-[var(--g3-primary-soft)]"
                 onClick={exportarPdf}
               >
                 <Download className="mr-1.5 h-3.5 w-3.5" />
@@ -376,7 +376,7 @@ export function PowerBiPage() {
                 type="button"
                 size="sm"
                 variant="outline"
-                className="justify-start border-white/30 bg-white/10 text-white hover:bg-white/20"
+                className="justify-start border-[var(--g3-border)] bg-[var(--g3-card)] text-[var(--g3-foreground)] hover:bg-[var(--g3-primary-soft)]"
                 onClick={exportarAbaAtualExcel}
               >
                 <Download className="mr-1.5 h-3.5 w-3.5" />
@@ -386,7 +386,7 @@ export function PowerBiPage() {
                 type="button"
                 size="sm"
                 variant="outline"
-                className="justify-start border-white/30 bg-white/10 text-white hover:bg-white/20"
+                className="justify-start border-[var(--g3-border)] bg-[var(--g3-card)] text-[var(--g3-foreground)] hover:bg-[var(--g3-primary-soft)]"
                 onClick={() => void alternarTelaCheia()}
               >
                 <Maximize2 className="mr-1.5 h-3.5 w-3.5" />
@@ -396,7 +396,7 @@ export function PowerBiPage() {
                 type="button"
                 size="sm"
                 variant="outline"
-                className="justify-start border-white/30 bg-white/10 text-white hover:bg-white/20"
+                className="justify-start border-[var(--g3-border)] bg-[var(--g3-card)] text-[var(--g3-foreground)] hover:bg-[var(--g3-primary-soft)]"
                 onClick={() => {
                   setMostrarFiltros((atual) => !atual);
                   filtrosRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });

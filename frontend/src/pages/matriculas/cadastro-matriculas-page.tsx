@@ -3163,6 +3163,15 @@ export function CadastroMatriculasPage() {
                       {errors.duracao_horas && <p className="text-xs text-rose-600">{errors.duracao_horas.message}</p>}
                     </div>
                     {ehTipoAtendimento && (
+                      <div className="space-y-1">
+                        <Label htmlFor="horario_final_atendimento">Horário final *</Label>
+                        <Input id="horario_final_atendimento" type="time" {...register("horario_final_atendimento")} />
+                        {errors.horario_final_atendimento && (
+                          <p className="text-xs text-rose-600">{errors.horario_final_atendimento.message}</p>
+                        )}
+                      </div>
+                    )}
+                    {ehTipoAtendimento && (
                       <div className="space-y-2 rounded-lg border border-sky-200 bg-sky-50/70 p-3 xl:col-span-4">
                         <div>
                           <div>
@@ -3183,13 +3192,6 @@ export function CadastroMatriculasPage() {
                           </label>
                         </div>
                         {controleHorarioAtendimento ? <p className="text-xs font-medium text-emerald-800">As vagas totais serão calculadas automaticamente a partir do horário inicial, final e duração.</p> : <p className="text-xs font-medium text-slate-700">Informe manualmente a quantidade de vagas totais e disponíveis abaixo.</p>}
-                        <div className="space-y-1">
-                          <Label htmlFor="horario_final_atendimento">Horário final *</Label>
-                          <Input id="horario_final_atendimento" type="time" {...register("horario_final_atendimento")} />
-                          {errors.horario_final_atendimento && (
-                            <p className="text-xs text-rose-600">{errors.horario_final_atendimento.message}</p>
-                          )}
-                        </div>
                         <div className="rounded-md border border-sky-200 bg-white px-3 py-2 text-xs text-sky-900">
                           {horariosAtendimento.length > 0 ? (
                             <>
@@ -3588,7 +3590,7 @@ export function CadastroMatriculasPage() {
                                   <span
                                     className={`rounded-full border px-2 py-1 text-[11px] font-semibold shadow-md ring-1 ring-black/10 ${
                                       possuiVagas
-                                        ? "border-emerald-200 bg-emerald-100/95 text-emerald-700"
+                                        ? "border-[var(--g3-primary)] bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"
                                         : "border-rose-200 bg-rose-100/95 text-rose-700"
                                     }`}
                                   >
@@ -3598,7 +3600,7 @@ export function CadastroMatriculasPage() {
                                     className={`rounded-full border px-2 py-1 text-[11px] font-semibold shadow-md ring-1 ring-black/10 ${
                                       faseAtendimento === "Triagem"
                                         ? "border-amber-200 bg-amber-100/95 text-amber-700"
-                                        : "border-sky-200 bg-sky-100/95 text-sky-700"
+                                        : "border-[var(--g3-border)] bg-[var(--g3-card-soft)] text-[var(--g3-active)]"
                                     }`}
                                   >
                                     {faseAtendimento}
@@ -3612,18 +3614,18 @@ export function CadastroMatriculasPage() {
                             </div>
 
                             <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                              <div className="rounded-md border border-emerald-200 bg-gradient-to-br from-emerald-50 via-green-50 to-emerald-100/70 p-2 shadow-sm">
-                                <p className="text-[11px] font-medium text-emerald-800/80">Vagas</p>
+                              <div className="rounded-md border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-2 shadow-sm">
+                                <p className="text-[11px] font-medium text-[var(--g3-muted)]">Vagas</p>
                                 <p className="font-semibold text-[var(--g3-foreground)]">
                                   {vagasDisponiveis}/{vagasTotais}
                                 </p>
                               </div>
-                              <div className="rounded-md border border-emerald-200 bg-gradient-to-br from-emerald-50 via-green-50 to-emerald-100/70 p-2 shadow-sm">
-                                <p className="text-[11px] font-medium text-emerald-800/80">Inscritos</p>
+                              <div className="rounded-md border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-2 shadow-sm">
+                                <p className="text-[11px] font-medium text-[var(--g3-muted)]">Inscritos</p>
                                 <p className="font-semibold text-[var(--g3-foreground)]">{item.total_matriculas ?? 0}</p>
                               </div>
-                              <div className="rounded-md border border-emerald-200 bg-gradient-to-br from-emerald-50 via-green-50 to-emerald-100/70 p-2 shadow-sm">
-                                <p className="text-[11px] font-medium text-emerald-800/80">Fila</p>
+                              <div className="rounded-md border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-2 shadow-sm">
+                                <p className="text-[11px] font-medium text-[var(--g3-muted)]">Fila</p>
                                 <p className="font-semibold text-[var(--g3-foreground)]">{item.total_fila_espera ?? 0}</p>
                               </div>
                             </div>
@@ -3772,7 +3774,7 @@ export function CadastroMatriculasPage() {
                   </div>
 
                   <div className="space-y-3">
-                    <div className="rounded-lg border border-emerald-900/70 bg-emerald-800 px-3 py-2 shadow-sm">
+                    <div className="rounded-lg border border-[var(--g3-primary)] bg-[var(--g3-primary)] px-3 py-2 shadow-sm">
                       <p className="text-sm font-semibold text-white">Inscrição</p>
                     </div>
                     <div className="rounded-lg border border-[var(--g3-border)] p-3">
