@@ -48,6 +48,36 @@ const abas = [
 
 type AbaId = (typeof abas)[number]["id"];
 
+const tiposIntegracaoTela = [
+  "CONSULTA_CEP",
+  "VALIDACAO_ENDERECO",
+  "MAPAS_GEOLOCALIZACAO",
+  "WHATSAPP",
+  "EMAIL",
+  "OCR",
+  "ARMAZENAMENTO_DOCUMENTOS",
+  "ASSINATURA_ELETRONICA",
+  "INTELIGENCIA_ARTIFICIAL",
+  "BIOMETRIA",
+  "ANTIVIRUS",
+  "NOTIFICACOES",
+  "MERCADO_PAGO",
+  "OUTROS_PROVEDORES"
+] as const;
+
+function criarIntegracoesPadraoTela(): IntegracaoApiSettings[] {
+  return tiposIntegracaoTela.map((tipo) => ({
+    tipo,
+    ativo: false,
+    fornecedor: "",
+    ambiente: "HOMOLOGACAO",
+    url_base: tipo === "MERCADO_PAGO" ? "https://api.mercadopago.com" : "",
+    timeout_ms: 5000,
+    tentativas: 1,
+    observacao: ""
+  }));
+}
+
 const camposCor = [
   { key: "corPrimaria", label: "Cor principal" },
   { key: "corSecundaria", label: "Cor secundária" },
@@ -166,10 +196,14 @@ export function ParametrosSistemaPage() {
         setAlertasCentralSalvos(alertasCentral);
         setConfiguracaoCadastroDraft(configuracaoCadastro);
         setConfiguracaoCadastroSalva(configuracaoCadastro);
-        setIntegracoes(integracoesData.integracoes);
-        setIntegracaoAtiva(integracoesData.integracoes[0]?.tipo ?? "CONSULTA_CEP");
+        const listaIntegracoes = integracoesData.integracoes.length ? integracoesData.integracoes : criarIntegracoesPadraoTela();
+        setIntegracoes(listaIntegracoes);
+        setIntegracaoAtiva(listaIntegracoes.some((item) => item.tipo === "MERCADO_PAGO") ? "MERCADO_PAGO" : listaIntegracoes[0]?.tipo ?? "CONSULTA_CEP");
       } catch (error: any) {
         if (!ativo) return;
+        const listaIntegracoes = criarIntegracoesPadraoTela();
+        setIntegracoes(listaIntegracoes);
+        setIntegracaoAtiva("MERCADO_PAGO");
         setMensagem({
           tipo: "erro",
           texto: error?.response?.data?.message ?? "Não foi possível carregar os parâmetros do sistema."
@@ -797,7 +831,7 @@ export function ParametrosSistemaPage() {
                 </div>
                 <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
                   <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
-                    {integracoes.map((item) => (
+                    {integracoes.length ? integracoes.map((item) => (
                       <button
                         key={item.tipo}
                         type="button"
@@ -806,7 +840,7 @@ export function ParametrosSistemaPage() {
                       >
                         <span className="min-w-0">{item.tipo.replaceAll("_", " ").toLowerCase()}</span>
                       </button>
-                    ))}
+                    )) : <p className="p-2 text-xs text-slate-500">Nenhuma integração disponível.</p>}
                   </div>
                   {integracaoSelecionada ? (
                     <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 md:grid-cols-2">
