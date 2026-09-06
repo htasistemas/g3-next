@@ -90,6 +90,23 @@ const tiposIntegracaoPadrao = [
   "OUTROS_PROVEDORES"
 ] as const;
 
+let integracaoEstruturaPromise: Promise<void> | undefined;
+
+async function garantirColunasIntegracaoMercadoPago() {
+  if (!integracaoEstruturaPromise) {
+    integracaoEstruturaPromise = prisma.$executeRaw(Prisma.sql`
+      ALTER TABLE integracao_configuracao
+        ADD COLUMN IF NOT EXISTS credencial_secundaria_mascarada VARCHAR(120),
+        ADD COLUMN IF NOT EXISTS credencial_secundaria_criptografada TEXT,
+        ADD COLUMN IF NOT EXISTS webhook_url TEXT
+    `).then(() => undefined).catch((error) => {
+      integracaoEstruturaPromise = undefined;
+      throw error;
+    });
+  }
+  await integracaoEstruturaPromise;
+}
+
 const configuracaoCadastroBeneficiarioPadrao = {
   prazo_revisao_dias: 365,
   permitir_sem_cpf: true,
@@ -486,6 +503,7 @@ export class ParametrosSistemaService {
   }
 
   async listarIntegracoes(tenantId?: string) {
+    await garantirColunasIntegracaoMercadoPago();
     const tenant = parseTenantId(tenantId);
     const rows = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
       SELECT tipo, ativo, fornecedor, ambiente, url_base, timeout_ms, tentativas,
@@ -523,6 +541,7 @@ export class ParametrosSistemaService {
   }
 
   async salvarIntegracao(rawPayload: unknown, usuarioId: string | undefined, tenantId: string) {
+    await garantirColunasIntegracaoMercadoPago();
     const tenant = parseTenantId(tenantId);
     const payload = (rawPayload && typeof rawPayload === "object" ? rawPayload : {}) as Record<string, unknown>;
     const tipo = normalizarTipoIntegracao(payload.tipo);
@@ -566,6 +585,7 @@ export class ParametrosSistemaService {
   }
 
   async testarIntegracao(rawPayload: unknown, usuarioId: string | undefined, tenantId: string) {
+    await garantirColunasIntegracaoMercadoPago();
     const tenant = parseTenantId(tenantId);
     const payload = (rawPayload && typeof rawPayload === "object" ? rawPayload : {}) as Record<string, unknown>;
     const tipo = normalizarTipoIntegracao(payload.tipo);
