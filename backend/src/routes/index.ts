@@ -11,7 +11,7 @@ import {
 } from "../modules/auth/middlewares/auth.middleware.js";
 import { reportsRoutes } from "../modules/reports/routes/reports.routes.js";
 import { unidadeAssistencialRoutes } from "../modules/unidades-assistenciais/routes/unidade-assistencial.routes.js";
-import { parametrosSistemaRoutes } from "../modules/configuracoes-gerais/routes/parametros-sistema.routes.js";
+import { parametrosSistemaMasterRoutes, parametrosSistemaRoutes } from "../modules/configuracoes-gerais/routes/parametros-sistema.routes.js";
 import { dashboardRoutes } from "../modules/dashboard/routes/dashboard.routes.js";
 import { profissionalRoutes } from "../modules/profissionais/routes/profissional.routes.js";
 import { voluntarioRoutes } from "../modules/voluntarios/routes/voluntario.routes.js";
@@ -92,6 +92,7 @@ appRoutes.get("/health", (_request, response) => {
 appRoutes.use("/api/auth", authRoutes);
 appRoutes.use("/api", ensurePlanoAcessoPorRota);
 appRoutes.use("/api/master/instituicoes", ensureAuthenticated, ensureSuperadmin, instituicoesRoutes);
+appRoutes.use("/api/master/integracoes", parametrosSistemaMasterRoutes);
 appRoutes.use("/api/master/importacao-dados", importacaoDadosRoutes);
 appRoutes.use("/api/ai", ensureAuthenticated, aiRoutes);
 appRoutes.use("/api/semente", ensureAuthenticated, sementeRoutes);

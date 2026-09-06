@@ -122,4 +122,20 @@ export class ParametrosSistemaController {
     );
     return response.json(resultado);
   }
+
+  async listarIntegracaoMercadoPagoGlobal(request: AuthenticatedRequest, response: Response) {
+    return response.json(await service.listarIntegracaoMercadoPagoGlobal());
+  }
+
+  async salvarIntegracaoMercadoPagoGlobal(request: AuthenticatedRequest, response: Response) {
+    return response.json(await service.salvarIntegracaoMercadoPagoGlobal(request.body, request.authUser?.id));
+  }
+
+  async listarIntegracoesGlobais(_request: AuthenticatedRequest, response: Response) {
+    return response.json(await service.listarIntegracoesGlobais());
+  }
+
+  async salvarIntegracaoGlobal(request: AuthenticatedRequest, response: Response) {
+    return response.json(await service.salvarIntegracaoGlobal(request.body, request.authUser?.id));
+  }
 }

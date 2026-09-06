@@ -116,6 +116,8 @@ export type IntegracaoApiSettings = {
   credencial_secundaria?: string;
   credencial_secundaria_mascarada?: string;
   webhook_url?: string;
+  escopo?: "TODOS" | "SELECIONADOS" | "NENHUM";
+  clientes_tenant_ids?: string[];
   limite_uso?: number;
   observacao?: string;
   ultima_tentativa_em?: string;
@@ -394,6 +396,31 @@ export const parametrosSistemaService = {
       "/api/configuracoes/parametros/integracoes/testar",
       { tipo }
     );
+    return data;
+  },
+
+  async listarIntegracaoMercadoPagoGlobal(): Promise<{ tipos: string[]; integracoes: IntegracaoApiSettings[] }> {
+    const { data } = await httpClient.get<{ tipos: string[]; integracoes: IntegracaoApiSettings[] }>(
+      "/api/master/integracoes/mercado-pago"
+    );
+    return data;
+  },
+
+  async salvarIntegracaoMercadoPagoGlobal(settings: IntegracaoApiSettings): Promise<{ tipos: string[]; integracoes: IntegracaoApiSettings[] }> {
+    const { data } = await httpClient.put<{ tipos: string[]; integracoes: IntegracaoApiSettings[] }>(
+      "/api/master/integracoes/mercado-pago",
+      settings
+    );
+    return data;
+  },
+
+  async listarIntegracoesGlobais(): Promise<{ tipos: string[]; integracoes: IntegracaoApiSettings[] }> {
+    const { data } = await httpClient.get<{ tipos: string[]; integracoes: IntegracaoApiSettings[] }>("/api/master/integracoes");
+    return data;
+  },
+
+  async salvarIntegracaoGlobal(settings: IntegracaoApiSettings): Promise<{ tipos: string[]; integracoes: IntegracaoApiSettings[] }> {
+    const { data } = await httpClient.put<{ tipos: string[]; integracoes: IntegracaoApiSettings[] }>("/api/master/integracoes", settings);
     return data;
   }
 };

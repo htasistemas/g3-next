@@ -17,8 +17,15 @@ export class MercadoPagoConfigRepository {
     const rows = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
       SELECT ativo, ambiente, url_base, timeout_ms, credencial_criptografada,
              credencial_secundaria_criptografada, webhook_url
-        FROM integracao_configuracao
-       WHERE tenant_id::text = ${tenantId.trim()} AND tipo = 'MERCADO_PAGO'
+        FROM integracao_configuracao_global
+       WHERE tipo = 'MERCADO_PAGO'
+         AND (
+           COALESCE(escopo, 'TODOS') = 'TODOS'
+           OR (COALESCE(escopo, 'TODOS') = 'SELECIONADOS' AND EXISTS (
+             SELECT 1 FROM integracao_configuracao_clientes c
+              WHERE c.tipo = 'MERCADO_PAGO' AND c.tenant_id::text = ${tenantId.trim()} AND c.habilitada = TRUE
+           ))
+         )
        LIMIT 1
     `);
     const row = rows[0];

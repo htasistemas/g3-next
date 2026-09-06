@@ -540,11 +540,156 @@ export class ParametrosSistemaService {
     };
   }
 
+  async listarIntegracaoMercadoPagoGlobal() {
+    const rows = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      SELECT tipo, ativo, fornecedor, ambiente, url_base, timeout_ms, tentativas,
+             credencial_mascarada, credencial_secundaria_mascarada, webhook_url, limite_uso, observacao,
+             escopo, atualizado_em
+        FROM integracao_configuracao_global
+       WHERE tipo = 'MERCADO_PAGO'
+       LIMIT 1
+    `);
+    const row = rows[0];
+    const clientes = await prisma.$queryRaw<Array<{ tenant_id: string }>>(Prisma.sql`
+      SELECT tenant_id::text
+        FROM integracao_configuracao_clientes
+       WHERE tipo = 'MERCADO_PAGO' AND habilitada = TRUE
+       ORDER BY tenant_id::text
+    `);
+    return {
+      tipos: ["MERCADO_PAGO"],
+      integracoes: [{
+        tipo: "MERCADO_PAGO",
+        ativo: Boolean(row?.ativo ?? false),
+        fornecedor: row?.fornecedor ? String(row.fornecedor) : "Mercado Pago",
+        ambiente: row?.ambiente ? String(row.ambiente) : "PRODUCAO",
+        url_base: row?.url_base ? String(row.url_base) : "https://api.mercadopago.com",
+        timeout_ms: Number(row?.timeout_ms ?? 15000),
+        tentativas: Number(row?.tentativas ?? 2),
+        credencial_mascarada: row?.credencial_mascarada ? String(row.credencial_mascarada) : undefined,
+        credencial_secundaria_mascarada: row?.credencial_secundaria_mascarada ? String(row.credencial_secundaria_mascarada) : undefined,
+        webhook_url: row?.webhook_url ? String(row.webhook_url) : undefined,
+        escopo: (row?.escopo ? String(row.escopo) : "TODOS") as "TODOS" | "SELECIONADOS" | "NENHUM",
+        clientes_tenant_ids: clientes.map((item) => item.tenant_id),
+        limite_uso: row?.limite_uso ? Number(row.limite_uso) : undefined,
+        observacao: row?.observacao ? String(row.observacao) : "Configuração global do G3N",
+        atualizado_em: row?.atualizado_em instanceof Date ? row.atualizado_em.toISOString() : undefined
+      }]
+    };
+  }
+
+  async salvarIntegracaoMercadoPagoGlobal(rawPayload: unknown, usuarioId: string | undefined) {
+    await garantirColunasIntegracaoMercadoPago();
+    const payload = (rawPayload && typeof rawPayload === "object" ? rawPayload : {}) as Record<string, unknown>;
+    const segredoCriptografado = criptografarSegredo(payload.credencial);
+    const segredoMascarado = mascararSegredo(payload.credencial);
+    const segredoSecundarioCriptografado = criptografarSegredo(payload.credencial_secundaria);
+    const segredoSecundarioMascarado = mascararSegredo(payload.credencial_secundaria);
+    const usuario = Number(usuarioId);
+    const escopo = ["TODOS", "SELECIONADOS", "NENHUM"].includes(String(payload.escopo)) ? String(payload.escopo) : "TODOS";
+    const clientesTenantIds = Array.isArray(payload.clientes_tenant_ids)
+      ? payload.clientes_tenant_ids.filter((item): item is string => typeof item === "string" && /^[0-9a-f-]{36}$/i.test(item))
+      : [];
+    await prisma.$executeRaw(Prisma.sql`
+      INSERT INTO integracao_configuracao_global (
+        tipo, ativo, fornecedor, ambiente, url_base, timeout_ms, tentativas,
+        credencial_mascarada, credencial_criptografada, credencial_secundaria_mascarada,
+        credencial_secundaria_criptografada, webhook_url, escopo, limite_uso, observacao, atualizado_por,
+        criado_em, atualizado_em
+      ) VALUES (
+        'MERCADO_PAGO', ${Boolean(payload.ativo)}, ${String(payload.fornecedor ?? "Mercado Pago").trim() || "Mercado Pago"},
+        ${String(payload.ambiente ?? "PRODUCAO").trim().toUpperCase()}, ${String(payload.url_base ?? "https://api.mercadopago.com").trim()},
+        ${Number(payload.timeout_ms ?? 15000)}, ${Number(payload.tentativas ?? 2)},
+        ${segredoMascarado ?? null}, ${segredoCriptografado}, ${segredoSecundarioMascarado ?? null}, ${segredoSecundarioCriptografado},
+        ${String(payload.webhook_url ?? "").trim() || null}, ${escopo}, ${payload.limite_uso ? Number(payload.limite_uso) : null},
+        ${String(payload.observacao ?? "Configuração global do G3N").trim() || null},
+        ${Number.isInteger(usuario) && usuario > 0 ? BigInt(usuario) : null}, NOW(), NOW()
+      )
+      ON CONFLICT (tipo) DO UPDATE SET
+        ativo = EXCLUDED.ativo, fornecedor = EXCLUDED.fornecedor, ambiente = EXCLUDED.ambiente,
+        url_base = EXCLUDED.url_base, timeout_ms = EXCLUDED.timeout_ms, tentativas = EXCLUDED.tentativas,
+        credencial_mascarada = COALESCE(EXCLUDED.credencial_mascarada, integracao_configuracao_global.credencial_mascarada),
+        credencial_criptografada = COALESCE(EXCLUDED.credencial_criptografada, integracao_configuracao_global.credencial_criptografada),
+        credencial_secundaria_mascarada = COALESCE(EXCLUDED.credencial_secundaria_mascarada, integracao_configuracao_global.credencial_secundaria_mascarada),
+        credencial_secundaria_criptografada = COALESCE(EXCLUDED.credencial_secundaria_criptografada, integracao_configuracao_global.credencial_secundaria_criptografada),
+        webhook_url = EXCLUDED.webhook_url, escopo = EXCLUDED.escopo, limite_uso = EXCLUDED.limite_uso, observacao = EXCLUDED.observacao,
+        atualizado_por = EXCLUDED.atualizado_por, atualizado_em = NOW()
+    `);
+    await prisma.$executeRaw(Prisma.sql`DELETE FROM integracao_configuracao_clientes WHERE tipo = 'MERCADO_PAGO'`);
+    if (escopo === "SELECIONADOS") {
+      for (const tenantId of clientesTenantIds) {
+        await prisma.$executeRaw(Prisma.sql`
+          INSERT INTO integracao_configuracao_clientes (tipo, tenant_id, habilitada, atualizado_por)
+          VALUES ('MERCADO_PAGO', ${tenantId}::uuid, TRUE, ${Number.isInteger(usuario) && usuario > 0 ? BigInt(usuario) : null})
+          ON CONFLICT (tipo, tenant_id) DO UPDATE SET habilitada = TRUE, atualizado_por = EXCLUDED.atualizado_por, atualizado_em = NOW()
+        `);
+      }
+    }
+    return this.listarIntegracaoMercadoPagoGlobal();
+  }
+
+  async listarIntegracoesGlobais() {
+    const rows = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      SELECT tipo, ativo, fornecedor, ambiente, url_base, timeout_ms, tentativas,
+             credencial_mascarada, credencial_secundaria_mascarada, webhook_url, escopo, limite_uso, observacao, atualizado_em
+        FROM integracao_configuracao_global
+       ORDER BY tipo ASC
+    `);
+    const clientes = await prisma.$queryRaw<Array<{ tipo: string; tenant_id: string }>>(Prisma.sql`
+      SELECT tipo, tenant_id::text FROM integracao_configuracao_clientes WHERE habilitada = TRUE ORDER BY tipo, tenant_id::text
+    `);
+    const porTipo = new Map(rows.map((row) => [String(row.tipo), row]));
+    return {
+      tipos: tiposIntegracaoPadrao,
+      integracoes: tiposIntegracaoPadrao.map((tipo) => {
+        const row = porTipo.get(tipo);
+        return {
+          tipo,
+          ativo: Boolean(row?.ativo ?? false),
+          fornecedor: row?.fornecedor ? String(row.fornecedor) : "",
+          ambiente: row?.ambiente ? String(row.ambiente) : "PRODUCAO",
+          url_base: row?.url_base ? String(row.url_base) : tipo === "MERCADO_PAGO" ? "https://api.mercadopago.com" : "",
+          timeout_ms: Number(row?.timeout_ms ?? 5000),
+          tentativas: Number(row?.tentativas ?? 1),
+          credencial_mascarada: row?.credencial_mascarada ? String(row.credencial_mascarada) : undefined,
+          credencial_secundaria_mascarada: row?.credencial_secundaria_mascarada ? String(row.credencial_secundaria_mascarada) : undefined,
+          webhook_url: row?.webhook_url ? String(row.webhook_url) : undefined,
+          escopo: (row?.escopo ? String(row.escopo) : "NENHUM") as "TODOS" | "SELECIONADOS" | "NENHUM",
+          clientes_tenant_ids: clientes.filter((item) => item.tipo === tipo).map((item) => item.tenant_id),
+          limite_uso: row?.limite_uso ? Number(row.limite_uso) : undefined,
+          observacao: row?.observacao ? String(row.observacao) : "",
+          atualizado_em: row?.atualizado_em instanceof Date ? row.atualizado_em.toISOString() : undefined
+        };
+      })
+    };
+  }
+
+  async salvarIntegracaoGlobal(rawPayload: unknown, usuarioId: string | undefined) {
+    await garantirColunasIntegracaoMercadoPago();
+    const payload = (rawPayload && typeof rawPayload === "object" ? rawPayload : {}) as Record<string, unknown>;
+    const tipo = normalizarTipoIntegracao(payload.tipo);
+    if (!tiposIntegracaoPadrao.includes(tipo as (typeof tiposIntegracaoPadrao)[number])) throw new AppError("Tipo de integração inválido.", 422);
+    const escopo = ["TODOS", "SELECIONADOS", "NENHUM"].includes(String(payload.escopo)) ? String(payload.escopo) : "NENHUM";
+    const ids = Array.isArray(payload.clientes_tenant_ids) ? payload.clientes_tenant_ids.filter((id): id is string => typeof id === "string" && /^[0-9a-f-]{36}$/i.test(id)) : [];
+    const usuario = Number(usuarioId);
+    await prisma.$executeRaw(Prisma.sql`
+      INSERT INTO integracao_configuracao_global (tipo, ativo, fornecedor, ambiente, url_base, timeout_ms, tentativas, credencial_mascarada, credencial_criptografada, credencial_secundaria_mascarada, credencial_secundaria_criptografada, webhook_url, escopo, limite_uso, observacao, atualizado_por)
+      VALUES (${tipo}, ${Boolean(payload.ativo)}, ${String(payload.fornecedor ?? "").trim() || null}, ${String(payload.ambiente ?? "PRODUCAO").trim().toUpperCase()}, ${String(payload.url_base ?? "").trim() || null}, ${Number(payload.timeout_ms ?? 5000)}, ${Number(payload.tentativas ?? 1)}, ${mascararSegredo(payload.credencial) ?? null}, ${criptografarSegredo(payload.credencial)}, ${mascararSegredo(payload.credencial_secundaria) ?? null}, ${criptografarSegredo(payload.credencial_secundaria)}, ${String(payload.webhook_url ?? "").trim() || null}, ${escopo}, ${payload.limite_uso ? Number(payload.limite_uso) : null}, ${String(payload.observacao ?? "").trim() || null}, ${Number.isInteger(usuario) && usuario > 0 ? BigInt(usuario) : null})
+      ON CONFLICT (tipo) DO UPDATE SET ativo = EXCLUDED.ativo, fornecedor = EXCLUDED.fornecedor, ambiente = EXCLUDED.ambiente, url_base = EXCLUDED.url_base, timeout_ms = EXCLUDED.timeout_ms, tentativas = EXCLUDED.tentativas, credencial_mascarada = COALESCE(EXCLUDED.credencial_mascarada, integracao_configuracao_global.credencial_mascarada), credencial_criptografada = COALESCE(EXCLUDED.credencial_criptografada, integracao_configuracao_global.credencial_criptografada), credencial_secundaria_mascarada = COALESCE(EXCLUDED.credencial_secundaria_mascarada, integracao_configuracao_global.credencial_secundaria_mascarada), credencial_secundaria_criptografada = COALESCE(EXCLUDED.credencial_secundaria_criptografada, integracao_configuracao_global.credencial_secundaria_criptografada), webhook_url = EXCLUDED.webhook_url, escopo = EXCLUDED.escopo, limite_uso = EXCLUDED.limite_uso, observacao = EXCLUDED.observacao, atualizado_por = EXCLUDED.atualizado_por, atualizado_em = NOW()
+    `);
+    await prisma.$executeRaw(Prisma.sql`DELETE FROM integracao_configuracao_clientes WHERE tipo = ${tipo}`);
+    if (escopo === "SELECIONADOS") for (const tenantId of ids) await prisma.$executeRaw(Prisma.sql`INSERT INTO integracao_configuracao_clientes (tipo, tenant_id, habilitada, atualizado_por) VALUES (${tipo}, ${tenantId}::uuid, TRUE, ${Number.isInteger(usuario) && usuario > 0 ? BigInt(usuario) : null}) ON CONFLICT (tipo, tenant_id) DO UPDATE SET habilitada = TRUE, atualizado_em = NOW()`);
+    return this.listarIntegracoesGlobais();
+  }
+
   async salvarIntegracao(rawPayload: unknown, usuarioId: string | undefined, tenantId: string) {
     await garantirColunasIntegracaoMercadoPago();
     const tenant = parseTenantId(tenantId);
     const payload = (rawPayload && typeof rawPayload === "object" ? rawPayload : {}) as Record<string, unknown>;
     const tipo = normalizarTipoIntegracao(payload.tipo);
+    if (tipo === "MERCADO_PAGO") {
+      throw new AppError("O Mercado Pago é uma integração global e só pode ser configurado pelo Painel master.", 403);
+    }
     const segredoCriptografado = criptografarSegredo(payload.credencial);
     const segredoMascarado = mascararSegredo(payload.credencial);
     const segredoSecundarioCriptografado = criptografarSegredo(payload.credencial_secundaria);

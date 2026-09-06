@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   BellRing,
   Clock3,
@@ -35,6 +36,8 @@ import {
   type IntegracaoApiSettings,
   type ObrigatoriedadeDocumentosBeneficiarioSettings
 } from "@/services/parametros-sistema.service";
+import { instituicoesService } from "@/services/instituicoes.service";
+import type { InstituicaoResumo } from "@/types/instituicao";
 import type { ThemeSettings } from "@/types/theme";
 
 const abas = [
@@ -76,6 +79,12 @@ function criarIntegracoesPadraoTela(): IntegracaoApiSettings[] {
     tentativas: 1,
     observacao: ""
   }));
+}
+
+function clientePodeUsarApi(tipo: string, plano: string) {
+  if (tipo === "INTELIGENCIA_ARTIFICIAL") return plano === "premium" || plano === "enterprise";
+  if (tipo === "CIPA" || tipo === "BIOMETRIA") return plano === "premium" || plano === "enterprise";
+  return true;
 }
 
 const camposCor = [
@@ -137,9 +146,11 @@ const configuracaoCadastroPadrao: BeneficiarioConfiguracaoCadastroSettings = {
 
 export function ParametrosSistemaPage() {
   const { usuario } = useAuth();
+  const location = useLocation();
+  const ehMasterIntegracoes = location.pathname === "/configuracoes/master-integracoes";
   const { settings, applyPreview, clearPreview, saveSettings, carregando: carregandoTema } = useTheme();
   const tenantId = usuario?.tenant_id ?? "sem-tenant";
-  const [abaAtiva, setAbaAtiva] = useState<AbaId>("personalizacao");
+  const [abaAtiva, setAbaAtiva] = useState<AbaId>(ehMasterIntegracoes ? "integracoes" : "personalizacao");
   const [draft, setDraft] = useState<ThemeSettings>(settings);
   const [carenciaDraft, setCarenciaDraft] = useState<CarenciaDoacaoRealizadaSettings>(carenciaPadrao);
   const [carenciaSalva, setCarenciaSalva] = useState<CarenciaDoacaoRealizadaSettings>(carenciaPadrao);
@@ -156,6 +167,7 @@ export function ParametrosSistemaPage() {
   const [configuracaoCadastroSalva, setConfiguracaoCadastroSalva] =
     useState<BeneficiarioConfiguracaoCadastroSettings>(configuracaoCadastroPadrao);
   const [integracoes, setIntegracoes] = useState<IntegracaoApiSettings[]>([]);
+  const [instituicoesMaster, setInstituicoesMaster] = useState<InstituicaoResumo[]>([]);
   const [integracaoAtiva, setIntegracaoAtiva] = useState("CONSULTA_CEP");
   const [carregandoCarencia, setCarregandoCarencia] = useState(true);
   const [carregandoObrigatoriedade, setCarregandoObrigatoriedade] = useState(true);
@@ -170,6 +182,11 @@ export function ParametrosSistemaPage() {
   }, [settings]);
 
   useEffect(() => {
+    if (!ehMasterIntegracoes) return;
+    void instituicoesService.listar().then(setInstituicoesMaster).catch(() => setInstituicoesMaster([]));
+  }, [ehMasterIntegracoes]);
+
+  useEffect(() => {
     let ativo = true;
 
     void (async () => {
@@ -181,11 +198,11 @@ export function ParametrosSistemaPage() {
       setCarregandoIntegracoes(true);
       try {
         const [carencia, obrigatoriedade, alertasCentral, configuracaoCadastro, integracoesData] = await Promise.all([
-          parametrosSistemaService.obterCarenciaDoacoesRealizadas(),
-          parametrosSistemaService.obterObrigatoriedadeDocumentosBeneficiario(),
-          parametrosSistemaService.obterAlertasCentralAtendimentos(),
-          parametrosSistemaService.obterConfiguracaoCadastroBeneficiario(),
-          parametrosSistemaService.listarIntegracoes()
+          ehMasterIntegracoes ? Promise.resolve(carenciaPadrao) : parametrosSistemaService.obterCarenciaDoacoesRealizadas(),
+          ehMasterIntegracoes ? Promise.resolve(obrigatoriedadePadrao) : parametrosSistemaService.obterObrigatoriedadeDocumentosBeneficiario(),
+          ehMasterIntegracoes ? Promise.resolve(alertasCentralAtendimentosPadrao) : parametrosSistemaService.obterAlertasCentralAtendimentos(),
+          ehMasterIntegracoes ? Promise.resolve(configuracaoCadastroPadrao) : parametrosSistemaService.obterConfiguracaoCadastroBeneficiario(),
+          ehMasterIntegracoes ? parametrosSistemaService.listarIntegracoesGlobais() : parametrosSistemaService.listarIntegracoes()
         ]);
         if (!ativo) return;
         setCarenciaDraft(carencia);
@@ -196,12 +213,13 @@ export function ParametrosSistemaPage() {
         setAlertasCentralSalvos(alertasCentral);
         setConfiguracaoCadastroDraft(configuracaoCadastro);
         setConfiguracaoCadastroSalva(configuracaoCadastro);
-        const listaIntegracoes = integracoesData.integracoes.length ? integracoesData.integracoes : criarIntegracoesPadraoTela();
+        const listaBase = integracoesData.integracoes.length ? integracoesData.integracoes : criarIntegracoesPadraoTela();
+        const listaIntegracoes = ehMasterIntegracoes ? listaBase : listaBase.filter((item) => item.tipo !== "MERCADO_PAGO");
         setIntegracoes(listaIntegracoes);
         setIntegracaoAtiva(listaIntegracoes.some((item) => item.tipo === "MERCADO_PAGO") ? "MERCADO_PAGO" : listaIntegracoes[0]?.tipo ?? "CONSULTA_CEP");
       } catch (error: any) {
         if (!ativo) return;
-        const listaIntegracoes = criarIntegracoesPadraoTela();
+        const listaIntegracoes = ehMasterIntegracoes ? criarIntegracoesPadraoTela().filter((item) => item.tipo === "MERCADO_PAGO") : criarIntegracoesPadraoTela().filter((item) => item.tipo !== "MERCADO_PAGO");
         setIntegracoes(listaIntegracoes);
         setIntegracaoAtiva("MERCADO_PAGO");
         setMensagem({
@@ -222,9 +240,10 @@ export function ParametrosSistemaPage() {
     return () => {
       ativo = false;
     };
-  }, [tenantId]);
+  }, [tenantId, ehMasterIntegracoes]);
 
-  const abaAtual = abas.find((aba) => aba.id === abaAtiva);
+  const abasVisiveis = ehMasterIntegracoes ? abas.filter((aba) => aba.id === "integracoes") : abas.filter((aba) => aba.id !== "integracoes");
+  const abaAtual = abasVisiveis.find((aba) => aba.id === abaAtiva);
   const IconeAbaAtual = abaAtual?.icon ?? SlidersHorizontal;
   const houveMudancaPersonalizacao = useMemo(
     () => JSON.stringify(draft) !== JSON.stringify(settings),
@@ -351,7 +370,9 @@ export function ParametrosSistemaPage() {
         setConfiguracaoCadastroSalva(salvo);
         setMensagem({ tipo: "sucesso", texto: "Configurações do cadastro de beneficiários salvas com sucesso." });
       } else if (abaAtiva === "integracoes" && integracaoSelecionada) {
-        const salvo = await parametrosSistemaService.salvarIntegracao(integracaoSelecionada);
+        const salvo = ehMasterIntegracoes
+          ? await parametrosSistemaService.salvarIntegracaoGlobal(integracaoSelecionada)
+          : await parametrosSistemaService.salvarIntegracao(integracaoSelecionada);
         setIntegracoes(salvo.integracoes);
         setMensagem({ tipo: "sucesso", texto: "Integração salva com sucesso." });
       } else {
@@ -433,7 +454,7 @@ export function ParametrosSistemaPage() {
     }));
   }
 
-  function atualizarIntegracao(campo: keyof IntegracaoApiSettings, valor: string | number | boolean | undefined) {
+  function atualizarIntegracao(campo: keyof IntegracaoApiSettings, valor: string | number | boolean | string[] | undefined) {
     setIntegracoes((estadoAtual) =>
       estadoAtual.map((item) =>
         item.tipo === integracaoAtiva ? { ...item, [campo]: valor } : item
@@ -446,6 +467,10 @@ export function ParametrosSistemaPage() {
     setSalvando(true);
     setMensagem(null);
     try {
+      if (ehMasterIntegracoes) {
+        setMensagem({ tipo: "sucesso", texto: "A configuração global será validada na próxima cobrança; os segredos permanecem protegidos no servidor." });
+        return;
+      }
       const resultado = await parametrosSistemaService.testarIntegracao(integracaoAtiva);
       setMensagem({ tipo: resultado.ok ? "sucesso" : "erro", texto: resultado.mensagem });
       const dados = await parametrosSistemaService.listarIntegracoes();
@@ -521,7 +546,7 @@ export function ParametrosSistemaPage() {
       <div className={classesTelaPadraoBeneficiario.gradePrincipal} data-print="layout-grid">
         <Card className={classesTelaPadraoBeneficiario.cardAbas} data-print="tabs">
           <CardContent className={classesTelaPadraoBeneficiario.conteudoAbas}>
-            {abas.map((aba, indice) => (
+            {abasVisiveis.map((aba, indice) => (
               <button
                 key={aba.id}
                 type="button"
@@ -836,6 +861,8 @@ export function ParametrosSistemaPage() {
                         key={item.tipo}
                         type="button"
                         className={classeBotaoAbaLateral(integracaoAtiva === item.tipo)}
+                        disabled={item.tipo === "MERCADO_PAGO" && !ehMasterIntegracoes}
+                        title={item.tipo === "MERCADO_PAGO" && !ehMasterIntegracoes ? "Configuração exclusiva do Painel master" : undefined}
                         onClick={() => setIntegracaoAtiva(item.tipo)}
                       >
                         <span className="min-w-0">{item.tipo.replaceAll("_", " ").toLowerCase()}</span>
@@ -874,6 +901,31 @@ export function ParametrosSistemaPage() {
                         <Label>Tentativas</Label>
                         <Input type="number" value={integracaoSelecionada.tentativas} onChange={(event) => atualizarIntegracao("tentativas", Number(event.target.value) || 1)} />
                       </div>
+                      {ehMasterIntegracoes ? <div className="md:col-span-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+                        <strong>Configuração global do G3N.</strong> Esta credencial será usada somente pelas instituições autorizadas pelo escopo definido no Painel master.
+                      </div> : null}
+                      {ehMasterIntegracoes ? <div className="space-y-3 md:col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                        <div>
+                          <Label>Disponibilidade da API</Label>
+                          <Select value={integracaoSelecionada.escopo ?? "TODOS"} onChange={(event) => atualizarIntegracao("escopo", event.target.value)}>
+                            <option value="TODOS">Disponível para todos os clientes elegíveis pelo plano</option>
+                            <option value="SELECIONADOS">Disponível somente para clientes selecionados</option>
+                            <option value="NENHUM">Não disponível para clientes</option>
+                          </Select>
+                        </div>
+                        {integracaoSelecionada.escopo === "SELECIONADOS" ? <div className="grid max-h-48 gap-2 overflow-y-auto rounded border border-slate-200 bg-white p-2 md:grid-cols-2">
+                          {instituicoesMaster.map((instituicao) => {
+                            const ids = integracaoSelecionada.clientes_tenant_ids ?? [];
+                            const marcado = ids.includes(instituicao.tenant_id);
+                            const elegivel = clientePodeUsarApi(integracaoSelecionada.tipo, instituicao.plano);
+                            return <label key={instituicao.tenant_id} className="flex items-center gap-2 text-sm text-slate-700">
+                              <Checkbox disabled={!elegivel} checked={marcado && elegivel} onChange={(event) => atualizarIntegracao("clientes_tenant_ids", event.target.checked ? [...ids.filter((id) => id !== instituicao.tenant_id), instituicao.tenant_id] : ids.filter((id) => id !== instituicao.tenant_id))} />
+                              <span className={!elegivel ? "text-slate-400" : undefined}>{instituicao.nome_fantasia || instituicao.razao_social} <small className="text-slate-500">({instituicao.plano}{!elegivel ? " · plano sem este módulo" : ""})</small></span>
+                            </label>;
+                          })}
+                          {!instituicoesMaster.length ? <p className="text-xs text-slate-500">Nenhuma instituição cadastrada para seleção.</p> : null}
+                        </div> : null}
+                      </div> : null}
                       <div className="md:col-span-2">
                         <Label>{integracaoSelecionada.tipo === "MERCADO_PAGO" ? "Access token do Mercado Pago" : "Credencial"}</Label>
                         <Input

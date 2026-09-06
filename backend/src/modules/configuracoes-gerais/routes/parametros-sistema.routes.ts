@@ -2,13 +2,43 @@ import { Router } from "express";
 import { asyncHandler } from "../../../shared/http/async-handler.js";
 import {
   ensureAuthenticated,
-  ensurePermissions
+  ensurePermissions,
+  ensureSuperadmin
 } from "../../auth/middlewares/auth.middleware.js";
 import { ParametrosSistemaController } from "../controllers/parametros-sistema.controller.js";
 
 const controller = new ParametrosSistemaController();
 
 export const parametrosSistemaRoutes = Router();
+export const parametrosSistemaMasterRoutes = Router();
+
+parametrosSistemaMasterRoutes.get(
+  "/",
+  ensureAuthenticated,
+  ensureSuperadmin,
+  asyncHandler(controller.listarIntegracoesGlobais.bind(controller))
+);
+
+parametrosSistemaMasterRoutes.put(
+  "/",
+  ensureAuthenticated,
+  ensureSuperadmin,
+  asyncHandler(controller.salvarIntegracaoGlobal.bind(controller))
+);
+
+parametrosSistemaMasterRoutes.get(
+  "/mercado-pago",
+  ensureAuthenticated,
+  ensureSuperadmin,
+  asyncHandler(controller.listarIntegracaoMercadoPagoGlobal.bind(controller))
+);
+
+parametrosSistemaMasterRoutes.put(
+  "/mercado-pago",
+  ensureAuthenticated,
+  ensureSuperadmin,
+  asyncHandler(controller.salvarIntegracaoMercadoPagoGlobal.bind(controller))
+);
 
 parametrosSistemaRoutes.get(
   "/personalizacao",

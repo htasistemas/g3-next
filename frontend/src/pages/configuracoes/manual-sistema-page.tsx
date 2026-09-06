@@ -905,7 +905,7 @@ const secoesManual: ManualSecao[] = [
           "Use o bloco Recuperação de recorrência para preparar ações rápidas de retenção, reativação ou upgrade e salvar tarefas com responsável e data prevista em 1 clique.",
           "Na gestão de doadores, campanhas, doações e comprovantes, trabalhe normalmente com listagem, cadastro, edição, cobrança, confirmação e emissão de comprovante em um clique por ação.",
           "Na área de configurações, mantenha mensagens, parâmetros de pagamento e regras operacionais da captação conforme a necessidade da instituição atual.",
-          "Para usar Mercado Pago, abra Configurações gerais > Integrações e APIs > Mercado Pago e informe o access token, o segredo do webhook, a URL base da API e a URL pública do webhook. Os segredos são cifrados no servidor e nunca retornam ao navegador.",
+          "Para configurar integrações externas, o usuário MASTER deve abrir Painel master > Integrações e APIs. As credenciais ficam protegidas no servidor e cada API pode ser liberada para todos os clientes elegíveis pelo plano, para clientes selecionados ou para nenhum cliente. As instituições não editam mais credenciais globais.",
           "No fluxo de cobrança, o PIX é criado no Mercado Pago com chave de idempotência; cartão e boleto usam checkout hospedado. O comprovante só é emitido depois da confirmação recebida e validada pelo webhook.",
           "Os relatórios e comprovantes emitidos pela tela passam a usar também os dados institucionais do tenant autenticado."
         ],

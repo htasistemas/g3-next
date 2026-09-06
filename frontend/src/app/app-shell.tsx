@@ -731,6 +731,13 @@ const menuSectionsBase: MenuSection[] = [
         label: "Importação de dados",
         icon: FileSpreadsheet,
         requiredPermissions: ["MASTER_ADMIN"]
+      },
+      {
+        id: "painel-master-integracoes",
+        to: "/configuracoes/master-integracoes",
+        label: "Integrações e APIs",
+        icon: Settings2,
+        requiredPermissions: ["MASTER_ADMIN"]
       }
     ]
   }
@@ -796,6 +803,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/configuracoes/licenca-uso")) return "Licença de uso";
   if (pathname.startsWith("/configuracoes/manual-do-sistema")) return "Manual do sistema";
   if (pathname.startsWith("/configuracoes/master-instituicoes")) return "Clientes registrados";
+  if (pathname.startsWith("/configuracoes/master-integracoes")) return "Integrações e APIs";
   if (pathname.startsWith("/configuracoes/pesquise-na-ia")) return "Pergunte à IA";
   if (pathname.startsWith("/configuracoes/sobre-o-sistema")) return "Sobre o sistema";
   if (pathname.startsWith("/configuracoes/mensagens-personalizadas")) return "Mensagens personalizadas";

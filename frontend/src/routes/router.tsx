@@ -647,6 +647,14 @@ export const router = createBrowserRouter([
         )
       },
       {
+        path: "/configuracoes/master-integracoes",
+        element: (
+          <RequirePermission permissions={["MASTER_ADMIN"]}>
+            {ParametrosSistemaPage}
+          </RequirePermission>
+        )
+      },
+      {
         path: "/configuracoes/importacao-dados",
         element: (
           <RequirePermission permissions={["MASTER_ADMIN"]}>
