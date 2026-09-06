@@ -242,7 +242,14 @@ fi
 
 if [ -x "$APP_DIR/scripts/deploy-check.sh" ]; then
   log "Post-deploy checks"
-  APP_DIR="$APP_DIR" "$APP_DIR/scripts/deploy-check.sh"
+  # Os smoke tests precisam acessar as rotas públicas reais. A página de
+  # manutenção responde 503 por desenho; desative-a durante a validação e
+  # restaure-a automaticamente se qualquer teste falhar.
+  disable_maintenance
+  if ! APP_DIR="$APP_DIR" "$APP_DIR/scripts/deploy-check.sh"; then
+    enable_maintenance
+    exit 1
+  fi
 else
   log "Post-deploy checks skipped (script not found)"
 fi
