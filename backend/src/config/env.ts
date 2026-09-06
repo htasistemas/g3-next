@@ -147,13 +147,8 @@ const envSchema = z
       });
     }
 
-    if (env.CAPTACAO_PAYMENT_PROVIDER === "mercado-pago" && !env.MERCADOPAGO_ACCESS_TOKEN) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["MERCADOPAGO_ACCESS_TOKEN"],
-        message: "MERCADOPAGO_ACCESS_TOKEN obrigatorio quando o provider Mercado Pago estiver habilitado"
-      });
-    }
+    // A credencial do Mercado Pago pode ser configurada por instituição no banco.
+    // A ausência de uma credencial global deve impedir somente a cobrança, não o boot da API.
 
     if (env.NODE_ENV === "production" && env.CAPTACAO_PAYMENT_PROVIDER === "mock-g3n") {
       ctx.addIssue({
