@@ -40,3 +40,8 @@ licencaUsoRoutes.post(
   "/webhook/infinitepay",
   asyncHandler(controller.webhookInfinitePay.bind(controller))
 );
+
+licencaUsoRoutes.post(
+  "/webhook/mercado-pago",
+  asyncHandler(controller.webhookMercadoPago.bind(controller))
+);

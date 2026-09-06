@@ -1,5 +1,5 @@
 export const licencaUsoPlanos = ["essencial", "profissional", "premium", "enterprise"] as const;
-export const licencaUsoCiclos = ["mensal", "semestral", "anual"] as const;
+export const licencaUsoCiclos = ["mensal", "semestral", "anual", "bienal", "trienal", "quadrienal"] as const;
 export const licencaUsoStatus = ["ativa", "vence_hoje", "vencida", "sem_vigencia"] as const;
 
 export type LicencaUsoPlano = (typeof licencaUsoPlanos)[number];

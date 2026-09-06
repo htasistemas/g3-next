@@ -1462,13 +1462,13 @@ const secoesManual: ManualSecao[] = [
         objetivo: "Escolher o plano de licença do G3N com clareza, visualizar o que será liberado e acompanhar a sequência de cobranças.",
         comoUsar: [
           "Ao clicar em Licença de uso no menu, a página abre direto no conteúdo comercial, sem etapa intermediária de escolha de aba.",
-          "Escolha um dos quatro cards: Essencial, Profissional, Premium ou Enterprise. Os cards aparecem em duas colunas no desktop e uma coluna no celular.",
+          "Escolha um dos quatro cards: Essencial, Profissional, Premium ou Enterprise. Em telas grandes, os quatro cards aparecem lado a lado para comparação; em telas menores, a grade se adapta.",
           "Leia o público indicado, os recursos incluídos e as regras de cada card antes de selecionar.",
           "Os valores mensais de referência são: Essencial R$ 399,00, Profissional R$ 699,00, Premium R$ 999,00 e Enterprise a partir de R$ 1.499,00.",
-          "Alterne entre mensal, semestral e anual. O semestral aplica 10% de desconto e o anual aplica 20% e isenta a implantação.",
+          "Alterne entre mensal, semestral, anual, bienal, trienal e quadrienal. Os descontos são, respectivamente, 0%, 10%, 20%, 30%, 40% e 50%; a implantação é gratuita a partir do ciclo anual.",
           "Ao escolher o plano e a data inicial do contrato, o sistema calcula automaticamente a vigência e prepara a contratação.",
-          "Use Gerar cobrança para criar o checkout e acompanhar os quadros de pagamentos pendentes e realizados.",
-          "Se a InfinitePay recusar a requisição ou houver falha de comunicação, o sistema mostra a mensagem técnica retornada pela integração em vez de erro interno genérico.",
+          "Use Gerar cobrança para criar a assinatura do Mercado Pago e acompanhar os quadros de pagamentos pendentes e realizados.",
+          "A primeira cobrança inclui a licença e, quando aplicável, a implantação. Após a aprovação, as cobranças seguintes usam apenas o valor recorrente do plano.",
           "Os alertas de vencimento usam automaticamente o e-mail cadastrado na unidade assistencial principal."
         ],
         atencoes: [
@@ -1476,8 +1476,8 @@ const secoesManual: ManualSecao[] = [
           "Cada instituição visualiza apenas a própria configuração, os próprios checkouts, o histórico financeiro e os alertas vinculados ao seu tenant/CNPJ.",
           "O Enterprise libera todos os módulos. Nos demais planos, módulos acima do nível contratado ficam bloqueados no menu e no backend.",
           "A data final é recalculada automaticamente a partir da data inicial e do ciclo escolhido disponível na página comercial.",
-          "Cada checkout gerado entra primeiro no histórico como pendente e migra para realizado quando a InfinitePay confirma o pagamento.",
-          "No ciclo anual, a implantação continua isenta conforme a política comercial definida."
+          "Cada assinatura gerada entra primeiro no histórico como pendente e migra para realizada quando o Mercado Pago confirma o pagamento por webhook.",
+          "Nos ciclos anual, bienal, trienal e quadrienal, a implantação continua isenta conforme a política comercial definida."
         ]
       },
       {

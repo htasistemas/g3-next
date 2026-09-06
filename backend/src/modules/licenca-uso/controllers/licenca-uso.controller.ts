@@ -25,6 +25,19 @@ export class LicencaUsoController {
     return response.json(resultado);
   }
 
+  async webhookMercadoPago(request: AuthenticatedRequest, response: Response) {
+    const dataId = typeof request.query["data.id"] === "string"
+      ? request.query["data.id"]
+      : typeof (request.body as any)?.data?.id === "string" ? (request.body as any).data.id : undefined;
+    const resultado = await service.processarWebhookMercadoPago({
+      payload: request.body ?? {},
+      signature: request.header("x-signature"),
+      requestId: request.header("x-request-id"),
+      dataId
+    });
+    return response.json(resultado);
+  }
+
   async confirmarRetorno(request: AuthenticatedRequest, response: Response) {
     const resultado = await service.confirmarPagamentoRetorno(request.body);
     return response.json(resultado);

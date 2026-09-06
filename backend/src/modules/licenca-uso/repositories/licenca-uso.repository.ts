@@ -490,6 +490,15 @@ export class LicencaUsoRepository {
     return rows[0] ?? null;
   }
 
+  async buscarPagamentoPorInvoiceSlug(invoiceSlug: string) {
+    await ensureLicencaUsoEstrutura();
+    const rows = await prisma.$queryRawUnsafe<Array<RegistroLicencaUsoPagamento & { tenant_id: string | null }>>(
+      `SELECT * FROM licenca_uso_pagamentos WHERE invoice_slug = $1 ORDER BY created_at DESC, id DESC LIMIT 1`,
+      invoiceSlug
+    );
+    return rows[0] ?? null;
+  }
+
   async marcarPagamentoComoPago(input: {
     tenantId: string;
     orderNsu: string;

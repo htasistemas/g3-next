@@ -1,5 +1,5 @@
 export type LicencaUsoPlanoId = "essencial" | "profissional" | "premium" | "enterprise";
-export type LicencaUsoCiclo = "mensal" | "semestral" | "anual";
+export type LicencaUsoCiclo = "mensal" | "semestral" | "anual" | "bienal" | "trienal" | "quadrienal";
 export type LicencaUsoStatus = "ativa" | "vence_hoje" | "vencida" | "sem_vigencia";
 
 export type LicencaUsoConfiguracao = {

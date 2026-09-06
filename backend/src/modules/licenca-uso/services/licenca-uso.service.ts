@@ -6,6 +6,7 @@ import { UnidadeAssistencialRepository } from "../../unidades-assistenciais/repo
 import { atualizarLicencaUsoPayloadSchema, licencaUsoConfiguracaoSchema } from "../licenca-uso.schema.js";
 import { LicencaUsoRepository } from "../repositories/licenca-uso.repository.js";
 import { InfinitePayService } from "./infinitepay.service.js";
+import { MercadoPagoPaymentProviderService } from "../../captacao-recursos/providers/mercado-pago-payment-provider.service.js";
 import type {
   LicencaUsoAlertaProcessado,
   LicencaUsoCiclo,
@@ -25,13 +26,19 @@ const planosBase: Record<LicencaUsoPlano, { nome: string; valorMensal: number; i
 const descontoPorCiclo: Record<LicencaUsoCiclo, number> = {
   mensal: 0,
   semestral: 10,
-  anual: 20
+  anual: 20,
+  bienal: 30,
+  trienal: 40,
+  quadrienal: 50
 };
 
 const fatorMesesPorCiclo: Record<LicencaUsoCiclo, number> = {
   mensal: 1,
   semestral: 6,
-  anual: 12
+  anual: 12,
+  bienal: 24,
+  trienal: 36,
+  quadrienal: 48
 };
 
 const configuracaoPadrao: LicencaUsoConfiguracao = {
@@ -49,11 +56,11 @@ const configuracaoPadrao: LicencaUsoConfiguracao = {
   emailsAlerta: [],
   pixAmbiente: "sandbox",
   pixExpiracaoMinutos: 1440,
-  pixProvider: "infinitypay",
-  cartaoProvider: "infinitypay",
+  pixProvider: "mercado-pago",
+  cartaoProvider: "mercado-pago",
   cartaoAmbiente: "sandbox",
   cartaoTentativasFalha: 2,
-  boletoProvider: "infinitypay",
+  boletoProvider: "mercado-pago",
   boletoAmbiente: "sandbox",
   boletoPrazoVencimentoDias: 5,
   checkoutHandle: "Torresoft",
@@ -66,9 +73,7 @@ function gerarOrderNsu() {
 }
 
 function mesesPorCiclo(ciclo: LicencaUsoCiclo) {
-  if (ciclo === "anual") return 12;
-  if (ciclo === "semestral") return 6;
-  return 1;
+  return fatorMesesPorCiclo[ciclo];
 }
 
 function adicionarMeses(dataIso: string, meses: number) {
@@ -115,7 +120,7 @@ function calcularCobranca(planoId: LicencaUsoPlano, ciclo: LicencaUsoCiclo) {
   const fatorMeses = fatorMesesPorCiclo[ciclo];
   const valorBruto = plano.valorMensal * fatorMeses;
   const valorComDesconto = Number((valorBruto * (1 - percentualDesconto / 100)).toFixed(2));
-  const implantacaoIsenta = ciclo === "anual";
+  const implantacaoIsenta = ciclo !== "mensal" && ciclo !== "semestral";
   const valorImplantacao = implantacaoIsenta ? 0 : plano.implantacao;
 
   return {
@@ -223,7 +228,7 @@ export class LicencaUsoService {
       configuracaoPadrao.cicloCobranca) as LicencaUsoCiclo;
     const cobrancaCalculada = calcularCobranca(planoId, cicloCobranca);
     const implantacaoIsentaCalculada =
-      cicloCobranca === "anual"
+      cicloCobranca !== "mensal" && cicloCobranca !== "semestral"
         ? true
         : payload.configuracao.implantacaoIsenta ?? cobrancaCalculada.implantacaoIsenta;
 
@@ -291,12 +296,9 @@ export class LicencaUsoService {
     return this.montarResposta(salvo, tenantId);
   }
 
-  async gerarCheckoutLink(rawTenantId?: string | null) {
+  async gerarCheckoutLink(rawTenantId?: string | null, payerEmail?: string) {
     const tenantId = this.parseTenant(rawTenantId);
     const { configuracao } = await this.obterConfiguracao(tenantId);
-    if (!configuracao.checkoutHandle?.trim()) {
-      throw new AppError("Configure o handle da InfinitePay antes de gerar o checkout.", 422);
-    }
     if (!configuracao.checkoutRedirectUrl?.trim()) {
       throw new AppError("Configure a URL de retorno do checkout antes de gerar o checkout.", 422);
     }
@@ -305,47 +307,29 @@ export class LicencaUsoService {
     const orderNsu = gerarOrderNsu();
     const dataInicio = configuracao.dataInicioVigencia ?? new Date().toISOString().slice(0, 10);
     const vigencia = calcularVigencia(configuracao, dataInicio);
-    const itens = [
-      {
-        quantity: 1,
-        price: Math.round(configuracao.valorCobranca * 100),
-        description: `Licença de uso G3N - ${plano.nome} (${configuracao.cicloCobranca})`
-      }
-    ];
-
-    if (!configuracao.implantacaoIsenta && configuracao.valorImplantacao > 0) {
-      itens.push({
-        quantity: 1,
-        price: Math.round(configuracao.valorImplantacao * 100),
-        description: "Implantação do G3N"
-      });
-    }
-
-    const customerName =
-      configuracao.instituicaoNome?.trim() || configuracao.checkoutHandle?.trim() || "Cliente G3N";
-    const customerEmail = configuracao.emailsAlerta.find((email) => Boolean(email?.trim()))?.trim();
-
-    const resposta = await this.infinitePayService.createCheckoutLink({
-      handle: configuracao.checkoutHandle,
-      order_nsu: orderNsu,
-      items: itens,
-      redirect_url: configuracao.checkoutRedirectUrl,
-      webhook_url: configuracao.pixWebhookUrl,
-      customer: {
-        name: customerName,
-        email: customerEmail
-      }
+    const customerEmail = configuracao.emailsAlerta.find((email) => Boolean(email?.trim()))?.trim() || payerEmail?.trim();
+    if (!customerEmail) throw new AppError("Cadastre um e-mail de cobrança da instituição ou informe um e-mail de acesso antes de gerar a assinatura.", 422);
+    const valorInicial = configuracao.valorCobranca + (configuracao.implantacaoIsenta ? 0 : configuracao.valorImplantacao);
+    const resposta = await new MercadoPagoPaymentProviderService(tenantId).criarAssinaturaLicenca({
+      referencia: orderNsu,
+      descricao: `Licença de uso G3N - ${plano.nome}`,
+      emailPagador: customerEmail,
+      valorInicial,
+      valorRecorrente: configuracao.valorCobranca,
+      mesesPorCiclo: mesesPorCiclo(configuracao.cicloCobranca),
+      urlRetorno: configuracao.checkoutRedirectUrl
     });
+    if (!resposta.id || !resposta.checkoutUrl) throw new AppError("O Mercado Pago não retornou um link de assinatura válido.", 502);
 
     const salvo = await this.repository.salvarConfiguracao(
       licencaUsoConfiguracaoSchema.parse({
         ...configuracao,
-        ultimoCheckoutUrl: resposta.url,
-        ultimoOrderNsu: resposta.order_nsu ?? orderNsu,
-        ultimoInvoiceSlug: resposta.invoice_slug,
+        ultimoCheckoutUrl: resposta.checkoutUrl,
+        ultimoOrderNsu: orderNsu,
+        ultimoInvoiceSlug: resposta.id,
         ultimoCheckoutPago: false
       }),
-      "infinitepay-checkout",
+      "mercado-pago-checkout",
       tenantId
     );
 
@@ -359,19 +343,19 @@ export class LicencaUsoService {
       vigenciaDias: vigencia.vigenciaDias,
       valorLicenca: configuracao.valorCobranca,
       valorImplantacao: configuracao.implantacaoIsenta ? 0 : configuracao.valorImplantacao,
-      valorTotal: configuracao.valorCobranca + (configuracao.implantacaoIsenta ? 0 : configuracao.valorImplantacao),
-      orderNsu: resposta.order_nsu ?? orderNsu,
-      invoiceSlug: resposta.invoice_slug,
-      checkoutUrl: resposta.url
+      valorTotal: valorInicial,
+      orderNsu,
+      invoiceSlug: resposta.id,
+      checkoutUrl: resposta.checkoutUrl
     });
 
     const respostaCompleta = await this.montarResposta(salvo, tenantId);
 
     return {
       ...respostaCompleta,
-      checkoutUrl: resposta.url,
-      orderNsu: resposta.order_nsu ?? orderNsu,
-      invoiceSlug: resposta.invoice_slug
+      checkoutUrl: resposta.checkoutUrl,
+      orderNsu,
+      invoiceSlug: resposta.id
     };
   }
 
@@ -465,6 +449,55 @@ export class LicencaUsoService {
       slug: payload.invoice_slug,
       receipt_url: payload.receipt_url
     });
+  }
+
+  async processarWebhookMercadoPago(input: { payload: Record<string, unknown>; signature?: string; requestId?: string; dataId?: string }) {
+    const subscriptionId = String(input.dataId ?? (input.payload.data as Record<string, unknown> | undefined)?.id ?? "").trim();
+    if (!subscriptionId) return { acknowledged: true, ignored: true };
+    const pagamento = await this.repository.buscarPagamentoPorInvoiceSlug(subscriptionId);
+    if (!pagamento?.tenant_id) return { acknowledged: true, ignored: true };
+    const provider = new MercadoPagoPaymentProviderService(String(pagamento.tenant_id));
+    if (!(await provider.validarAssinaturaWebhook(input.signature, input.requestId, subscriptionId))) {
+      throw new AppError("Notificação de assinatura não autenticada.", 401);
+    }
+    if (pagamento.status === "pago") return { acknowledged: true, processed: true, duplicate: true };
+
+    const assinatura = await provider.obterAssinaturaLicenca(subscriptionId);
+    const status = String(assinatura.status ?? "pending").toLowerCase();
+    if (!["authorized", "active"].includes(status)) return { acknowledged: true, processed: false, status };
+
+    const { configuracao } = await this.obterConfiguracao(String(pagamento.tenant_id));
+    const hoje = new Date().toISOString().slice(0, 10);
+    const vigencia = calcularVigencia(configuracao, hoje);
+    const valorInicial = Number(pagamento.valor_total);
+    const valorRecorrente = configuracao.valorCobranca;
+    const valorAtual = Number((assinatura.auto_recurring as Record<string, unknown> | undefined)?.transaction_amount ?? 0);
+    if (Math.abs(valorAtual - valorRecorrente) > 0.009) await provider.atualizarValorRecorrente(subscriptionId, valorRecorrente, mesesPorCiclo(configuracao.cicloCobranca));
+
+    const salvo = await this.repository.salvarConfiguracao(
+      licencaUsoConfiguracaoSchema.parse({
+        ...configuracao,
+        dataInicioVigencia: vigencia.vigenciaInicio,
+        dataVencimento: vigencia.vigenciaFim,
+        statusLicenca: "ativa",
+        ultimoInvoiceSlug: subscriptionId,
+        ultimoCheckoutPago: true,
+        ultimoValorPago: valorInicial
+      }),
+      "mercado-pago-webhook",
+      String(pagamento.tenant_id)
+    );
+    await this.repository.marcarPagamentoComoPago({
+      tenantId: String(pagamento.tenant_id),
+      orderNsu: String(pagamento.order_nsu ?? ""),
+      invoiceSlug: subscriptionId,
+      transactionNsu: subscriptionId,
+      valorTotal: valorInicial,
+      vigenciaInicio: vigencia.vigenciaInicio,
+      vigenciaFim: vigencia.vigenciaFim,
+      vigenciaDias: vigencia.vigenciaDias
+    });
+    return { acknowledged: true, processed: true, status, configuracao: salvo };
   }
 
   async processarAlertasEmailPendentes() {

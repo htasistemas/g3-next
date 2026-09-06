@@ -73,6 +73,12 @@ async function requestInfinitePay<T>(path: string, payload: Record<string, unkno
         : typeof body === "object" && body !== null && "message" in body
           ? String((body as Record<string, unknown>).message ?? "")
           : JSON.stringify(body);
+    if (/external checkout is not enabled|checkout externo.*desabilitad|checkout externo.*desativad/i.test(errorMessage)) {
+      throw new AppError(
+        "A cobrança não pôde ser gerada porque o checkout externo está desativado na conta InfinitePay. Ative essa opção nas configurações de checkout da InfinitePay e tente novamente.",
+        422
+      );
+    }
     throw new AppError(
       `InfinitePay recusou a requisicao de checkout${errorMessage ? `: ${errorMessage}` : ""}`.trim(),
       response.status >= 500 ? 502 : 400

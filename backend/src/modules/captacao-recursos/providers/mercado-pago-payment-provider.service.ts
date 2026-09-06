@@ -7,6 +7,16 @@ import { MercadoPagoConfigRepository } from "../repositories/mercado-pago-config
 
 type MercadoPagoPayload = Record<string, any>;
 
+export type MercadoPagoLicencaAssinaturaInput = {
+  referencia: string;
+  descricao: string;
+  emailPagador: string;
+  valorInicial: number;
+  valorRecorrente: number;
+  mesesPorCiclo: number;
+  urlRetorno: string;
+};
+
 function statusOf(value: unknown): PaymentChargeResult["status"] {
   switch (String(value ?? "").toLowerCase()) {
     case "approved": return "confirmado";
@@ -120,6 +130,47 @@ export class MercadoPagoPaymentProviderService implements PaymentProviderInterfa
   async getChargeStatus(reference: string) {
     const payload = await this.request(`/v1/payments/${encodeURIComponent(reference)}`);
     return { status: String(payload.status ?? "pending"), payload };
+  }
+
+  async criarAssinaturaLicenca(input: MercadoPagoLicencaAssinaturaInput) {
+    const stored = await this.configPromise;
+    const notificationUrl = stored?.webhookUrl ?? env.MERCADOPAGO_WEBHOOK_URL;
+    if (!input.emailPagador.trim()) throw new AppError("Informe um e-mail para criar a assinatura da licença.", 422);
+    const payload = await this.request("/preapproval", {
+      method: "POST",
+      headers: { "X-Idempotency-Key": `g3n-licenca-${input.referencia}` },
+      body: JSON.stringify({
+        reason: input.descricao,
+        external_reference: input.referencia,
+        payer_email: input.emailPagador.trim(),
+        back_url: input.urlRetorno,
+        notification_url: notificationUrl,
+        auto_recurring: {
+          frequency: input.mesesPorCiclo,
+          frequency_type: "months",
+          transaction_amount: Number(input.valorInicial.toFixed(2)),
+          currency_id: "BRL"
+        },
+        status: "pending"
+      })
+    });
+    return {
+      id: String(payload.id ?? ""),
+      status: String(payload.status ?? "pending"),
+      checkoutUrl: env.NODE_ENV === "production" ? String(payload.init_point ?? "") : String(payload.sandbox_init_point ?? payload.init_point ?? ""),
+      payload
+    };
+  }
+
+  async obterAssinaturaLicenca(id: string) {
+    return this.request(`/preapproval/${encodeURIComponent(id)}`);
+  }
+
+  async atualizarValorRecorrente(id: string, valorRecorrente: number, mesesPorCiclo?: number) {
+    return this.request(`/preapproval/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: JSON.stringify({ auto_recurring: { ...(mesesPorCiclo ? { frequency: mesesPorCiclo, frequency_type: "months" } : {}), transaction_amount: Number(valorRecorrente.toFixed(2)), currency_id: "BRL" } })
+    });
   }
 
   async cancelCharge(reference: string) {
