@@ -70,6 +70,7 @@ import { cipaRoutes } from "../modules/cipa/routes/cipa.routes.js";
 import { parceriasPublicasRoutes } from "../modules/educacional/parcerias-publicas.routes.js";
 import { importacaoDadosRoutes } from "../modules/importacao-dados/importacao-dados.routes.js";
 import { pessoasRoutes } from "../modules/pessoas/pessoas.routes.js";
+import { ensurePlanoAcessoPorRota } from "../modules/licenca-uso/middlewares/plano.middleware.js";
 import { obterAtualizacaoSistemaPaths } from "../modules/atualizacao-sistema/services/atualizacao-sistema.paths.js";
 
 export const appRoutes = Router();
@@ -89,6 +90,7 @@ appRoutes.get("/health", (_request, response) => {
 });
 
 appRoutes.use("/api/auth", authRoutes);
+appRoutes.use("/api", ensurePlanoAcessoPorRota);
 appRoutes.use("/api/master/instituicoes", ensureAuthenticated, ensureSuperadmin, instituicoesRoutes);
 appRoutes.use("/api/master/importacao-dados", importacaoDadosRoutes);
 appRoutes.use("/api/ai", ensureAuthenticated, aiRoutes);

@@ -98,6 +98,25 @@ export type MenuItem = {
   emMigracao?: boolean;
 };
 
+type PlanoAcesso = "essencial" | "profissional" | "premium" | "enterprise";
+const ORDEM_PLANOS: PlanoAcesso[] = ["essencial", "profissional", "premium", "enterprise"];
+const ROTAS_PROFISSIONAL = ["/agendamentos", "/atendimentos", "/financeiro/registro-doacao", "/registro-doacao", "/registro-ponto", "/dashboard", "/senhas", "/configuracoes/usuarios"];
+const ROTAS_PREMIUM = ["/financeiro/doacoes", "/captacao-recursos", "/portal-transparencia", "/setor-financeiro", "/setor-juridico", "/setor-administrativo", "/setor-rh/contratacao", "/setor-rh/cipa", "/setor-vendas", "/educacional", "/configuracoes/pesquise-na-ia"];
+
+function normalizarPlanoAcesso(plano?: string): PlanoAcesso {
+  const valor = plano?.toLowerCase();
+  if (valor === "essencial" || valor === "profissional" || valor === "premium" || valor === "enterprise") return valor;
+  if (valor === "avancado") return "premium";
+  return "profissional";
+}
+
+function planoMinimoParaRota(rota?: string): PlanoAcesso {
+  const caminho = rota?.toLowerCase() ?? "";
+  if (ROTAS_PREMIUM.some((item) => caminho.startsWith(item))) return "premium";
+  if (ROTAS_PROFISSIONAL.some((item) => caminho.startsWith(item))) return "profissional";
+  return "essencial";
+}
+
 export type MenuSection = {
   id: string;
   secao: string;
@@ -920,6 +939,9 @@ export function AppShell() {
       },
     [permissoesUsuario]
   );
+  const planoUsuario = normalizarPlanoAcesso(usuario?.plano);
+  const nivelPlanoUsuario = ORDEM_PLANOS.indexOf(planoUsuario);
+  const possuiPlano = (rota?: string) => usuario?.is_superadmin || nivelPlanoUsuario >= ORDEM_PLANOS.indexOf(planoMinimoParaRota(rota));
 
   const menuSectionsVisiveis = useMemo(() => {
     return menuSections
@@ -928,12 +950,12 @@ export function AppShell() {
         ...secao,
         itens: ordenarItensMenu(
           secao.itens.filter((item) => {
-            return possuiPermissao(item.requiredPermissions);
+            return possuiPermissao(item.requiredPermissions) && possuiPlano(item.to);
           })
         )
       }))
       .filter((secao) => secao.itens.length > 0);
-  }, [possuiPermissao]);
+  }, [possuiPermissao, planoUsuario, usuario?.is_superadmin]);
 
   const secaoAtivaId = useMemo(() => {
     for (const secao of menuSectionsVisiveis) {

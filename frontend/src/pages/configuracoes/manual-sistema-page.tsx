@@ -1459,22 +1459,22 @@ const secoesManual: ManualSecao[] = [
       },
       {
         nome: "Licença de uso",
-        objetivo: "Apresentar os planos comerciais do G3N em formato de página de vendas e permitir contratação com simulação, vigência e histórico financeiro no mesmo fluxo.",
+        objetivo: "Escolher o plano de licença do G3N com clareza, visualizar o que será liberado e acompanhar a sequência de cobranças.",
         comoUsar: [
           "Ao clicar em Licença de uso no menu, a página abre direto no conteúdo comercial, sem etapa intermediária de escolha de aba.",
-          "Use o topo comercial da página para comparar os planos, entender o posicionamento de cada faixa e acionar demonstração ou WhatsApp.",
-          "Os valores mensais vigentes exibidos nos cards são: Essencial R$ 397,00, Profissional R$ 697,00, Premium R$ 997,00 e Enterprise R$ 1.497,00.",
-          "Alterne entre mensal e anual para visualizar economia e custo-benefício antes de definir o plano.",
-          "Consulte os cards comerciais, o comparativo entre planos, a seção Para quem é, os benefícios e o FAQ para apoiar a decisão.",
+          "Escolha um dos quatro cards: Essencial, Profissional, Premium ou Enterprise. Os cards aparecem em duas colunas no desktop e uma coluna no celular.",
+          "Leia o público indicado, os recursos incluídos e as regras de cada card antes de selecionar.",
+          "Os valores mensais de referência são: Essencial R$ 399,00, Profissional R$ 699,00, Premium R$ 999,00 e Enterprise a partir de R$ 1.499,00.",
+          "Alterne entre mensal, semestral e anual. O semestral aplica 10% de desconto e o anual aplica 20% e isenta a implantação.",
           "Ao escolher o plano e a data inicial do contrato, o sistema calcula automaticamente a vigência e prepara a contratação.",
           "Use Gerar cobrança para criar o checkout e acompanhar os quadros de pagamentos pendentes e realizados.",
           "Se a InfinitePay recusar a requisição ou houver falha de comunicação, o sistema mostra a mensagem técnica retornada pela integração em vez de erro interno genérico.",
           "Os alertas de vencimento usam automaticamente o e-mail cadastrado na unidade assistencial principal."
         ],
         atencoes: [
-          "A licença fica vinculada ao CNPJ da unidade principal registrada no sistema.",
+          "A licença fica vinculada ao tenant e ao CNPJ da instituição principal registrada no sistema.",
           "Cada instituição visualiza apenas a própria configuração, os próprios checkouts, o histórico financeiro e os alertas vinculados ao seu tenant/CNPJ.",
-          "No plano Enterprise, a implantação inicial vigente é de R$ 2.497,00.",
+          "O Enterprise libera todos os módulos. Nos demais planos, módulos acima do nível contratado ficam bloqueados no menu e no backend.",
           "A data final é recalculada automaticamente a partir da data inicial e do ciclo escolhido disponível na página comercial.",
           "Cada checkout gerado entra primeiro no histórico como pendente e migra para realizado quando a InfinitePay confirma o pagamento.",
           "No ciclo anual, a implantação continua isenta conforme a política comercial definida."

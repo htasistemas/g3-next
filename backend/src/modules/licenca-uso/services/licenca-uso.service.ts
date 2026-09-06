@@ -1,4 +1,5 @@
 import { normalizarCnpj, normalizarEmail } from "../../../utils/br-utils.js";
+import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { EmailService } from "../../email/services/email.service.js";
 import { UnidadeAssistencialRepository } from "../../unidades-assistenciais/repositories/unidade-assistencial.repository.js";
@@ -15,10 +16,10 @@ import type {
 } from "../licenca-uso.types.js";
 
 const planosBase: Record<LicencaUsoPlano, { nome: string; valorMensal: number; implantacao: number }> = {
-  essencial: { nome: "Essencial", valorMensal: 297, implantacao: 497 },
-  profissional: { nome: "Profissional", valorMensal: 497, implantacao: 897 },
-  premium: { nome: "Premium", valorMensal: 697, implantacao: 1500 },
-  enterprise: { nome: "Enterprise", valorMensal: 797, implantacao: 1500 }
+  essencial: { nome: "Essencial", valorMensal: 399, implantacao: 497 },
+  profissional: { nome: "Profissional", valorMensal: 699, implantacao: 897 },
+  premium: { nome: "Premium", valorMensal: 999, implantacao: 1497 },
+  enterprise: { nome: "Enterprise", valorMensal: 1499, implantacao: 2497 }
 };
 
 const descontoPorCiclo: Record<LicencaUsoCiclo, number> = {
@@ -222,7 +223,9 @@ export class LicencaUsoService {
       configuracaoPadrao.cicloCobranca) as LicencaUsoCiclo;
     const cobrancaCalculada = calcularCobranca(planoId, cicloCobranca);
     const implantacaoIsentaCalculada =
-      payload.configuracao.implantacaoIsenta ?? cobrancaCalculada.implantacaoIsenta;
+      cicloCobranca === "anual"
+        ? true
+        : payload.configuracao.implantacaoIsenta ?? cobrancaCalculada.implantacaoIsenta;
 
     const dataInicioVigencia =
       payload.configuracao.dataInicioVigencia ?? atual?.dataInicioVigencia ?? new Date().toISOString().slice(0, 10);
@@ -260,13 +263,12 @@ export class LicencaUsoService {
         configuracaoPadrao.vigenciaInicialDias,
       dataInicioVigencia,
       dataVencimento: payload.configuracao.dataVencimento ?? vigenciaCalculada.vigenciaFim,
-      valorBaseMensal: payload.configuracao.valorBaseMensal ?? cobrancaCalculada.valorBaseMensal,
-      percentualDesconto:
-        payload.configuracao.percentualDesconto ?? cobrancaCalculada.percentualDesconto,
-      valorCobranca: payload.configuracao.valorCobranca ?? cobrancaCalculada.valorCobranca,
-      valorImplantacao: implantacaoIsentaCalculada
-        ? 0
-        : payload.configuracao.valorImplantacao ?? cobrancaCalculada.valorImplantacao,
+      // Valores comerciais são calculados no servidor para impedir que o cliente
+      // altere o desconto ou o total da cobrança pelo navegador.
+      valorBaseMensal: cobrancaCalculada.valorBaseMensal,
+      percentualDesconto: cobrancaCalculada.percentualDesconto,
+      valorCobranca: cobrancaCalculada.valorCobranca,
+      valorImplantacao: implantacaoIsentaCalculada ? 0 : cobrancaCalculada.valorImplantacao,
       implantacaoIsenta: implantacaoIsentaCalculada,
       emailsAlerta: (payload.configuracao.emailsAlerta ?? atual?.emailsAlerta ?? []).map((email) =>
         normalizarEmail(email)
@@ -285,6 +287,7 @@ export class LicencaUsoService {
     });
 
     const salvo = await this.repository.salvarConfiguracao(normalizado, usuarioAtualizacao, tenantId);
+    await prisma.$executeRaw`UPDATE instituicoes SET plano = ${normalizado.planoId}, atualizado_em = NOW() WHERE tenant_id = ${tenantId}::uuid`;
     return this.montarResposta(salvo, tenantId);
   }
 
