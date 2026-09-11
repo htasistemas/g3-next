@@ -643,7 +643,7 @@ export function CadastroVoluntariadoPage() {
     }
   }
 
-  async function imprimirDocumentoVoluntario(tipo: "ficha" | "termo") {
+  async function imprimirDocumentoVoluntario(tipo: "ficha" | "termo" | "atestado") {
     if (!idSelecionado) return;
 
     let janela: ReturnType<typeof reservarJanelaRelatorio> | undefined;
@@ -652,15 +652,19 @@ export function CadastroVoluntariadoPage() {
       setImprimindoRelatorio(true);
       setMensagem(null);
       setPopupImprimirAberto(false);
-      janela = reservarJanelaRelatorio(
-        tipo === "ficha" ? "Gerando ficha cadastral" : "Gerando termo de voluntariado"
-      );
+      janela = reservarJanelaRelatorio(tipo === "ficha" ? "Gerando ficha cadastral" : tipo === "termo" ? "Gerando termo de voluntariado" : "Gerando atestado de atividade voluntária");
       const usuarioEmissor = usuario?.nome || usuario?.nomeUsuario || "Sistema G3-Next";
       const payload = { voluntarioId: idSelecionado, usuarioEmissor };
-      const blob =
-        tipo === "ficha"
-          ? await reportsService.gerarFichaVoluntario(payload)
-          : await reportsService.gerarTermoVoluntariado(payload);
+      let blob: Blob;
+      if (tipo === "ficha") blob = await reportsService.gerarFichaVoluntario(payload);
+      else if (tipo === "termo") blob = await reportsService.gerarTermoVoluntariado(payload);
+      else {
+        const atividades = window.prompt("Descreva as atividades sociais voluntárias realizadas:", "Apoio às atividades sociais e atendimento aos beneficiários.");
+        const responsavelNome = window.prompt("Nome do diretor(a) ou coordenador(a) que assinará:", "");
+        const responsavelCargo = window.prompt("Cargo do responsável pela assinatura:", "Diretor(a) ou coordenador(a)");
+        if (!atividades || !responsavelNome || !responsavelCargo) { janela.fechar(); setMensagem({ tipo: "erro", texto: "Informe as atividades e os dados do responsável pela assinatura." }); return; }
+        blob = await reportsService.gerarAtestadoAtividadeVoluntario({ ...payload, situacaoAtividade: "ATUAL", dataInicio: snapshot?.inicio_previsto, atividades, cargaHorariaTotal: snapshot?.carga_horaria_semanal ? `${snapshot.carga_horaria_semanal} horas semanais` : undefined, responsavelNome, responsavelCargo });
+      }
       janela.publicar(blob);
     } catch (error: any) {
       janela?.fechar();
@@ -1019,7 +1023,7 @@ export function CadastroVoluntariadoPage() {
         </div>
       )}
       {popupExcluirAberto && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4" onClick={() => !removerMutation.isPending && setPopupExcluirAberto(false)}><div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}><div className="border-b border-slate-100 px-5 py-4"><h3 className="text-base font-semibold text-slate-900">Confirmar exclusão</h3></div><div className="px-5 py-4"><p className="text-sm text-slate-700">Esta ação é irreversível. Deseja continuar?</p></div><div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3"><Button type="button" variant="outline" onClick={() => setPopupExcluirAberto(false)} disabled={removerMutation.isPending}>Cancelar</Button><Button type="button" variant="danger" onClick={() => void confirmarExclusao()} disabled={removerMutation.isPending}>{removerMutation.isPending ? "Excluindo..." : "Excluir"}</Button></div></div></div>}
-      {popupImprimirAberto && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4" onClick={() => !imprimindoRelatorio && setPopupImprimirAberto(false)}><div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}><div className="border-b border-slate-100 px-5 py-4"><h3 className="text-base font-semibold text-slate-900">Imprimir</h3></div><div className="space-y-3 px-5 py-4"><p className="text-sm text-slate-700">Selecione o documento que deseja emitir.</p><div className="grid gap-2 sm:grid-cols-2"><Button type="button" variant="outline" onClick={() => void imprimirDocumentoVoluntario("ficha")} disabled={imprimindoRelatorio}>Ficha cadastral</Button><Button type="button" variant="outline" onClick={() => void imprimirDocumentoVoluntario("termo")} disabled={imprimindoRelatorio}>Termo de voluntariado</Button></div></div><div className="flex justify-end border-t border-slate-100 px-5 py-3"><Button type="button" variant="outline" onClick={() => setPopupImprimirAberto(false)} disabled={imprimindoRelatorio}>Cancelar</Button></div></div></div>}
+      {popupImprimirAberto && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4" onClick={() => !imprimindoRelatorio && setPopupImprimirAberto(false)}><div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}><div className="border-b border-slate-100 px-5 py-4"><h3 className="text-base font-semibold text-slate-900">Imprimir</h3></div><div className="space-y-3 px-5 py-4"><p className="text-sm text-slate-700">Selecione o documento que deseja emitir.</p><div className="grid gap-2 sm:grid-cols-2"><Button type="button" variant="outline" onClick={() => void imprimirDocumentoVoluntario("ficha")} disabled={imprimindoRelatorio}>Ficha cadastral</Button><Button type="button" variant="outline" onClick={() => void imprimirDocumentoVoluntario("termo")} disabled={imprimindoRelatorio}>Termo de voluntariado</Button><Button type="button" variant="outline" onClick={() => void imprimirDocumentoVoluntario("atestado")} disabled={imprimindoRelatorio}>Atestado de atividade voluntária</Button></div></div><div className="flex justify-end border-t border-slate-100 px-5 py-3"><Button type="button" variant="outline" onClick={() => setPopupImprimirAberto(false)} disabled={imprimindoRelatorio}>Cancelar</Button></div></div></div>}
       {webcamAberta && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4 py-4"

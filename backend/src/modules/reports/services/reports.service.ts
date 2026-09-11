@@ -6,6 +6,7 @@ import { RegistroDoacaoService } from "../../registro-doacao/services/registro-d
 import { DoacaoRealizadaService } from "../../doacoes-realizadas/services/doacao-realizada.service.js";
 import { UnidadeAssistencialService } from "../../unidades-assistenciais/services/unidade-assistencial.service.js";
 import { VoluntarioService } from "../../voluntarios/services/voluntario.service.js";
+import { ProntuarioService } from "../../prontuario/services/prontuario.service.js";
 import { RegistroPontoService } from "../../registro-ponto/services/registro-ponto.service.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { ReportsRepository } from "../repositories/reports.repository.js";
@@ -40,6 +41,8 @@ import {
   termosParceriaRelacaoRequestSchema,
   unidadeAssistencialRelacaoRequestSchema,
   voluntarioFichaRequestSchema,
+  atestadoComparecimentoRequestSchema,
+  atestadoVoluntarioRequestSchema,
   voluntarioRelacaoRequestSchema
 } from "../reports.schema.js";
 
@@ -72,6 +75,7 @@ export class ReportsService {
   private readonly doacaoRealizadaService = new DoacaoRealizadaService();
   private readonly unidadeAssistencialService = new UnidadeAssistencialService();
   private readonly voluntarioService = new VoluntarioService();
+  private readonly prontuarioService = new ProntuarioService();
   private readonly registroPontoService = new RegistroPontoService();
   private readonly repository = new ReportsRepository();
   private readonly template = new RelatorioTemplatePadrao();
@@ -1552,6 +1556,77 @@ export class ReportsService {
       pdf,
       filename: `termo-voluntariado-${voluntario.id_voluntario ?? payload.voluntarioId}.pdf`
     };
+  }
+
+  async gerarAtestadoAtividadeVoluntario(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
+    const payload = atestadoVoluntarioRequestSchema.parse(rawPayload);
+    const voluntario = await this.voluntarioService.buscarPorId(payload.voluntarioId, authUser?.tenant_id);
+    const contexto = await this.montarContextoInstitucional(authUser?.tenant_id);
+    const nome = this.normalizarTexto(voluntario.nome_completo) ?? "voluntário(a) não informado(a)";
+    const instituicao = this.normalizarTexto(contexto.cabecalho.razaoSocial) ?? "instituição não informada";
+    const periodo = this.formatarPeriodoCurso(payload.dataInicio, payload.dataFim) ?? "Período não informado";
+    const status = payload.situacaoAtividade === "ATUAL" ? "está participando" : "participou";
+    const instituicaoDados = await this.repository.obterInstituicaoRelatorio(authUser?.tenant_id);
+    const local = [this.normalizarTexto(instituicaoDados.cidade), this.normalizarTexto(instituicaoDados.uf)].filter(Boolean).join(" / ") || "Local não informado";
+    const relatorioInput: RelatorioHtmlInput = {
+      titulo: "Atestado de atividade voluntária",
+      subtitulo: "Comprovação de atividades sociais realizadas na instituição",
+      descricao: "Documento emitido com base nos registros administrativos do voluntariado da instituição.",
+      metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
+      blocos: [
+        { titulo: "Identificação do voluntário", colunas: 2, destaque: true, campos: [this.campo("Nome completo", nome), this.campo("CPF", voluntario.cpf), this.campo("E-mail", voluntario.email), this.campo("Área de atuação", voluntario.area_interesse)] },
+        { titulo: "Período e atividade", colunas: 3, campos: [this.campo("Situação", payload.situacaoAtividade === "ATUAL" ? "Atividade em andamento" : "Atividade encerrada"), this.campo("Período", periodo), this.campo("Carga horária total", payload.cargaHorariaTotal), this.campo("Frequência", payload.frequencia), this.campo("Modalidade", [voluntario.presencial ? "Presencial" : undefined, voluntario.remoto ? "Remota" : undefined].filter(Boolean).join(" e "))] }
+      ],
+      secoes: [
+        { titulo: "Declaração", conteudo: `Declaramos, para os devidos fins, que ${nome}, inscrito(a) no CPF sob o nº ${this.normalizarTexto(voluntario.cpf) ?? "não informado"}, ${status} em atividades sociais voluntárias junto à ${instituicao}, no período de ${periodo}. As atividades foram desenvolvidas de forma não remunerada, conforme os registros institucionais e os termos firmados entre as partes.` },
+        { titulo: "Atividades realizadas", conteudo: payload.atividades },
+        { titulo: "Observações", conteudo: payload.observacoes ?? "Não informado." },
+        { titulo: "Assinatura institucional", conteudo: `${local}, ____ de __________________ de ______.\n\n[[espaco:3.8]]\n_______________________________________________________________\n${payload.responsavelNome}\n${payload.responsavelCargo}\n${instituicao}\n\nEste documento comprova a atividade registrada pela instituição e não substitui documentos específicos exigidos por órgão destinatário.` }
+      ],
+      cabecalho: contexto.cabecalho,
+      rodape: contexto.rodape
+    };
+    const html = this.template.montarHtml(relatorioInput);
+    const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
+    return { html, pdf, filename: `atestado-atividade-voluntaria-${payload.voluntarioId}.pdf` };
+  }
+
+  async gerarAtestadoComparecimento(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
+    const payload = atestadoComparecimentoRequestSchema.parse(rawPayload);
+    const contextoProntuario = await this.prontuarioService.obterContexto(payload.beneficiarioId, { id: authUser?.id ?? "", nome: authUser?.nome, nomeUsuario: authUser?.nomeUsuario, permissoes: authUser?.permissoes, tenant_id: authUser?.tenant_id });
+    const beneficiario = contextoProntuario.beneficiario;
+    const atendimento = payload.atendimentoId ? contextoProntuario.atendimentos.find((item) => item.id === payload.atendimentoId) : undefined;
+    if (payload.atendimentoId && !atendimento) throw new AppError("Atendimento não encontrado para o beneficiário no ambiente atual.", 404);
+    const contexto = await this.montarContextoInstitucional(authUser?.tenant_id);
+    const nomeBeneficiario = this.normalizarTexto(beneficiario.nome_completo) ?? "beneficiário(a) não informado(a)";
+    const nomePessoa = payload.tipo === "ACOMPANHANTE" ? payload.nomeAcompanhante! : nomeBeneficiario;
+    const finalidade = payload.finalidade ?? "comprovação de comparecimento e atendimento social";
+    const formatarHora = (valor?: string) => {
+      if (!valor) return undefined;
+      if (/^\d{2}:\d{2}/.test(valor)) return valor.slice(0, 5);
+      const data = new Date(valor);
+      return Number.isNaN(data.getTime()) ? valor : new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }).format(data);
+    };
+    const horario = [formatarHora(payload.horaInicio), formatarHora(payload.horaFim)].filter(Boolean).join(" às ") || "horário não informado";
+    const declaracao = payload.tipo === "ACOMPANHANTE"
+      ? `Declaramos, para os devidos fins, que ${nomePessoa} compareceu à ${contexto.cabecalho.razaoSocial} na condição de acompanhante de ${nomeBeneficiario}, para acompanhamento de atendimento social, em ${this.formatarDataComHifen(payload.dataAtendimento)}, das ${horario}.`
+      : `Declaramos, para os devidos fins, que ${nomeBeneficiario} compareceu e foi atendido(a) pela ${contexto.cabecalho.razaoSocial} em ${this.formatarDataComHifen(payload.dataAtendimento)}, das ${horario}, para ${finalidade}.`;
+    const relatorioInput: RelatorioHtmlInput = {
+      titulo: "Atestado de comparecimento",
+      subtitulo: payload.tipo === "ACOMPANHANTE" ? "Atendimento social — acompanhante" : "Atendimento social — beneficiário",
+      descricao: "Declaração administrativa de presença e atendimento, sem indicação de diagnóstico ou informação clínica.",
+      metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
+      blocos: [
+        { titulo: "Identificação", colunas: 2, destaque: true, campos: [this.campo("Pessoa que compareceu", nomePessoa), this.campo("CPF do beneficiário", beneficiario.cpf), this.campo("Beneficiário atendido", nomeBeneficiario), this.campo("Tipo de declaração", payload.tipo === "ACOMPANHANTE" ? "Acompanhante" : "Beneficiário")] },
+        { titulo: "Dados do comparecimento", colunas: 3, campos: [this.campo("Data", this.formatarDataComHifen(payload.dataAtendimento)), this.campo("Horário", horario), this.campo("Finalidade", finalidade), this.campo("Atendimento registrado", atendimento?.id ? `Nº ${atendimento.id}` : "Não vinculado")] }
+      ],
+      secoes: [{ titulo: "Declaração", conteudo: declaracao }, { titulo: "Assinatura institucional", conteudo: `Local e data: ________________________________\n\n[[espaco:3.8]]\n_______________________________________________________________\n${payload.responsavelNome ?? "Nome do diretor(a) ou coordenador(a)"}\n${payload.responsavelCargo ?? "Diretor(a) ou coordenador(a) da instituição"}\n${contexto.cabecalho.razaoSocial}` }],
+      cabecalho: contexto.cabecalho,
+      rodape: contexto.rodape
+    };
+    const html = this.template.montarHtml(relatorioInput);
+    const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
+    return { html, pdf, filename: `atestado-comparecimento-${payload.tipo.toLowerCase()}-${payload.beneficiarioId}.pdf` };
   }
 
   async gerarRelacaoLivrosBiblioteca(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {

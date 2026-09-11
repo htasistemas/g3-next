@@ -100,6 +100,38 @@ export const voluntarioFichaRequestSchema = z.object({
   usuarioEmissor: optionalString
 });
 
+export const atestadoComparecimentoRequestSchema = z.object({
+  beneficiarioId: z.string().trim().min(1, "beneficiarioId e obrigatorio."),
+  atendimentoId: optionalString,
+  tipo: z.enum(["BENEFICIARIO", "ACOMPANHANTE"]).default("BENEFICIARIO"),
+  nomeAcompanhante: optionalString,
+  dataAtendimento: z.string().trim().min(1, "dataAtendimento e obrigatorio."),
+  horaInicio: optionalString,
+  horaFim: optionalString,
+  finalidade: optionalString,
+  responsavelNome: optionalString,
+  responsavelCargo: optionalString,
+  usuarioEmissor: optionalString
+}).superRefine((data, ctx) => {
+  if (data.tipo === "ACOMPANHANTE" && !data.nomeAcompanhante) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["nomeAcompanhante"], message: "Informe o nome do acompanhante." });
+  }
+});
+
+export const atestadoVoluntarioRequestSchema = z.object({
+  voluntarioId: z.string().trim().min(1, "voluntarioId e obrigatorio."),
+  situacaoAtividade: z.enum(["ATUAL", "ENCERRADA"]).default("ATUAL"),
+  dataInicio: optionalString,
+  dataFim: optionalString,
+  atividades: z.string().trim().min(5, "Informe as atividades realizadas."),
+  cargaHorariaTotal: optionalString,
+  frequencia: optionalString,
+  responsavelNome: z.string().trim().min(3, "Informe o nome do responsável pela assinatura."),
+  responsavelCargo: z.string().trim().min(3, "Informe o cargo do responsável pela assinatura."),
+  observacoes: optionalString,
+  usuarioEmissor: optionalString
+});
+
 export const bibliotecaLivroRelacaoRequestSchema = z.object({
   termo: optionalString,
   usuarioEmissor: optionalString

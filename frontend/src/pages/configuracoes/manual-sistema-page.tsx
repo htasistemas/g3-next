@@ -249,6 +249,7 @@ const secoesManual: ManualSecao[] = [
           "Escolha a especialidade, registre a evolução e use Salvar rascunho para continuar depois.",
           "Finalize somente quando o registro estiver conferido; alterações posteriores devem ser feitas por adendo.",
           "A linha do tempo respeita sigilo e permissões. Clique em um atendimento para consultar os dados completos; registros finalizados ficam somente para visualização e podem ser impressos no padrão de relatório do G3N."
+          ,"Use o botão Atestado de comparecimento para emitir a declaração do beneficiário ou do acompanhante. No modo acompanhante, informe o nome completo da pessoa; o documento permite informar finalidade e responsável pela assinatura e não inclui diagnóstico ou conteúdo clínico."
         ],
         atencoes: ["Os atendimentos são persistidos no PostgreSQL, vinculados ao tenant e auditados por ação."]
       },
@@ -1021,7 +1022,8 @@ const secoesManual: ManualSecao[] = [
           "Ao salvar uma nova escala, confira o modal com ícone de sucesso e o número do cadastro. Clique em Finalizar cadastro para fechar a confirmação.",
           "A mesma aba agora exibe um mapa semanal com todas as escalas cadastradas no sistema, organizado por dia, sala, unidade e horário para facilitar a leitura da ocupação.",
           "A listagem detalhada do voluntário continua disponível abaixo do mapa para editar ou excluir apenas as escalas do cadastro aberto.",
-          "Na aba Listagem de voluntários, use Imprimir para emitir a relação filtrada; nas abas do cadastro selecionado, use Imprimir e escolha entre ficha cadastral ou termo de voluntariado no padrão institucional de relatórios.",
+          "Na aba Listagem de voluntários, use Imprimir para emitir a relação filtrada; nas abas do cadastro selecionado, use Imprimir e escolha entre ficha cadastral, termo de voluntariado ou atestado de atividade voluntária no padrão institucional de relatórios.",
+          "No atestado de atividade voluntária, informe as atividades realizadas e o nome e cargo do diretor(a) ou coordenador(a) que assinará o documento. O atestado registra período, situação, frequência e carga horária informados para comprovação institucional.",
           "Ao concluir o cadastro de um voluntário, confira a confirmação visual com o ícone na cor padrão da unidade e o número do cadastro. Clique em Finalizar cadastro para fechar a mensagem e continuar na tela.",
           "Quando houver foto 3x4, o sistema processa o arquivo antes do salvamento e informa o motivo real caso a imagem não possa ser utilizada.",
           "Em produção, o cadastro foi ajustado para funcionar também em bases legadas que ainda não possuem colunas novas de comunicação na tabela cadastro_voluntario."

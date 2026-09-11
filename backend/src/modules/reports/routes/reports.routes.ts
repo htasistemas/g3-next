@@ -65,6 +65,8 @@ reportsRoutes.post(
   ensurePermissions(permissoesLeitura),
   asyncHandler(controller.termoVoluntariado.bind(controller))
 );
+reportsRoutes.post("/voluntarios/atestado-atividade", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.atestadoAtividadeVoluntario.bind(controller)));
+reportsRoutes.post("/prontuario/atestado-comparecimento", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.atestadoComparecimento.bind(controller)));
 reportsRoutes.post(
   "/biblioteca/livros/relacao",
   ensureAuthenticated,

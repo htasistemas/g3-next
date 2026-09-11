@@ -76,6 +76,18 @@ export class ReportsController {
     return responderRelatorio(response, resultado, formato);
   }
 
+  async atestadoAtividadeVoluntario(request: AuthenticatedRequest, response: Response) {
+    const formato = formatoRelatorioSchema.parse(request.query.formato);
+    const resultado = await service.gerarAtestadoAtividadeVoluntario(request.body, request.authUser);
+    return responderRelatorio(response, resultado, formato);
+  }
+
+  async atestadoComparecimento(request: AuthenticatedRequest, response: Response) {
+    const formato = formatoRelatorioSchema.parse(request.query.formato);
+    const resultado = await service.gerarAtestadoComparecimento(request.body, request.authUser);
+    return responderRelatorio(response, resultado, formato);
+  }
+
   async relacaoLivrosBiblioteca(request: AuthenticatedRequest, response: Response) {
     const formato = formatoRelatorioSchema.parse(request.query.formato);
     const resultado = await service.gerarRelacaoLivrosBiblioteca(request.body, request.authUser);

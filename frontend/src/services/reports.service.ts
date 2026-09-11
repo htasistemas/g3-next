@@ -74,6 +74,16 @@ export const reportsService = {
     return data as Blob;
   },
 
+  async gerarAtestadoAtividadeVoluntario(payload: Record<string, unknown>) {
+    const { data } = await httpClient.post("/api/reports/voluntarios/atestado-atividade", payload, { responseType: "blob" });
+    return data as Blob;
+  },
+
+  async gerarAtestadoComparecimento(payload: Record<string, unknown>) {
+    const { data } = await httpClient.post("/api/reports/prontuario/atestado-comparecimento", payload, { responseType: "blob" });
+    return data as Blob;
+  },
+
   async gerarRelacaoLivrosBiblioteca(payload: Record<string, unknown>) {
     const { data } = await httpClient.post("/api/reports/biblioteca/livros/relacao", payload, {
       responseType: "blob"
